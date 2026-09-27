@@ -148,7 +148,7 @@ describeDb('schema against the database', () => {
     expect(isValidNpi(orgRow.rows[0].npi)).toBe(true);
 
     const sites = await admin.query<{ time_zone: string; n: string }>(
-      `SELECT time_zone, count(*) AS n FROM public.site WHERE organization_id = $1 AND state = 'FL' AND is_test_record GROUP BY 1 ORDER BY 1`,
+      `SELECT time_zone, count(*) AS n FROM public.site WHERE organization_id = $1 AND state = 'FL' AND is_test_record GROUP BY 1 ORDER BY 1 COLLATE "C"`,
       [org],
     );
     expect(sites.rows).toEqual([

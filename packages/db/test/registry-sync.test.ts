@@ -19,7 +19,7 @@ describeDb('registries in step with @deemed/domain', () => {
 
   it('audit.action_registry equals AUDIT_ACTIONS (action, category, description)', async () => {
     const { rows } = await admin.query<{ action: string; category: string; description: string }>(
-      'SELECT action, category, description FROM audit.action_registry ORDER BY action',
+      'SELECT action, category, description FROM audit.action_registry ORDER BY action COLLATE "C"',
     );
     const fromCode = Object.entries(AUDIT_ACTIONS)
       .map(([action, e]) => ({ action, category: e.category, description: e.description }))
@@ -29,7 +29,7 @@ describeDb('registries in step with @deemed/domain', () => {
 
   it('public.approval_area equals PROPOSED_APPROVAL_AREAS and is marked proposed', async () => {
     const { rows } = await admin.query<{ key: string; modules: string[]; status: string }>(
-      'SELECT key, modules, status FROM public.approval_area ORDER BY key',
+      'SELECT key, modules, status FROM public.approval_area ORDER BY key COLLATE "C"',
     );
     expect(Object.fromEntries(rows.map((r) => [r.key, r.modules]))).toEqual(
       Object.fromEntries(Object.entries(PROPOSED_APPROVAL_AREAS).map(([k, v]) => [k, [...v]])),
