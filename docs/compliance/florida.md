@@ -51,6 +51,9 @@ one.
 | `FL-SUNSHINE` | Fla. Stat. ch. 119 (public records) and ch. 286 (open meetings) | Governance, for health centers that are public agencies or public-agency co-applicants | draft |
 | `FL-617` | Florida Not For Profit Corporation Act, Fla. Stat. ch. 617 (§617.0801 board powers, §617.0821 action without a meeting, §617.0825 committees, §617.0832 director conflicts, §617.0840–.0841 officers) | Approvals: who may act for the corporation, committee limits, disinterested-director votes. See `approval-authority.md` §2.3 and §3.1 | draft |
 | `FL-MEDICAID-SIGN` | Fla. Stat. §409.907 and r. 59G-1.060 (Medicaid provider agreement, authorized signer) | Approvals: who signs the Florida Medicaid provider agreement (outside the product) | draft |
+| `FL-MEDICAID-PPS` | AHCA Florida Medicaid FQHC coverage and reimbursement policy (PPS encounter rate, encounter definition, same-day visits, SMMC wraparound or supplemental payments) | Finance & Grants tracking of rates, deadlines, and reconciliation. See `market-requirements.md` MR-5 | draft |
+| `FL-RECORDS` | Fla. Stat. §456.057 and the practice board record rules (for example Fla. Admin. Code 64B8-10.002) | Retention periods. See MR-7 | draft |
+| `FL-TELEHEALTH` | Fla. Stat. §456.47 | Telehealth provider registration and credentialing. See MR-7 | draft |
 
 ## 3. Privacy and breach items (for `security-privacy-officer` and counsel)
 
