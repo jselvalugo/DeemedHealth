@@ -1,0 +1,10 @@
+pnpm-lock.yaml
+node_modules
+dist
+coverage
+.next
+*.md
+# Owned by other agents; they opt in by running `pnpm format` on their package
+# and removing the line here (TODO: platform-devops-engineer to follow up).
+packages/requirements-catalog
+packages/test-fixtures

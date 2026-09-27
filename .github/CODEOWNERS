@@ -1,0 +1,8 @@
+# Default owner: the product owner (roadmap decision D5).
+*                         @jselvalugo
+/.github/                 @jselvalugo
+/scripts/                 @jselvalugo
+/docs/adr/                @jselvalugo
+/docs/security/           @jselvalugo
+/docs/compliance/         @jselvalugo
+/pnpm-lock.yaml           @jselvalugo

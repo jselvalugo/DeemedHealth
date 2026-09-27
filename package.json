@@ -1,0 +1,30 @@
+{
+  "name": "deemed-health",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Deemed Health: FQHC Compliance Software",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.0.0 <23",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc -b --pretty && pnpm -r --if-present typecheck",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:no-ssn": "node scripts/check-no-ssn.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^26.6.3",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.9",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^2.1.9"
+  }
+}
