@@ -134,12 +134,13 @@ export function ApiMfaForm({ locale, expired }: { locale: Locale; expired: boole
 }
 
 /** First sign-in: the user must set up a passkey (preferred) or an authenticator app. */
-export function ApiMfaSetup({ locale, initialCode }: { locale: Locale; initialCode?: string }) {
+export function ApiMfaSetup({ locale }: { locale: Locale }) {
   const tr = (k: Parameters<typeof t>[1]) => t(locale, k);
   const [secret, setSecret] = useState<string | null>(null);
-  // The single-use setup code an administrator sent (invitation or MFA reset). A link
-  // may carry it as ?code=; otherwise the person types it.
-  const [enrollmentToken, setEnrollmentToken] = useState(initialCode ?? '');
+  // The single-use setup code an administrator sent (invitation or MFA reset). The
+  // person types it; it is never read from the URL, where it would end up in browser
+  // history, server and proxy logs, and Referer headers.
+  const [enrollmentToken, setEnrollmentToken] = useState('');
 
   const [keyState, keyAction, keyPending] = useActionState(async (): Promise<AuthFormState> => {
     const options = await apiPost<Parameters<typeof startRegistration>[0]['optionsJSON']>(
