@@ -7,14 +7,21 @@ import { authMode } from './auth-mode';
 import { modulesFromNavigation } from './navigation';
 
 describe('authMode', () => {
-  it('keeps the demo stub only for local or preview without a database', () => {
-    expect(authMode({ DH_ENV: 'local' })).toBe('stub');
-    expect(authMode({ DH_ENV: 'preview' })).toBe('stub');
-    expect(authMode({ DH_ENV: 'local', DATABASE_URL: 'postgres://x' })).toBe('api');
-    expect(authMode({ DH_ENV: 'development' })).toBe('api');
-    expect(authMode({ DH_ENV: 'staging' })).toBe('api');
+  it('uses the demo stub in any non-production environment without a database', () => {
+    for (const env of ['local', 'preview', 'development', 'staging']) {
+      expect(authMode({ DH_ENV: env }), env).toBe('stub');
+      expect(authMode({ DH_ENV: env, DATABASE_URL: '' }), env).toBe('stub');
+    }
+  });
+
+  it('uses the real API whenever DATABASE_URL is set, and always in production', () => {
+    for (const env of ['local', 'preview', 'development', 'staging', 'production']) {
+      expect(authMode({ DH_ENV: env, DATABASE_URL: 'postgres://app_user@db/dh' }), env).toBe('api');
+    }
     expect(authMode({ DH_ENV: 'production' })).toBe('api');
+    // A missing or unknown DH_ENV never gets the demo.
     expect(authMode({})).toBe('api');
+    expect(authMode({ DH_ENV: 'prod' })).toBe('api');
   });
 });
 

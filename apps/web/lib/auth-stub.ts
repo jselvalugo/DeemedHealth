@@ -8,7 +8,7 @@
  *
  * - DH_ENV=production: every action returns { status: 'not_implemented' }. Nobody
  *   can sign in, and no demo code path is reachable.
- * - Outside the stub mode (authMode(): only DH_ENV local or preview without a
+ * - Outside the stub mode (authMode(): a non-production DH_ENV with no
  *   DATABASE_URL) every action also returns "not implemented"; apps/api is used.
  * - In the stub mode: synthetic demo users from auth-demo.ts can sign in so the
  *   shell can be reviewed. auth-demo.ts throws if it is ever called in production.
@@ -32,7 +32,7 @@ import { PENDING_COOKIE, SESSION_COOKIE, cookieOptions } from './session-cookies
 
 const NOT_IMPLEMENTED: AuthFormState = { status: 'not_implemented' };
 
-/** The stub answers only where authMode() selects it (DH_ENV local or preview, no database). */
+/** The stub answers only where authMode() selects it (non-production, no database). */
 function inProduction(): boolean {
   return isProduction(process.env.DH_ENV) || authMode() !== 'stub';
 }

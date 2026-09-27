@@ -230,6 +230,8 @@ export const en = {
     'We couldn’t confirm this request came from Deemed Health. Reload the page and try again.',
   'apiError.payload_too_large': 'That is too large to send. Try a smaller file or less text.',
   'apiError.unsupported': 'This option isn’t available for your account.',
+  'apiError.not_configured':
+    'This environment isn’t connected to its database yet. Try again later.',
   'apiError.internal':
     'Something went wrong on our side. Try again. If it keeps happening, contact support with the reference number.',
 } as const;

@@ -35,6 +35,7 @@ export const API_ERROR_CODES = [
   'csrf_failed',
   'payload_too_large',
   'unsupported',
+  'not_configured',
   'internal',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

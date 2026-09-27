@@ -28,6 +28,7 @@ export const STATUS: Record<ApiErrorCode, number> = {
   csrf_failed: 403,
   payload_too_large: 413,
   unsupported: 400,
+  not_configured: 503,
   internal: 500,
 };
 

@@ -1,16 +1,21 @@
 /**
- * Which sign-in backend the web app uses (phase-1 plan S3, frontend task):
+ * Which sign-in backend the web app uses:
  *
- *   api   the real apps/api sessions, MFA, and RBAC. Every environment with a
- *         database, and always in development, staging, and production.
- *   stub  the synthetic S1 demo (auth-stub.ts), ONLY for DH_ENV local or preview
- *         when no DATABASE_URL is configured, so the shell can still be reviewed.
+ *   api   the real apps/api sessions, MFA, and RBAC, whenever DATABASE_URL is set,
+ *         and always when DH_ENV is production (or missing or unknown).
+ *   stub  the synthetic S1 demo (auth-stub.ts) in any NON-production environment
+ *         without a database, so a site with no database yet (the development site
+ *         while Netlify DB is pending) keeps working.
  */
+import { DH_ENVS, isProduction } from '@deemed/domain';
+
 export type AuthMode = 'api' | 'stub';
 
 export function authMode(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): AuthMode {
-  const stubAllowed = env['DH_ENV'] === 'local' || env['DH_ENV'] === 'preview';
-  return stubAllowed && !env['DATABASE_URL'] ? 'stub' : 'api';
+  const dhEnv = env['DH_ENV'];
+  const known = dhEnv !== undefined && (DH_ENVS as readonly string[]).includes(dhEnv);
+  if (!known || isProduction(dhEnv)) return 'api';
+  return env['DATABASE_URL'] ? 'api' : 'stub';
 }

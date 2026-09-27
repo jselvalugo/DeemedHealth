@@ -232,6 +232,8 @@ export const es: Record<keyof typeof en, string> = {
   'apiError.payload_too_large':
     'Es demasiado grande para enviarlo. Pruebe con un archivo más pequeño o menos texto.',
   'apiError.unsupported': 'Esta opción no está disponible para su cuenta.',
+  'apiError.not_configured':
+    'Este entorno aún no está conectado a su base de datos. Intente más tarde.',
   'apiError.internal':
     'Algo salió mal de nuestro lado. Intente de nuevo. Si sigue ocurriendo, comuníquese con soporte e indique el número de referencia.',
 };

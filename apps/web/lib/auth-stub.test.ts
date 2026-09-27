@@ -80,7 +80,10 @@ describe('auth stub in production', () => {
 });
 
 describe('auth stub outside production (synthetic demo)', () => {
-  beforeEach(() => vi.stubEnv('DH_ENV', 'local'));
+  beforeEach(() => {
+    vi.stubEnv('DH_ENV', 'development');
+    vi.stubEnv('DATABASE_URL', '');
+  });
 
   it('validates the email without revealing whether an account exists', async () => {
     expect(await actions.startSignIn(IDLE, form({ email: '' }))).toMatchObject({
@@ -138,5 +141,26 @@ describe('auth stub outside production (synthetic demo)', () => {
     jar.set('dh_demo_session', 'demo-compliance');
     expect(await redirectOf(actions.signOut())).toBe('/sign-in?reason=signed-out');
     expect(jar.size).toBe(0);
+  });
+});
+
+describe('auth stub when a database is configured (real API mode)', () => {
+  beforeEach(() => {
+    vi.stubEnv('DH_ENV', 'development');
+    vi.stubEnv('DATABASE_URL', 'postgres://app_user@db.example/dh');
+  });
+
+  it('refuses every demo sign-in step and never reads a demo session', async () => {
+    const valid = form({
+      email: 'demo@xyz-chc.test',
+      password: 'long-enough-password',
+      code: '000000',
+    });
+    expect(await actions.startSignIn(IDLE, valid)).toEqual({ status: 'not_implemented' });
+    expect(await actions.signInWithPassword(IDLE, valid)).toEqual({ status: 'not_implemented' });
+    expect(await actions.verifyMfaCode(IDLE, valid)).toEqual({ status: 'not_implemented' });
+    jar.set('dh_demo_session', 'demo-compliance');
+    // The API is not reachable here (no DH_API_URL), so nobody is signed in.
+    expect(await session.getCurrentUser()).toBeNull();
   });
 });

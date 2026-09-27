@@ -3,5 +3,6 @@ export { buildApp, type BuildAppOptions } from './app.js';
 export { createApi } from './create.js';
 export { ConfigError, loadApiConfig, type ApiConfig } from './config.js';
 export { createFetchHandler, type FetchHandlerOptions } from './adapters/fetch.js';
+export { createApiHandler, type RequestHandler } from './entry.js';
 export { ROUTES, ROUTE_IDS, requiredCases, type RouteId, type RouteSpec } from './manifest.js';
 export type { AppServices, RequestContext } from './context.js';

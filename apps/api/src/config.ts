@@ -29,13 +29,21 @@ const Env = z.object({
 
 export class ConfigError extends Error {
   override name = 'ConfigError';
+
+  /** Names of the variables at fault (never their values). */
+  constructor(
+    message: string,
+    readonly names: readonly string[] = [],
+  ) {
+    super(message);
+  }
 }
 
 export function loadApiConfig(env: Record<string, string | undefined>): ApiConfig {
   const parsed = Env.safeParse(env);
   if (!parsed.success) {
     const names = [...new Set(parsed.error.issues.map((i) => String(i.path[0])))].sort();
-    throw new ConfigError(`invalid or missing configuration: ${names.join(', ')}`);
+    throw new ConfigError(`invalid or missing configuration: ${names.join(', ')}`, names);
   }
   const e = parsed.data;
   if (isProduction(e.DH_ENV)) {
@@ -45,11 +53,14 @@ export function loadApiConfig(env: Record<string, string | undefined>): ApiConfi
       'DH_ENV=production requires the KMS key provider (S6); DH_DEV_ROOT_KEY is refused',
     );
   }
-  if (!e.DH_DEV_ROOT_KEY)
-    throw new ConfigError('invalid or missing configuration: DH_DEV_ROOT_KEY');
+  if (!e.DH_DEV_ROOT_KEY) {
+    throw new ConfigError('invalid or missing configuration: DH_DEV_ROOT_KEY', ['DH_DEV_ROOT_KEY']);
+  }
   const root = Buffer.from(e.DH_DEV_ROOT_KEY, 'base64');
   if (root.length < 32) {
-    throw new ConfigError('invalid or missing configuration: DH_DEV_ROOT_KEY (32+ bytes, base64)');
+    throw new ConfigError('invalid or missing configuration: DH_DEV_ROOT_KEY (32+ bytes, base64)', [
+      'DH_DEV_ROOT_KEY',
+    ]);
   }
   const origin = new URL(e.DH_PUBLIC_ORIGIN);
   const insecure = e.DH_INSECURE_COOKIES === '1';
