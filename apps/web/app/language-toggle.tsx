@@ -1,36 +1,41 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import type { Locale } from '@deemed/i18n';
+import { LOCALES, type Locale } from '@deemed/i18n';
+import { cn } from '@deemed/ui';
+import { setLocaleCookie } from '../lib/locale-client';
 
-const OPTIONS: { value: Locale; label: string }[] = [
-  { value: 'en', label: 'EN' },
-  { value: 'es', label: 'ES' },
-];
+const LABELS: Record<Locale, { short: string; name: string }> = {
+  en: { short: 'EN', name: 'English' },
+  es: { short: 'ES', name: 'Español' },
+};
 
 export function LanguageToggle({ locale, label }: { locale: Locale; label: string }) {
   const router = useRouter();
 
   function choose(next: Locale) {
-    document.cookie = `dh_lang=${next}; path=/; max-age=31536000; samesite=lax; secure`;
+    setLocaleCookie(next);
     router.refresh();
   }
 
   return (
-    <div role="group" aria-label={label} className="border-gray-200 flex rounded-md border">
-      {OPTIONS.map((o) => (
+    <div role="group" aria-label={label} className="flex rounded-control border border-gray-500">
+      {LOCALES.map((l) => (
         <button
-          key={o.value}
+          key={l}
           type="button"
-          aria-pressed={locale === o.value}
-          onClick={() => choose(o.value)}
-          className={
-            locale === o.value
-              ? 'bg-navy-900 text-white px-3 py-1 text-sm font-semibold'
-              : 'text-gray-700 px-3 py-1 text-sm'
-          }
+          lang={l}
+          aria-pressed={locale === l}
+          aria-label={LABELS[l].name}
+          onClick={() => choose(l)}
+          className={cn(
+            'focus-ring min-h-10 min-w-10 px-3 text-sm first:rounded-l-control last:rounded-r-control',
+            locale === l
+              ? 'bg-navy-900 font-semibold text-white'
+              : 'text-gray-700 hover:bg-gray-100',
+          )}
         >
-          {o.label}
+          {LABELS[l].short}
         </button>
       ))}
     </div>

@@ -1,0 +1,194 @@
+/*
+ * Deemed Health design tokens (docs/brand/design-system.md §1–§3, §7).
+ *
+ * This is the ONLY file in the repository that may hold color literals. Components
+ * use the Tailwind utilities mapped in `@theme` below (bg-navy-900, text-teal-700,
+ * bg-status-warn-bg, …). A test (packages/ui/src/tokens.test.ts) fails the build
+ * when a hex value appears anywhere else in packages/ui or apps/web.
+ *
+ * Import after `@import 'tailwindcss';` in the app's global stylesheet.
+ */
+:root {
+  /* Brand (sampled from assets/brand/deemed-health-logo.png) */
+  --dh-navy-900: #043262;
+  --dh-navy-700: #0a4a85;
+  --dh-blue-700: #034491;
+  --dh-blue-600: #0462b6;
+  --dh-blue-50: #e8f3fd;
+  --dh-sky-500: #0ba1f1;
+  --dh-teal-800: #0a6e61;
+  --dh-teal-700: #0b7e6f;
+  --dh-teal-500: #0eac97;
+  --dh-teal-400: #18b29e;
+  --dh-teal-50: #e7f7f4;
+
+  /* Neutrals (white-based UI) */
+  --dh-white: #ffffff;
+  --dh-gray-25: #f8fafc;
+  --dh-gray-50: #f1f5f9;
+  --dh-gray-100: #eef2f6;
+  --dh-gray-200: #e2e8f0;
+  --dh-gray-500: #64748b;
+  --dh-gray-700: #334155;
+  --dh-gray-900: #0f172a;
+
+  /*
+   * Status. `*-icon` is the glyph color (3:1 against its background), `*-text`
+   * the label color (4.5:1), `*-bg` the badge fill. Never use color alone.
+   */
+  /* teal-700 on teal-50 is 4.496:1 (just under AA), so badge text uses teal-800. */
+  --dh-status-ok-icon: var(--dh-teal-700);
+  --dh-status-ok-text: var(--dh-teal-800);
+  --dh-status-ok-bg: var(--dh-teal-50);
+  --dh-status-warn-icon: #b7791f;
+  --dh-status-warn-text: #8a5a00;
+  --dh-status-warn-bg: #fef6e7;
+  --dh-status-critical-icon: #c2410c;
+  --dh-status-critical-text: #b91c1c;
+  --dh-status-critical-bg: #fdecec;
+  --dh-status-info-icon: var(--dh-blue-600);
+  --dh-status-info-text: var(--dh-blue-600);
+  --dh-status-info-bg: var(--dh-blue-50);
+  --dh-status-neutral-icon: var(--dh-gray-500);
+  --dh-status-neutral-text: var(--dh-gray-700);
+  --dh-status-neutral-bg: var(--dh-gray-50);
+
+  /* Preview banner (non-production only) */
+  --dh-preview-fg: #8a5a00;
+  --dh-preview-bg: #fff4db;
+
+  /* Focus: 2px sky-500 ring, 2px offset filled with navy so it clears 3:1 on white. */
+  --dh-focus-ring: var(--dh-sky-500);
+  --dh-focus-ring-inner: var(--dh-navy-900);
+
+  /* Structure */
+  --dh-bar-divider: rgb(255 255 255 / 0.15);
+  --dh-overlay: rgb(4 50 98 / 0.35);
+  --dh-shadow-modal: 0 24px 48px -12px rgb(4 50 98 / 0.25);
+  --dh-gradient-brand: linear-gradient(160deg, #0ba1f1 0%, #0462b6 55%, #034491 100%);
+}
+
+/* Drop Tailwind's default palette so only brand tokens are available. */
+@theme {
+  --color-*: initial;
+}
+
+@theme inline {
+  --color-navy-900: var(--dh-navy-900);
+  --color-navy-700: var(--dh-navy-700);
+  --color-blue-700: var(--dh-blue-700);
+  --color-blue-600: var(--dh-blue-600);
+  --color-blue-50: var(--dh-blue-50);
+  --color-sky-500: var(--dh-sky-500);
+  --color-teal-800: var(--dh-teal-800);
+  --color-teal-700: var(--dh-teal-700);
+  --color-teal-500: var(--dh-teal-500);
+  --color-teal-400: var(--dh-teal-400);
+  --color-teal-50: var(--dh-teal-50);
+  --color-white: var(--dh-white);
+  --color-gray-25: var(--dh-gray-25);
+  --color-gray-50: var(--dh-gray-50);
+  --color-gray-100: var(--dh-gray-100);
+  --color-gray-200: var(--dh-gray-200);
+  --color-gray-500: var(--dh-gray-500);
+  --color-gray-700: var(--dh-gray-700);
+  --color-gray-900: var(--dh-gray-900);
+  --color-status-ok-icon: var(--dh-status-ok-icon);
+  --color-status-ok-text: var(--dh-status-ok-text);
+  --color-status-ok-bg: var(--dh-status-ok-bg);
+  --color-status-warn-icon: var(--dh-status-warn-icon);
+  --color-status-warn-text: var(--dh-status-warn-text);
+  --color-status-warn-bg: var(--dh-status-warn-bg);
+  --color-status-critical-icon: var(--dh-status-critical-icon);
+  --color-status-critical-text: var(--dh-status-critical-text);
+  --color-status-critical-bg: var(--dh-status-critical-bg);
+  --color-status-info-icon: var(--dh-status-info-icon);
+  --color-status-info-text: var(--dh-status-info-text);
+  --color-status-info-bg: var(--dh-status-info-bg);
+  --color-status-neutral-icon: var(--dh-status-neutral-icon);
+  --color-status-neutral-text: var(--dh-status-neutral-text);
+  --color-status-neutral-bg: var(--dh-status-neutral-bg);
+  --color-preview-fg: var(--dh-preview-fg);
+  --color-preview-bg: var(--dh-preview-bg);
+  --color-bar-divider: var(--dh-bar-divider);
+  --color-overlay: var(--dh-overlay);
+
+  --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
+  --font-serif: 'Source Serif 4 Variable', 'Source Serif 4', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-modal: 14px;
+
+  --shadow-modal: var(--dh-shadow-modal);
+
+  --animate-launcher-in: dh-launcher-in 200ms ease-out;
+  --animate-fade-in: dh-fade-in 200ms ease-out;
+}
+
+@keyframes dh-launcher-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dh-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Visible focus for every interactive element (§ Rules: 2px sky-500, 2px offset). */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--dh-focus-ring);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--dh-focus-ring-inner);
+  }
+}
+
+/* Inset variant for full-height items inside clipped containers (module bar tabs). */
+@utility focus-ring-inset {
+  &:focus-visible {
+    outline: 2px solid var(--dh-focus-ring);
+    outline-offset: -4px;
+  }
+}
+
+@utility bg-brand-gradient {
+  background-image: var(--dh-gradient-brand);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--dh-white);
+    color: var(--dh-gray-700);
+    font-family: var(--font-sans);
+  }
+  :focus-visible {
+    outline: 2px solid var(--dh-focus-ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
