@@ -1,6 +1,6 @@
 # ADR-0012: Platform operator console and customer-approved support access
 
-- Status: **Proposed**
+- Status: **Accepted** (@jselvalugo, 2026-09-27; roadmap D10)
 - Date: 2026-09-27
 - Owner: `suite-architect`
 - Reviewers required: `security-privacy-officer` (HIPAA guardrails, RBAC, audit),
@@ -263,6 +263,6 @@ them): `support_access_grant`, `support_access_event_summary`, `tenant_feature_f
 
 ## Status
 
-Proposed by `suite-architect` on 2026-09-27. Needs review by `security-privacy-officer`,
-`data-architect`, `platform-devops-engineer`, and `hrsa-regulatory-analyst`, and
-acceptance by the product owner (@jselvalugo) as roadmap decision D10.
+Accepted by the product owner (@jselvalugo) on 2026-09-27 as roadmap decision D10.
+Implementation PRs still need reviews by `security-privacy-officer`, `data-architect`,
+`platform-devops-engineer`, and `hrsa-regulatory-analyst`.
