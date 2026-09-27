@@ -10,3 +10,9 @@ Planned first records:
 - `0002-tenancy-and-row-level-security.md`
 - `0003-requirements-catalog-versioning.md`
 - `0004-ai-gateway-and-guardrails.md`
+- `0005-hosting-environments-and-regions.md`
+- `0006-identity-sso-mfa.md`
+- `0007-encryption-and-key-management.md`
+- `0008-audit-log.md`
+
+All eight must be Accepted before gate G0 in `docs/product/implementation-roadmap.md`.

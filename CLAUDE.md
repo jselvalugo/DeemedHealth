@@ -38,6 +38,7 @@ Logo: `assets/brand/deemed-health-logo.png`. Tagline: "FQHC Compliance Software"
 | `.claude/agents/` | Subagent definitions (one file per role — see roster below) |
 | `docs/brand/design-system.md` | Colors, type, tokens, and the app shell (header, module bar, launcher) |
 | `docs/product/module-map.md` | The module and page registry — the single source for navigation |
+| `docs/product/implementation-roadmap.md` | Build phases and the security/compliance gates each one must pass before real data is allowed |
 | `docs/compliance/hrsa-requirements-framework.md` | HRSA requirements mapped to modules, evidence, and cadences |
 | `docs/adr/` | Architecture Decision Records (`NNNN-title.md`) |
 | `assets/brand/` | Logo and brand assets |
