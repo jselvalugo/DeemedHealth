@@ -74,4 +74,4 @@ Restrict creations to maintainers, Restrict updates, Restrict deletions, Require
 
 | Date | Applied by | Notes |
 | --- | --- | --- |
-| | | |
+| 2026-09-27 | @jselvalugo | `main` ruleset active: no deletions or force pushes, signed commits, PR required with **0 approvals** (single maintainer; raise to 1 when a second maintainer joins), squash only, required checks `lint-typecheck-test`, `dependency-review`, `secret-scan`, `codeql`, up to date. Secret scanning push protection and Dependabot alerts/updates on. Default branch changed to `main`; the merged `claude/keen-thompson-pl5cu2` branch deleted |
