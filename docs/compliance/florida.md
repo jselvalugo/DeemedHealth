@@ -69,9 +69,10 @@ agent deadline.
   public minutes rules sit on top of Compliance Manual Ch. 19. Model them as
   applicability on the organization.
 
-## 5. Open questions (owner: @jselvalugo)
+## 5. Decisions (2026-09-27, owner @jselvalugo)
 
-- Should the UI add Haitian Creole after English and Spanish?
-- Which pilot health centers are §330 recipients and which are Look-Alikes?
-- Are any pilot health centers public agencies or public-agency co-applicants?
-  If so, the Sunshine Law items apply.
+| # | Question | Decision |
+| --- | --- | --- |
+| FL-D1 | Languages | Follow language-access guidelines, with **English as the default**. The UI ships in English, with Spanish available as planned. Haitian Creole is not added to the staff-facing UI. Patient-facing outputs (grievance forms, survey text, notices) follow the language-access guidance that applies to the health center (HHS Section 1557 and Title VI limited-English-proficiency guidance, to verify), which the health center configures |
+| FL-D2 | §330 recipient vs. Look-Alike | Unknown for the pilot. Build and verify applicability for **both** award types to the compliance standards. Neither type is blocked from the pilot, but a tenant's award type still cannot be provisioned until its catalog entries are verified |
+| FL-D3 | Public agency or co-applicant | Unknown. Model it as an organization setting that onboarding asks about (default: not a public agency). When it is on, the `FL-SUNSHINE` items and the public-agency governance rules apply |

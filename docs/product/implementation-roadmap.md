@@ -349,8 +349,9 @@ BAA, with tight limits.
   summary, the penetration test summary with fix status, the subprocessor list,
   and answers to its security questionnaire. The pilot agreement states that
   SOC 2 Type I is in progress.
-- Pilot scope: MVP modules only; the Deemed Assistant is off. Pilot health
-  centers may be §330 recipients only if Look-Alike entries are not yet verified.
+- Pilot scope: MVP modules only; the Deemed Assistant is off. Both §330
+  recipients and Look-Alikes may join (FL-D2), once their award type's catalog
+  entries are verified.
 - Data loaded through the audited importer with a dry run. PHI allowed only in
   FTCA incidents and claims, and only if the health center opts in.
 - Weekly review with each pilot health center: accuracy of readiness statuses,
@@ -474,8 +475,8 @@ Where each baseline control is first built and where it is proven.
 ### Open questions
 
 For `hrsa-regulatory-analyst`:
-- Which Look-Alike differences affect the MVP modules? (Applicability ships in
-  the MVP; the pilot may be §330-only.) How the board-composition waiver applies to
+- Which Look-Alike differences affect the MVP modules? Applicability for both
+  award types ships in the MVP (Florida decision FL-D2). How the board-composition waiver applies to
   Look-Alikes needs HRSA project officer confirmation.
 - The re-credentialing and re-privileging interval. Planned approach: store it as
   a health-center policy parameter, with the Compliance Manual's example interval
