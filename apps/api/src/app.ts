@@ -15,14 +15,7 @@
  * their own transaction or they roll back. Errors use the stable model in errors.ts.
  */
 import { randomUUID } from 'node:crypto';
-import {
-  AuthError,
-  SESSION_POLICY,
-  csrfTokenFor,
-  isUuid,
-  safeEqual,
-  type ActiveSession,
-} from '@deemed/auth';
+import { AuthError, SESSION_POLICY, isUuid, safeEqual, type ActiveSession } from '@deemed/auth';
 import { appendAuditEvent, type Actor } from '@deemed/db';
 import {
   activeRoleIds,
@@ -143,7 +136,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     const token = readCookie(req.headers.cookie, names.session);
     let session: ActiveSession;
     try {
-      session = await services.auth.authenticate(token, ctx.meta);
+      session = await services.auth.authenticate(token, ctx.meta, {
+        rotate: MUTATING.has(req.method),
+      });
     } catch (error) {
       if (error instanceof AuthError && token)
         reply.header('set-cookie', clearCookie(names.session, services.secureCookies));
@@ -161,9 +156,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       );
     }
     if (MUTATING.has(req.method)) {
-      // The CSRF token is derived from the token the client held when it sent the request.
+      // Per-session CSRF token (stable across rotation), plus the origin check above.
       const presented = headerValue(req, 'x-csrf-token') ?? '';
-      if (!token || !safeEqual(presented, csrfTokenFor(token))) throw new ApiError('csrf_failed');
+      if (!safeEqual(presented, session.csrfToken)) throw new ApiError('csrf_failed');
     }
     const bundle = await services.database.withTenant(
       session.organizationId,

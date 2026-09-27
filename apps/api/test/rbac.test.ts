@@ -11,6 +11,7 @@ import {
   XYZ_REQ,
   auditFor,
   createUser,
+  nextCode,
   signIn,
   startApi,
   stepUp,
@@ -270,14 +271,23 @@ defineRouteTests('admin.roles.grant', {
         site_id: { before: null, after: S2 },
       },
     });
-    // Rotation on privilege change: the grantee's next request gets a new token.
-    const next = await clients.target.get('/api/me');
-    expect(next.statusCode).toBe(200);
+    // The grantee's roles apply on the next request; the token rotates on the next
+    // request the browser sends itself (a mutation), and the CSRF token stays valid.
+    const read = await clients.target.get('/api/me');
+    expect(read.json().roles).toEqual(['board_liaison', 'staff_provider']);
+    expect(clients.target.sessionToken).toBe(before);
+    const write = await clients.target.post('/api/auth/reauth/totp', {
+      code: nextCode(api, users.target),
+    });
+    expect(write.statusCode).toBe(200);
     expect(clients.target.sessionToken).not.toBe(before);
-    expect(next.json().roles).toEqual(['board_liaison', 'staff_provider']);
+    expect((await auditFor(api, write)).map((e) => e.action)).toEqual([
+      'session.rotated',
+      'session.reauth',
+    ]);
     const stale = await new Client(api).get('/api/me', { cookie: `__Host-dh_session=${before}` });
     expect(stale.statusCode).toBe(401);
-    clients.target.csrf = next.json().csrfToken;
+    expect((await clients.target.get('/api/me')).statusCode).toBe(200);
   },
   deniedRole: async () => {
     await fresh('staff');

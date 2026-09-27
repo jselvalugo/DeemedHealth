@@ -49,11 +49,11 @@ describe('tokens', () => {
     expect(isUuid(ORG.toUpperCase())).toBe(false);
   });
 
-  it('derive a CSRF token that changes with the session token', () => {
-    const a = issueToken(ORG).token;
-    const b = issueToken(ORG).token;
-    expect(csrfTokenFor(a)).toBe(csrfTokenFor(a));
-    expect(csrfTokenFor(a)).not.toBe(csrfTokenFor(b));
+  it('derive a CSRF token per session that needs the server key', () => {
+    const key = randomBytes(32);
+    expect(csrfTokenFor(key, ORG)).toBe(csrfTokenFor(key, ORG));
+    expect(csrfTokenFor(key, ORG)).not.toBe(csrfTokenFor(key, OTHER));
+    expect(csrfTokenFor(randomBytes(32), ORG)).not.toBe(csrfTokenFor(key, ORG));
   });
 });
 

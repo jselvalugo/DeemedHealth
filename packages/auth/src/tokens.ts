@@ -5,7 +5,7 @@
  * the API open the tenant transaction before it looks the token up under RLS; a forged
  * id only makes the lookup miss. Only SHA-256(token) is stored.
  */
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const VERSION = 'v1';
 const SECRET_BYTES = 32;
@@ -63,12 +63,13 @@ export function parseToken(
 }
 
 /**
- * Per-session CSRF token (ADR-0010 section 1): derived from the session token, so it
- * needs no storage and changes when the session rotates. The browser receives it in
- * the body of GET /api/me and sends it back as `x-csrf-token`.
+ * Per-session CSRF token (ADR-0010 section 1): an HMAC of the session id under a
+ * server key, so it needs no storage, cannot be forged without the key, and survives
+ * token rotation. The browser receives it in the body of GET /api/me (and at sign-in)
+ * and sends it back as `x-csrf-token` on every mutation.
  */
-export function csrfTokenFor(sessionToken: string): string {
-  return sha256(`csrf|${sessionToken}`).toString('base64url');
+export function csrfTokenFor(key: Buffer, sessionId: string): string {
+  return createHmac('sha256', key).update(`csrf|${sessionId}`).digest('base64url');
 }
 
 export function safeEqual(a: string, b: string): boolean {

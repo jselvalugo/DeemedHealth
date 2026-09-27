@@ -14,6 +14,7 @@
  *    as the state change it describes. Unknown emails leave no audit row (there is no
  *    tenant), and they are throttled exactly like known ones.
  */
+import { hkdfSync } from 'node:crypto';
 import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   appendAuditEvent,
@@ -206,12 +207,21 @@ export class AuthService {
   readonly clock: Clock;
   private readonly secretKey: SecretBoxKey;
   private readonly webauthn: WebAuthnConfig;
+  private readonly csrfKey: Buffer;
 
   constructor(options: AuthServiceOptions) {
     this.db = options.db;
     this.clock = options.clock ?? systemClock;
     this.secretKey = options.secretKey;
     this.webauthn = options.webauthn;
+    this.csrfKey = Buffer.from(
+      hkdfSync('sha256', options.secretKey.root, Buffer.alloc(0), 'dh:csrf:v1', 32),
+    );
+  }
+
+  /** The CSRF token of a session (stable across token rotation). */
+  csrfToken(sessionId: string): string {
+    return csrfTokenFor(this.csrfKey, sessionId);
   }
 
   /** Decrypts a TOTP secret; null when the envelope does not open (wrong key or tenant). */
@@ -516,7 +526,7 @@ export class AuthService {
     );
     return {
       token: issued.token,
-      csrfToken: csrfTokenFor(issued.token),
+      csrfToken: this.csrfToken(sessionId),
       sessionId,
       organizationId: attempt.organizationId,
       userAccountId: account.id,
@@ -807,7 +817,11 @@ export class AuthService {
    * still active, rotation after a privilege change. Throws `unauthenticated` or
    * `session_expired`; expiry is revoked and audited before the error is thrown.
    */
-  async authenticate(token: string | undefined, meta: RequestMeta): Promise<ActiveSession> {
+  async authenticate(
+    token: string | undefined,
+    meta: RequestMeta,
+    options: { rotate?: boolean } = {},
+  ): Promise<ActiveSession> {
     const parsed = parseToken(token);
     if (!parsed) throw new AuthError('unauthenticated');
     const now = this.clock.now();
@@ -837,7 +851,10 @@ export class AuthService {
         }
         let current = token as string;
         let rotated = false;
-        if (row.rotateRequired) {
+        // Pending rotation happens on a request whose response reaches the browser
+        // (mutations are always sent by the browser itself); server-side reads from
+        // apps/web could not pass a new cookie on.
+        if (row.rotateRequired && options.rotate) {
           const next = issueToken(row.organizationId);
           await tx
             .update(schema.session)
@@ -865,7 +882,7 @@ export class AuthService {
           id: row.id,
           token: current,
           rotated,
-          csrfToken: csrfTokenFor(current),
+          csrfToken: this.csrfToken(row.id),
           organizationId: row.organizationId,
           userAccountId: account.id,
           personId: account.personId,
