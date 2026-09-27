@@ -14,9 +14,8 @@
   (audit log, redaction, export), ADR-0011 (names), ADR-0012 (support grants scope by
   record type), ADR-0013 (feature flags)
 - Related decisions: D1 (no SSN), D4 (Florida only), D9 (synthetic data only), D13
-  (executives approve only within their own area; row pending merge on
-  `claude/accept-d10-d11`, research in `docs/compliance/approval-authority.md` on
-  `claude/approval-authority-research`, not yet on `main`)
+  (executives approve only within their own area, accepted; research in
+  `docs/compliance/approval-authority.md`)
 - Amends, on acceptance: `docs/product/module-map.md` (new "Record types" section and
   record routes), `docs/brand/design-system.md` §5 (DataTable, Drawer, Timeline become
   `RecordTable`, `RecordPage`, `RecordForm`), `docs/data/erd.md` (row version, archive

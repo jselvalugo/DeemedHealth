@@ -1,6 +1,6 @@
 # ADR-0013: Environment management
 
-- Status: **Proposed**
+- Status: **Accepted** (@jselvalugo, 2026-09-27; roadmap D11)
 - Date: 2026-09-27
 - Owners: `suite-architect`, `platform-devops-engineer`
 - Reviewers required: `data-architect` (migrations, seed, parity), `security-privacy-officer`
@@ -161,6 +161,6 @@ schema version; catalog bundle version; Node version; `DH_ENV` equal to the data
 
 ## Status
 
-Proposed by `suite-architect` on 2026-09-27. Needs review by `platform-devops-engineer`,
-`data-architect`, `security-privacy-officer`, and `qa-test-engineer`, and acceptance by the
-product owner (@jselvalugo) as roadmap decision D11.
+Accepted by the product owner (@jselvalugo) on 2026-09-27 as roadmap decision D11.
+Implementation PRs still need reviews by `platform-devops-engineer`, `data-architect`,
+`security-privacy-officer`, and `qa-test-engineer`.
