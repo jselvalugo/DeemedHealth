@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next';
-import { securityHeaders } from './lib/security-headers';
+import { headerRules } from './lib/security-headers';
 
 // Netlify hosts non-production only (ADR-0009). Refuse a production build there.
 if (process.env.NETLIFY === 'true' && process.env.DH_ENV === 'production') {
@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   env: { DH_API_URL: apiUrl },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return headerRules();
   },
   // Local development only: the browser calls /api/* on the web origin (same-origin
   // cookies), and Next forwards it to apps/api. Netlify serves /api/* with the function.

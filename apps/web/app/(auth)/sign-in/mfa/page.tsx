@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { isProduction } from '@deemed/domain';
 import { t } from '@deemed/i18n';
 import { verifyMfaCode, verifyPasskey } from '../../../../lib/auth-stub';
@@ -16,14 +17,16 @@ export default async function MfaPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const params = await searchParams;
+  // The setup code is typed, never taken from the URL (history, logs, Referer). A link
+  // that still carries one comes back to the same step without it; the value is ignored.
+  if (params.code !== undefined) {
+    redirect(params.setup === '1' ? '/sign-in/mfa?setup=1' : '/sign-in/mfa');
+  }
   const locale = await getLocale();
   if (authMode() === 'api') {
     const pending = await hasPendingSignIn();
-    const params = await searchParams;
-    if (pending && params.setup === '1') {
-      const code = typeof params.code === 'string' ? params.code : undefined;
-      return <ApiMfaSetup locale={locale} {...(code ? { initialCode: code } : {})} />;
-    }
+    if (pending && params.setup === '1') return <ApiMfaSetup locale={locale} />;
     return <ApiMfaForm locale={locale} expired={!pending} />;
   }
   // In production the stubs answer "not implemented", so show the form rather than

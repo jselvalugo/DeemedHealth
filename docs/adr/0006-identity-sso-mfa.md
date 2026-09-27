@@ -77,3 +77,10 @@ outside the center's directory.
 ## Open items
 - Identity vendor vs. library choice (with ADR-0001/0005).
 - Confirm idle-timeout values with pilot customers' own policies.
+- **Shared rate-limit store before production scales out.** The API's request rate
+  limits (global per client and tighter on sign-in steps, keyed by IPv4 address or
+  IPv6 /64) count in each process's memory. A shared store (for example Redis) is
+  required before production runs more than one API task, or each task grants its
+  own budget. Sign-in throttling and lockout do not depend on it: they live in
+  PostgreSQL (`platform.auth_throttle`, on the database clock). Tracked in the Phase 1
+  plan, S9.

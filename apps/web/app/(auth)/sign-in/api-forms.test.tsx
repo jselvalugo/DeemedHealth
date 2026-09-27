@@ -51,10 +51,12 @@ async function passwordStep() {
     'maria.delgado@xyz-chc.example',
   );
   await user.click(screen.getByRole('button', { name: 'Continue' }));
+  // The email step is an async action: wait for the password field it reveals.
+  const password = await screen.findByLabelText('Password');
   // No SSO button until the OIDC connector ships; no demo hint against the real API.
   expect(screen.queryByRole('button', { name: /single sign-on/ })).toBeNull();
   expect(screen.queryByText(/Preview only/)).toBeNull();
-  await user.type(screen.getByLabelText('Password'), 'violet tram under glass 42');
+  await user.type(password, 'violet tram under glass 42');
   await user.click(screen.getByRole('button', { name: 'Sign in with password' }));
   return user;
 }

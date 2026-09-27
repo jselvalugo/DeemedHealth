@@ -22,7 +22,7 @@ export interface ColumnEntry {
   display?: 'shown' | 'masked' | 'hidden';
   /**
    * Free text people type (reasons, comments). It may hold anything, so it is PII and
-   * the audit diff keeps only its length and SHA-256 (ADR-0008 section 5).
+   * the audit diff keeps only its length and a per-tenant HMAC (ADR-0008 section 5).
    */
   freeText?: boolean;
 }

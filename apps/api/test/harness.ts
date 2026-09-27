@@ -34,7 +34,12 @@ export interface TestApi {
   close(): Promise<void>;
 }
 
-export async function startApi(): Promise<TestApi> {
+/**
+ * `dhEnv` defaults to 'local'. 'production' builds the app as production would run it
+ * (the config loader still refuses production until S6; buildApp itself does not), to
+ * test production-only behavior such as what an MFA reset returns.
+ */
+export async function startApi(options: { dhEnv?: string } = {}): Promise<TestApi> {
   const c = need();
   // Seeded grants start at seed time (real clock); run the fake clock a little later.
   const clock = new FakeClock(new Date(Date.now() + 5 * 60_000));
@@ -49,7 +54,7 @@ export async function startApi(): Promise<TestApi> {
     database,
     auth,
     clock,
-    dhEnv: 'local',
+    dhEnv: options.dhEnv ?? 'local',
     allowedOrigins: [ORIGIN],
     secureCookies: true,
     // Rate limits are tested on their own (src/rate-limit.test.ts).
@@ -240,6 +245,21 @@ export async function createUser(
     await setup.close();
   }
   return { organizationId, userAccountId, personId, email, enrollmentToken: enrollment.token };
+}
+
+/**
+ * Throttling runs on the database clock (migration 0006), so the fake clock cannot end
+ * a lock. This ages the given keys' rows instead, as if `seconds` had passed on the
+ * server; other tests' keys are left alone.
+ */
+export async function ageThrottle(api: TestApi, keys: Buffer[], seconds: number): Promise<void> {
+  await api.admin.query(
+    `UPDATE platform.auth_throttle
+     SET window_started_at = window_started_at - make_interval(secs => $2),
+         locked_until = locked_until - make_interval(secs => $2)
+     WHERE key_hash = ANY ($1::bytea[])`,
+    [keys, seconds],
+  );
 }
 
 /** The next valid code, moving the fake clock one TOTP step so codes never replay. */

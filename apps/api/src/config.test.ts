@@ -1,4 +1,5 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
+import { TEXT_DIGEST_KEY_ID, textDigest, textDigestKey } from '@deemed/auth';
 import { describe, expect, it } from 'vitest';
 import { redactedDiff } from './audit.js';
 import { ConfigError, isCanonicalKey32, loadApiConfig } from './config.js';
@@ -113,17 +114,28 @@ describe('redactedDiff (ADR-0008 section 5)', () => {
     });
   });
 
-  it('keeps only the length and SHA-256 of free-text reasons', () => {
-    const diff = redactedDiff('public.role_assignment', null, {
-      role_key: 'finance',
-      grant_reason: 'Covering for María Delgado while on leave',
-    }) as { fields: Record<string, { after: Record<string, unknown> }> };
-    expect(JSON.stringify(diff)).not.toContain('María');
-    expect(diff.fields.grant_reason?.after).toEqual({
+  it('keeps only the length and a keyed digest of free-text reasons, never a plain hash', () => {
+    const reason = 'Covering for María Delgado while on leave';
+    const row = { role_key: 'finance', grant_reason: reason };
+    type Diff = { fields: Record<string, { after: Record<string, unknown> }> };
+    // Without a tenant key: the length only.
+    const bare = redactedDiff('public.role_assignment', null, row) as Diff;
+    expect(bare.fields.grant_reason?.after).toEqual({ redacted: true, length: 41 });
+    // With one: an HMAC under that key, and the key id.
+    const key = textDigestKey(Buffer.alloc(32, 1), '0f000000-0000-4000-8000-000000000001');
+    const keyed = redactedDiff('public.role_assignment', null, row, {
+      digest: (text) => textDigest(key, text),
+      keyId: TEXT_DIGEST_KEY_ID,
+    }) as Diff;
+    expect(keyed.fields.grant_reason?.after).toEqual({
       redacted: true,
       length: 41,
-      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      hmac_sha256: textDigest(key, reason),
+      digest_key: TEXT_DIGEST_KEY_ID,
     });
+    const text = JSON.stringify(keyed);
+    expect(text).not.toContain('María');
+    expect(text).not.toContain(createHash('sha256').update(reason).digest('hex'));
   });
 
   it('refuses columns and tables missing from the column registry', () => {

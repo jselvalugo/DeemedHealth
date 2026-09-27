@@ -13,7 +13,8 @@ import {
   recordFailure,
   type ThrottleState,
 } from './throttle.js';
-import { csrfTokenFor, isUuid, issueToken, parseToken } from './tokens.js';
+import { TEXT_DIGEST_KEY_ID, textDigest, textDigestKey } from './text-digest.js';
+import { csrfTokenFor, isUuid, issueToken, parseToken, sha256 } from './tokens.js';
 import { generateTotp, isTotpFormat, newTotpSecret, totpStep, verifyTotp } from './totp.js';
 
 const ORG = '0f000000-0000-4000-8000-000000000001';
@@ -158,8 +159,49 @@ describe('throttling with a fake clock (ADR-0006 rule 11)', () => {
 
   it('keys by email and IP prefix, never by the raw value', () => {
     expect(accountKey('A@B.example').hash.equals(accountKey(' a@b.example ').hash)).toBe(true);
-    expect(ipPrefix('2001:db8:1:2:3:4:5:6')).toBe('2001:db8:1:2');
+    expect(ipPrefix('2001:db8:1:2:3:4:5:6')).toBe('2001:db8:1:2::/64');
     expect(ipPrefix('::ffff:192.0.2.7')).toBe('192.0.2.7');
     expect(ipKey('192.0.2.7').hash).toHaveLength(32);
+  });
+
+  it('normalizes IPv6 to its /64, whatever the spelling (compressed, case, zeros, zone)', () => {
+    const net = '2001:db8:0:0::/64';
+    for (const spelling of [
+      '2001:db8::1',
+      '2001:db8::ffff:2',
+      '2001:DB8:0:0:1:2:3:4',
+      '2001:0db8:0000:0000:0000:0000:0000:0001',
+      '2001:db8:0:0::',
+    ]) {
+      expect(ipPrefix(spelling), spelling).toBe(net);
+    }
+    // Compressed forms used to keep the whole address (every host its own key).
+    expect(ipKey('2001:db8::1').hash).toEqual(ipKey('2001:db8::2').hash);
+    // Another /64 is another key; a group after `::` is not part of the prefix.
+    expect(ipPrefix('2001:db8:0:1::1')).toBe('2001:db8:0:1::/64');
+    expect(ipPrefix('2001:db8::1:0:0:1')).toBe(net);
+    expect(ipPrefix('::1')).toBe('0:0:0:0::/64');
+    expect(ipPrefix('fe80::1%eth0')).toBe('fe80:0:0:0::/64');
+    expect(ipPrefix('64:ff9b::192.0.2.1')).toBe('64:ff9b:0:0::/64');
+    // IPv4-mapped, dotted or hex, is the IPv4 address.
+    expect(ipPrefix('::ffff:c000:207')).toBe('192.0.2.7');
+    expect(ipPrefix(' 192.0.2.7 ')).toBe('192.0.2.7');
+    expect(ipPrefix('not-an-address')).toBe('not-an-address');
+  });
+});
+
+describe('free-text digests (security re-review N4)', () => {
+  const root = Buffer.alloc(32, 9);
+  const text = 'lost phone, identity confirmed in person';
+  it('are a per-tenant HMAC: stable in a tenant, unrelated across tenants, not a plain hash', () => {
+    const a = textDigestKey(root, ORG);
+    const b = textDigestKey(root, '0f000000-0000-4000-8000-000000000002');
+    expect(textDigest(a, text)).toBe(textDigest(textDigestKey(root, ORG), text));
+    expect(textDigest(a, text)).toMatch(/^[0-9a-f]{64}$/);
+    expect(textDigest(a, text)).not.toBe(textDigest(b, text));
+    expect(textDigest(a, text)).not.toBe(sha256(text).toString('hex'));
+    // Another root key (another environment) gives another digest.
+    expect(textDigest(textDigestKey(Buffer.alloc(32, 8), ORG), text)).not.toBe(textDigest(a, text));
+    expect(TEXT_DIGEST_KEY_ID).toBe('tenant-hkdf-v1');
   });
 });

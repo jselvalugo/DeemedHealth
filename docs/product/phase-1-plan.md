@@ -308,6 +308,7 @@ G1-15 internal security review.
 | `backend-engineer` | Tasks service and API; Approval service rejecting non-human actors and pinning the approved version | CLAUDE.md architectural rules, ERD | Service and API tests incl. four RBAC cases; AI/service actor approval rejected; version mismatch rejected |
 | `backend-engineer` + `integrations-engineer` | Notifications: in-app store, email port with a capture adapter in non-production; template lint forbids PII fields other than recipient name | Roadmap §4 notifications row | No template can reference a restricted field (test); nothing is delivered outside production |
 | `platform-devops-engineer` | Scheduled function deploy, alert on tick failures in the dev site logs | ADR-0010 §3 | Tick runs on the dev site; failures visible |
+| `backend-engineer` + `security-privacy-officer` | Production delivery of MFA setup codes. An invitation or an administrator's MFA reset issues a single-use enrollment code (S3, `auth.enrollment_token`); outside production `admin.mfa.reset` returns it for synthetic personas, and in production it returns none (tested in S3). Deliver it out of band through the notification service to the user's own verified work email (template without other PII), or in person, and send the user the reset notice ADR-0006 rule 11 requires (today the audit event records it as pending) | ADR-0006 rules 3, 11; S3 enrollment tokens | Production MFA reset and invitation deliver the code only through the notification service (test with the capture adapter); no API response or log carries a code in production (test); delivery and the user notice are audited; the invitation endpoint (S7) uses the same path |
 
 ### S6 · Evidence store and field encryption
 
@@ -424,6 +425,7 @@ G1-15 internal security review.
 | `platform-devops-engineer` | IaC modules and policy-as-code checks in CI | ADR-0005, ADR-0007, ADR-0008 §9 | Checks fail on an unencrypted bucket, missing rotation, or public access |
 | `platform-devops-engineer` | Deploy the `dh-nonprod` evidence bucket and KMS key; set `DH_EVIDENCE_STORE=s3` on Netlify | ADR-0010 §4 | Synthetic upload works on the dev site; nightly configuration test passes on the deployed account |
 | `security-privacy-officer` | Review key policies and bucket policies | ADR-0007 rule 5 | Verdict recorded |
+| `platform-devops-engineer` + `backend-engineer` | Shared store for the API rate limiter (for example ElastiCache Redis). Today the limits count in each process's memory, keyed by IPv4 address or IPv6 /64; sign-in lockout is already shared (PostgreSQL) | ADR-0006 open items; S3 rate limiting | Required before production runs more than one API task: the limiter uses the shared store in production, and a test with two app instances on one store sees one budget |
 
 ### S10 · G1 closure
 
