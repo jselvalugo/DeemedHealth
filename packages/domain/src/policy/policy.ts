@@ -214,9 +214,15 @@ export function navigationFor<P extends NavigablePage, M extends NavigableModule
   modules: readonly M[],
   now: Date,
 ): { id: ModuleId; pages: P[] }[] {
-  const permissions = effectivePermissions(principal, now);
+  // Per grant: a role's module permission opens a page unless the role excludes it.
+  const roles = activeGrants(principal, now).map(roleOf);
+  const allowed = (page: P) =>
+    roles.some(
+      (role) =>
+        pageAllowed(page, new Set(role.permissions)) && !role.excludedRoutes?.includes(page.route),
+    );
   return modules
     .filter((m) => NAVIGATION_STATUSES.includes(m.status))
-    .map((m) => ({ id: m.id, pages: m.pages.filter((p) => pageAllowed(p, permissions)) }))
+    .map((m) => ({ id: m.id, pages: m.pages.filter(allowed) }))
     .filter((m) => m.pages.length > 0);
 }

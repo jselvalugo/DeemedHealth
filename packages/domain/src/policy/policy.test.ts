@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ROLES, type Permission, type RoleId } from '../permissions.js';
-import { PROPOSED_APPROVAL_AREAS, isSnakeKey } from './approval-areas.js';
+import { APPROVAL_AREAS, isSnakeKey } from './approval-areas.js';
 import {
   activeGrants,
   activeRoleIds,
@@ -44,7 +44,7 @@ function principal(...grants: RoleGrant[]): Principal {
   return { organizationId: ORG, userAccountId: 'u', personId: ME, grants };
 }
 
-const ctx = (now = T0): PolicyContext => ({ now, approvalAreas: PROPOSED_APPROVAL_AREAS });
+const ctx = (now = T0): PolicyContext => ({ now, approvalAreas: APPROVAL_AREAS });
 const record = (siteId: string | null, owners?: string[]) => ({
   organizationId: ORG,
   siteId,
@@ -53,7 +53,7 @@ const record = (siteId: string | null, owners?: string[]) => ({
 
 describe('grants', () => {
   it('ignore unknown roles, future, expired, and revoked grants (deny by default)', () => {
-    expect(grantInactiveReason(grant('org_admin'), T0)).toBe('unknown_role');
+    expect(grantInactiveReason(grant('ghost_role'), T0)).toBe('unknown_role');
     expect(grantInactiveReason(grant('finance', { validFrom: at(1) }), T0)).toBe('not_started');
     expect(grantInactiveReason(grant('finance', { expiresAt: T0 }), T0)).toBe('expired');
     expect(grantInactiveReason(grant('finance', { revokedAt: at(-0.5) }), T0)).toBe('revoked');
@@ -62,7 +62,7 @@ describe('grants', () => {
       allowed: false,
       reason: 'no_active_role',
     });
-    expect(authorize(principal(grant('org_admin')), 'admin:read', undefined, ctx())).toEqual({
+    expect(authorize(principal(grant('ghost_role')), 'admin:read', undefined, ctx())).toEqual({
       allowed: false,
       reason: 'no_active_role',
     });
@@ -175,6 +175,7 @@ describe('authorize', () => {
     ['finance', 'scope:read', 'scope:write'],
     ['staff_provider', 'learning:read_own', 'learning:write'],
     ['auditor', 'readiness:export', 'readiness:write'],
+    ['org_admin', 'admin:write', 'readiness:read'],
   ];
   it.each(perRole)('%s: allows %s, denies %s', (role, yes, no) => {
     const end = role === 'auditor' ? { expiresAt: at(10) } : {};
@@ -222,6 +223,30 @@ describe('navigationFor', () => {
     expect(navigationFor(principal(), modules, T0)).toEqual([]);
   });
 
+  it('shows the health center administrator only the Administration pages D15 names', () => {
+    const adminModule = {
+      id: 'admin' as const,
+      status: 'mvp',
+      pages: [
+        '/admin/users',
+        '/admin/org',
+        '/admin/integrations',
+        '/admin/catalog',
+        '/admin/audit',
+        '/admin/support-access',
+      ].map((route) => ({ id: route, route, permission: 'admin:read' as Permission })),
+    };
+    const orgAdmin = principal(grant('org_admin'));
+    expect(
+      navigationFor(orgAdmin, [adminModule], T0).map((m) => [m.id, m.pages.map((p) => p.route)]),
+    ).toEqual([
+      ['admin', ['/admin/users', '/admin/org', '/admin/integrations', '/admin/support-access']],
+    ]);
+    // Another role that holds admin:read still sees every page.
+    const both = principal(grant('org_admin'), grant('compliance_officer'));
+    expect(navigationFor(both, [adminModule], T0)[0]?.pages).toHaveLength(6);
+  });
+
   it('follows the clock: an expired grant empties the launcher', () => {
     const p = principal(grant('compliance_officer', { expiresAt: at(1) }));
     expect(navigationFor(p, modules, at(0.5))).toHaveLength(2);
@@ -232,7 +257,7 @@ describe('navigationFor', () => {
 
 describe('approval areas', () => {
   it('use snake_case keys and known modules', () => {
-    for (const key of Object.keys(PROPOSED_APPROVAL_AREAS)) expect(isSnakeKey(key)).toBe(true);
+    for (const key of Object.keys(APPROVAL_AREAS)) expect(isSnakeKey(key)).toBe(true);
     expect(isSnakeKey('Bad-Key')).toBe(false);
     expect(isSnakeKey('')).toBe(false);
     expect(isSnakeKey('9lives')).toBe(false);
