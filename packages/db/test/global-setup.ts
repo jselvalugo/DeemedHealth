@@ -11,7 +11,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import pg from 'pg';
-import type { GlobalSetupContext } from 'vitest/node';
+import type { TestProject } from 'vitest/node';
 import { migrate } from '../src/migrate.js';
 import { GULF_FIXTURE, XYZ_FIXTURE } from '../seed/fixtures.js';
 import { runSeed } from '../seed/seed.js';
@@ -20,7 +20,7 @@ import { acquirePostgres, withDatabase } from './pg-harness.js';
 
 const log = (m: string) => console.log(`[db-tests] ${m}`);
 
-export default async function setup({ provide }: GlobalSetupContext) {
+export default async function setup({ provide }: TestProject) {
   const required = process.env.CI === 'true' || process.env.DH_REQUIRE_DB === '1';
   const acquired = await acquirePostgres(log);
 
