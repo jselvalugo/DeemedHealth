@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "paths": {
+      "@deemed/domain": ["../domain/src/index.ts"]
+    }
+  },
+  "include": ["src", "test", "seed", "scripts", "vitest.config.ts"]
+}

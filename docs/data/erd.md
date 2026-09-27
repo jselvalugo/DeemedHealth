@@ -1,6 +1,11 @@
 # Entity Relationship Diagram: core shared entities
 
-Owner: `data-architect`. Status: draft v0.1 (2026-09-27), Phase 0.
+Owner: `data-architect`. Status: v0.2 (2026-09-27). Phase 1 slice S2 implements
+`organization`, `site`, `person`, `user_account`, `role`, `role_assignment`,
+`requirement_instance` (minimal), `task` (minimal), `approval` (minimal),
+`audit_event`, `chain_head`, and `platform.tenant` in `packages/db/migrations`;
+the other entities below are still design. Column classes are in
+`docs/data/data-dictionary.md` (generated from `packages/db/src/data-dictionary.ts`).
 
 Scope: the shared core only. Module-owned tables (credentialing, enrollment,
 screening, governance, FTCA/risk, scope, contracts, finance, quality,
@@ -10,8 +15,12 @@ experience, learning) attach to `person`, `site`, `requirement_instance`, and
 Conventions that apply to every table below (not repeated in the diagram):
 
 - Every tenant-scoped table has `organization_id uuid NOT NULL` and a forced
-  RLS policy (ADR-0002). Catalog tables (`catalog_release`, `requirement`,
-  `requirement_version`) are global and read-only to tenants.
+  RLS policy on `current_setting('app.organization_id')` (ADR-0002, names per
+  ADR-0011). Child rows reference parents with composite
+  `(organization_id, id)` foreign keys so no row can point into another tenant.
+  Catalog tables (`catalog_release`, `requirement`, `requirement_version`) and
+  `role` are global and read-only to tenants; `platform.tenant` is the
+  cross-tenant registry, reachable only through `app_platform` functions.
 - Business records carry `created_at`, `created_by`, `updated_at`,
   `updated_by`, and `archived_at` (soft delete). Timestamps are UTC.
 - Temporal rows (`staff_assignment`, `provider_profile`, `board_membership`,
@@ -23,7 +32,8 @@ Conventions that apply to every table below (not repeated in the diagram):
   DOB, NPI, and license number.
 - Florida only (D4): addresses are validated to FL; `site.time_zone` is
   `America/New_York` or `America/Chicago`.
-- Audit design is in ADR-0008.
+- Audit design is in ADR-0008; the tables live in schema `audit`
+  (`audit.audit_event`, `audit.chain_head`, `audit.action_registry`).
 
 ```mermaid
 erDiagram
@@ -31,6 +41,12 @@ erDiagram
     organization ||--o{ department : has
     organization ||--o{ person : "employs or engages"
     site ||--o{ department : hosts
+
+    person ||--o{ user_account : "signs in as"
+    user_account ||--o{ role_assignment : holds
+    role ||--o{ role_assignment : "granted as"
+    site |o--o{ role_assignment : "scopes (NULL = all sites)"
+    organization ||--|| tenant : "registered in (platform)"
 
     person ||--o{ staff_assignment : "works as"
     person ||--o| provider_profile : "practices as"
@@ -54,22 +70,30 @@ erDiagram
     workflow_run ||--o{ approval : records
     person ||--o{ task : "assigned to"
     person ||--o{ approval : decides
+    user_account ||--o{ approval : "records (own session only)"
+    task |o--o{ approval : "closed by"
     person ||--o{ notification : receives
 
     organization ||--o{ readiness_snapshot : "trended in"
     catalog_release ||--o{ readiness_snapshot : "evaluated against"
     organization ||--o{ audit_event : "chained in"
-    organization ||--|| audit_chain_head : "head of"
+    organization ||--|| chain_head : "head of"
+    action_registry ||--o{ audit_event : "registers action of"
 
     organization {
         uuid id PK
         text legal_name
-        text award_type "section_330 | look_alike"
+        text award_type "section330 | lookalike (ADR-0011, catalog values)"
         text[] sub_programs "CHC MHC HCH PHPC"
         text grant_number
+        text npi "type 2"
         text time_zone "America/New_York | America/Chicago"
         boolean is_public_agency "FL-D3; turns on FL-SUNSHINE"
+        text address_line1
+        text city
         text state "FL only (D4)"
+        text postal_code "Florida ZIP 32xxx-34xxx"
+        boolean is_test_record
         timestamptz archived_at
     }
     site {
@@ -77,15 +101,54 @@ erDiagram
         uuid organization_id FK
         text name
         text form_5b_site_id "links to Form 5B"
-        text site_type
+        text site_type "service_delivery administrative mobile intermittent seasonal other"
         text address_line1
         text city
         text state "FL"
-        text postal_code
-        text time_zone
+        text postal_code "Florida ZIP"
+        text time_zone "America/New_York | America/Chicago"
         date valid_from
         date valid_to
+        boolean is_test_record
         timestamptz archived_at
+    }
+    user_account {
+        uuid id PK
+        uuid organization_id FK
+        uuid person_id FK
+        text idp_issuer
+        text idp_subject "unique per tenant"
+        text login_email
+        text status "invited active suspended deprovisioned"
+        timestamptz mfa_enrolled_at
+        timestamptz last_login_at
+        boolean is_test_record
+        timestamptz archived_at
+    }
+    role {
+        text key PK "module-map default roles"
+        text name_en
+        text name_es
+        boolean requires_expiry "auditor"
+        interval max_duration "auditor: 30 days"
+    }
+    role_assignment {
+        uuid id PK
+        uuid organization_id FK
+        uuid user_account_id FK
+        text role_key FK
+        uuid site_id FK "NULL = all sites"
+        timestamptz valid_from
+        timestamptz expires_at "required for auditor"
+        timestamptz revoked_at "one-way; never edited in place"
+        uuid revoked_by
+    }
+    tenant {
+        uuid organization_id PK "schema platform"
+        text status "active suspended offboarding"
+        text time_zone
+        boolean is_test_record
+        timestamptz provisioned_at
     }
     department {
         uuid id PK
@@ -106,7 +169,6 @@ erDiagram
         bytea home_address_enc "enc"
         text npi "nullable"
         boolean is_test_record "synthetic seed flag"
-        uuid identity_user_id "SSO account (ADR-0006)"
         timestamptz archived_at
     }
     staff_assignment {
@@ -186,9 +248,11 @@ erDiagram
     requirement_instance {
         uuid id PK
         uuid organization_id FK
-        uuid requirement_version_id FK
-        text subject_type "organization site person contract ..."
+        text requirement_id "catalog requirementId"
+        uuid requirement_version_id FK "FK arrives with catalog tables"
+        text subject_type "S2: organization site person; more per module"
         uuid subject_id
+        uuid site_id FK
         uuid owner_person_id FK
         text status "met due_soon overdue missing not_applicable"
         text not_applicable_reason
@@ -248,20 +312,27 @@ erDiagram
     task {
         uuid id PK
         uuid organization_id FK
-        uuid workflow_run_id FK
+        uuid workflow_run_id FK "arrives with workflow tables"
         uuid requirement_instance_id FK
+        uuid site_id FK
         uuid assignee_person_id FK
         text title
         date due_on
-        text status
+        text status "open in_progress blocked done cancelled"
+        timestamptz completed_at
         timestamptz archived_at
     }
     approval {
         uuid id PK
         uuid organization_id FK
-        uuid workflow_run_id FK
+        uuid workflow_run_id FK "arrives with workflow tables"
+        uuid task_id FK
+        text subject_type
+        uuid subject_id
         uuid approver_person_id FK "human only; AI never approves"
+        uuid approver_user_account_id FK "must be app.actor_id"
         text decision "approved rejected"
+        text[] requirement_ids
         text comment
         timestamptz decided_at
     }
@@ -296,8 +367,8 @@ erDiagram
         bytea prev_hash
         bytea row_hash
     }
-    audit_chain_head {
-        uuid organization_id PK
+    chain_head {
+        uuid organization_id PK "owned by audit_writer"
         bigint chain_seq
         bytea row_hash
     }
@@ -311,9 +382,15 @@ erDiagram
 - `requirement_instance.subject_type/subject_id` is polymorphic; integrity is
   enforced by a check trigger per subject type rather than a foreign key.
   To revisit if it proves fragile.
-- `person.npi` and `provider_profile.npi` overlap; decide in the data
-  dictionary whether NPI lives only on `provider_profile`.
+- `person.npi` and `provider_profile.npi` overlap; decide when
+  `provider_profile` lands whether NPI lives only there (S2 keeps `person.npi`).
+- `person.identity_user_id` was replaced by `user_account.person_id` (S2): one
+  person can hold a sign-in account per identity provider, and the account row
+  carries its own status for SCIM deprovisioning (ADR-0006).
+- `approval` is insert-only for `app_user`; a correction is a new row. A trigger
+  accepts it only when `app.actor_id` is the approver's own active account, so a
+  service or AI session can never record one (product principle 2).
 - Seed NPIs are Luhn-valid (with the `80840` prefix) and rows carry
   `is_test_record = true`.
-- Sensitivity classes per column go in the data dictionary (next deliverable,
-  template from `security-privacy-officer`).
+- Sensitivity classes per column are in `docs/data/data-dictionary.md`; a column
+  without a class fails the `@deemed/db` tests.
