@@ -1,0 +1,20 @@
+{
+  "name": "@deemed/test-fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Synthetic regulatory fixtures for Deemed Health tests. Synthetic data only; never real people or organizations.",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./npi": "./src/npi.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
