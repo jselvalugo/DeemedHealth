@@ -474,6 +474,7 @@ Where each baseline control is first built and where it is proven.
 | D7 | **Develop on Netlify for now.** | Netlify hosts non-production environments only, with synthetic data and the PREVIEW banner (ADR-0009). Production stays on AWS; Netlify never receives customer data |
 | D8 | **Phase 0 approvals.** @jselvalugo is the HIPAA security officer and privacy officer; ADR-0001 to ADR-0008 are accepted; risk analysis v1, threat model v1, policies (including sanctions), data classification, and the subprocessor list are signed. | G0 still needs: AWS BAA accepted, workforce training recorded, branch protection on, and catalog sources verified |
 | D3 | **Engage legal counsel on every item listed under "For legal counsel" below.** | Counsel's written conclusions are filed before the gate that depends on each: BAA, terms, and state breach law before G4; NPDB/CVO role before any feature that queries NPDB for a customer; FTCA claim handling before G3; state Medicaid screening before G5. Until counsel answers, the conservative default in each item stays in force |
+| D9 | **Phase 1 starts before G0 closes (AWS BAA, training record, source verification), synthetic data only; G0 must close before G1.** | Phase 1 runs on Netlify (ADR-0009, ADR-0010) with synthetic data only, in parallel with the open G0 items. No G1 checkbox is signed until G0 is closed. Plan: `docs/product/phase-1-plan.md` |
 
 ### Open questions
 
