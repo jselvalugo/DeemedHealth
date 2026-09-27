@@ -11,6 +11,7 @@ export {
 export { BREACHED_PASSWORDS, isBreachedPassword } from './breached-passwords.js';
 export { open as openSecret, seal as sealSecret, type SecretBoxKey } from './secret-box.js';
 export { csrfTokenFor, isUuid, issueToken, parseToken, safeEqual, sha256 } from './tokens.js';
+export { TEXT_DIGEST_KEY_ID, textDigest, textDigestKey } from './text-digest.js';
 export {
   generateTotp,
   isTotpFormat,

@@ -32,7 +32,8 @@ import { verifyPassword } from './password.js';
 import { SESSION_POLICY } from './policy.js';
 import { open, seal, type SecretBoxKey } from './secret-box.js';
 import { accountKey, ipKey, type ThrottleKey } from './throttle.js';
-import { csrfTokenFor, issueToken, parseToken, sha256 } from './tokens.js';
+import { TEXT_DIGEST_KEY_ID, textDigest, textDigestKey } from './text-digest.js';
+import { csrfTokenFor, issueToken, parseToken } from './tokens.js';
 import { newTotpSecret, totpUri, verifyTotp } from './totp.js';
 import {
   passkeyAuthenticationOptions,
@@ -211,6 +212,7 @@ export class AuthService {
   private readonly secretKey: SecretBoxKey;
   private readonly webauthn: WebAuthnConfig;
   private readonly csrfKey: Buffer;
+  private readonly textDigestKeys = new Map<string, Buffer>();
 
   constructor(options: AuthServiceOptions) {
     this.db = options.db;
@@ -225,6 +227,19 @@ export class AuthService {
   /** The CSRF token of a session (stable across token rotation). */
   csrfToken(sessionId: string): string {
     return csrfTokenFor(this.csrfKey, sessionId);
+  }
+
+  /**
+   * Keyed digest of free text for the audit log: HMAC-SHA256 under this tenant's key,
+   * derived from the root secret (text-digest.ts). Never an unsalted hash.
+   */
+  textDigest(organizationId: string, text: string): string {
+    let key = this.textDigestKeys.get(organizationId);
+    if (!key) {
+      key = textDigestKey(this.secretKey.root, organizationId);
+      this.textDigestKeys.set(organizationId, key);
+    }
+    return textDigest(key, text);
   }
 
   /** Decrypts a TOTP secret; null when the envelope does not open (wrong key or tenant). */
@@ -1375,9 +1390,10 @@ export class AuthService {
         metadata: {
           factors_revoked: factors.length,
           sessions_revoked: sessions.length,
-          // Free text stays out of the log (PII class): length and digest only.
+          // Free text stays out of the log (PII class): length and a keyed digest only.
           reason_length: [...reason].length,
-          reason_sha256: sha256(reason).toString('hex'),
+          reason_hmac_sha256: this.textDigest(ctx.organizationId as string, reason),
+          reason_digest_key: TEXT_DIGEST_KEY_ID,
           user_notification: 'pending (S5 notifications)',
         },
       }),

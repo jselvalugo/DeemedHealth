@@ -13,7 +13,8 @@ import {
   recordFailure,
   type ThrottleState,
 } from './throttle.js';
-import { csrfTokenFor, isUuid, issueToken, parseToken } from './tokens.js';
+import { TEXT_DIGEST_KEY_ID, textDigest, textDigestKey } from './text-digest.js';
+import { csrfTokenFor, isUuid, issueToken, parseToken, sha256 } from './tokens.js';
 import { generateTotp, isTotpFormat, newTotpSecret, totpStep, verifyTotp } from './totp.js';
 
 const ORG = '0f000000-0000-4000-8000-000000000001';
@@ -186,5 +187,21 @@ describe('throttling with a fake clock (ADR-0006 rule 11)', () => {
     expect(ipPrefix('::ffff:c000:207')).toBe('192.0.2.7');
     expect(ipPrefix(' 192.0.2.7 ')).toBe('192.0.2.7');
     expect(ipPrefix('not-an-address')).toBe('not-an-address');
+  });
+});
+
+describe('free-text digests (security re-review N4)', () => {
+  const root = Buffer.alloc(32, 9);
+  const text = 'lost phone, identity confirmed in person';
+  it('are a per-tenant HMAC: stable in a tenant, unrelated across tenants, not a plain hash', () => {
+    const a = textDigestKey(root, ORG);
+    const b = textDigestKey(root, '0f000000-0000-4000-8000-000000000002');
+    expect(textDigest(a, text)).toBe(textDigest(textDigestKey(root, ORG), text));
+    expect(textDigest(a, text)).toMatch(/^[0-9a-f]{64}$/);
+    expect(textDigest(a, text)).not.toBe(textDigest(b, text));
+    expect(textDigest(a, text)).not.toBe(sha256(text).toString('hex'));
+    // Another root key (another environment) gives another digest.
+    expect(textDigest(textDigestKey(Buffer.alloc(32, 8), ORG), text)).not.toBe(textDigest(a, text));
+    expect(TEXT_DIGEST_KEY_ID).toBe('tenant-hkdf-v1');
   });
 });

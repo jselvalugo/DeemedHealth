@@ -3,6 +3,7 @@
  * permission endpoint with its four cases (allowed, denied role, other site, other
  * tenant) plus step-up, and the audit events each outcome writes.
  */
+import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, expect } from 'vitest';
 import { ctx } from '../../../packages/db/test/helpers.js';
 import {
@@ -21,6 +22,9 @@ import {
   retarget,
 } from './harness.js';
 import { defineRouteTests } from './route-tests.js';
+
+/** An unsalted SHA-256, which must never appear in the log (security re-review N4). */
+const plainSha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 
 let api: TestApi;
 let S1: string;
@@ -270,8 +274,21 @@ defineRouteTests('admin.roles.grant', {
       fields: {
         role_key: { before: null, after: 'board_liaison' },
         site_id: { before: null, after: S2 },
+        // Free text: length and a per-tenant HMAC, never the words or a plain SHA-256.
+        grant_reason: {
+          before: null,
+          after: {
+            redacted: true,
+            length: 38,
+            hmac_sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+            digest_key: 'tenant-hkdf-v1',
+          },
+        },
       },
     });
+    const diffText = JSON.stringify(events[0]?.diff);
+    expect(diffText).not.toContain('board packet');
+    expect(diffText).not.toContain(plainSha256('covering the board packet this quarter'));
     // The grantee's roles apply on the next request; the token rotates on the next
     // request the browser sends itself (a mutation), and the CSRF token stays valid.
     const read = await clients.target.get('/api/me');
@@ -506,7 +523,15 @@ defineRouteTests('admin.mfa.reset', {
     ]);
     // The free-text reason never enters the log (PII class): length and digest only.
     expect(JSON.stringify(events)).not.toContain('lost phone');
-    expect(events[1]?.metadata).toMatchObject({ reason_length: 40 });
+    expect(events[1]?.metadata).toMatchObject({
+      reason_length: 40,
+      reason_hmac_sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      reason_digest_key: 'tenant-hkdf-v1',
+    });
+    expect(events[1]?.metadata).not.toHaveProperty('reason_sha256');
+    expect(JSON.stringify(events)).not.toContain(
+      plainSha256('lost phone, identity confirmed in person'),
+    );
     // The target's session ended, and MFA is still mandatory: the next sign-in enrolls again.
     expect((await clients.target.get('/api/me')).statusCode).toBe(401);
     const again = new Client(api);

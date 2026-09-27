@@ -231,7 +231,7 @@ Rules, driven by the sensitivity class in the data dictionary:
 | public, internal | Before and after values in clear |
 | confidential | Before and after values in clear, unless the column is also field-encrypted |
 | PII or PHI that is field-encrypted (DOB, DEA #, home address, narratives) | Never the plaintext and never the ciphertext. A **reference**: key version plus a keyed HMAC of the ciphertext (`enc:v<n>:<hmac>`), so reviewers can see *that* it changed and correlate two events without reading the value. The historical value itself stays in the source table's version history (e.g. `evidence_version`), readable only through an audited reveal |
-| Free-text fields that may contain PHI | `{"redacted": true, "length": n, "sha256": ...}` |
+| Free-text fields that may contain PHI | `{"redacted": true, "length": n, "hmac_sha256": ..., "digest_key": "tenant-hkdf-v1"}`: an HMAC-SHA256 under a per-tenant key derived from the root key (HKDF, salt = organization id), never an unsalted hash, which could be tested against guessed texts. Someone holding the key can recompute it to confirm a known text |
 | Files | Object key, SHA-256, size, MIME type; never the content |
 
 - Redaction happens in the audit middleware from the column registry generated

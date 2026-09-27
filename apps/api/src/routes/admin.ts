@@ -4,6 +4,7 @@
  * same transaction (ADR-0006 rule 10, ADR-0008 `permission` and `auth`), and makes the
  * affected user's sessions rotate their token (rule 4: rotation on privilege change).
  */
+import { TEXT_DIGEST_KEY_ID } from '@deemed/auth';
 import { appendAuditEvent, schema, type TransactionContext, type Tx } from '@deemed/db';
 import {
   GrantRoleRequest,
@@ -56,7 +57,12 @@ function notSelf(h: Helpers, userAccountId: string): void {
   }
 }
 
-function assignmentDiff(before: AssignmentRow | null, after: AssignmentRow) {
+function assignmentDiff(
+  h: Helpers,
+  organizationId: string,
+  before: AssignmentRow | null,
+  after: AssignmentRow,
+) {
   const pick = (r: AssignmentRow | null) =>
     r && {
       role_key: r.roleKey,
@@ -68,7 +74,10 @@ function assignmentDiff(before: AssignmentRow | null, after: AssignmentRow) {
       grant_reason: r.grantReason,
       revoke_reason: r.revokeReason,
     };
-  return redactedDiff('public.role_assignment', pick(before), pick(after));
+  return redactedDiff('public.role_assignment', pick(before), pick(after), {
+    digest: (text) => h.services.auth.textDigest(organizationId, text),
+    keyId: TEXT_DIGEST_KEY_ID,
+  });
 }
 
 export const adminHandlers = {
@@ -147,7 +156,7 @@ export const adminHandlers = {
         txCtx,
         'role.grant',
         created,
-        assignmentDiff(null, created),
+        assignmentDiff(h, txCtx.organizationId as string, null, created),
       );
       return view(created);
     });
@@ -186,7 +195,7 @@ export const adminHandlers = {
         txCtx,
         'role.revoke',
         revoked,
-        assignmentDiff(existing, revoked),
+        assignmentDiff(h, txCtx.organizationId as string, existing, revoked),
       );
       return view(revoked);
     });
