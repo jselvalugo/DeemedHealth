@@ -19,7 +19,9 @@ These values were sampled from `assets/brand/deemed-health-logo.png`.
 | `--dh-blue-600` | `#0462B6` | "D" mark, body | Links, info status, selected row accent |
 | `--dh-sky-500` | `#0BA1F1` | "D" mark, top | Focus ring, highlights, gradient start |
 | `--dh-teal-500` | `#0EAC97` | "Health" wordmark | Success/compliant, "Current" badges, secondary accent |
-| `--dh-teal-400` | `#18B29E` | Checkmark | Checkmark icon, progress fill |
+| `--dh-teal-400` | `#18B29E` | Checkmark | Checkmark icon, progress fill, active tab underline |
+| `--dh-teal-700` | `#0B7E6F` | derived | Teal text on white; teal status glyph on `teal-50` |
+| `--dh-teal-800` | `#0A6E61` | derived | Teal text on `teal-50` (badge labels such as `Current`) |
 | `--dh-teal-50` | `#E7F7F4` | derived | Teal badge background |
 | `--dh-blue-50` | `#E8F3FD` | derived | Info badge background, icon tiles in the launcher |
 
@@ -32,9 +34,10 @@ Brand gradient (logo mark, splash, and empty-state art only):
 | --- | --- | --- |
 | `--dh-white` | `#FFFFFF` | Page background, cards, header |
 | `--dh-gray-25` | `#F8FAFC` | Section wash, table header, launcher column header |
-| `--dh-gray-100` | `#EEF2F6` | Dividers, input backgrounds |
-| `--dh-gray-200` | `#E2E8F0` | Card and input borders |
-| `--dh-gray-500` | `#64748B` | Secondary text, captions, keyboard hints |
+| `--dh-gray-50` | `#F1F5F9` | Neutral status badge background |
+| `--dh-gray-100` | `#EEF2F6` | Dividers, disabled input backgrounds, skeletons |
+| `--dh-gray-200` | `#E2E8F0` | Card borders (decorative; 1.2:1) |
+| `--dh-gray-500` | `#64748B` | Secondary text, captions, keyboard hints, **form input borders** (3:1 boundary, WCAG 1.4.11) |
 | `--dh-gray-700` | `#334155` | Body text |
 | `--dh-gray-900` | `#0F172A` | Strong body text (when navy is too much) |
 
@@ -42,19 +45,36 @@ Brand gradient (logo mark, splash, and empty-state art only):
 
 Status must never be conveyed by color alone. Always pair it with an icon and a label.
 
-| Status | Token | Hex | Label examples |
-| --- | --- | --- | --- |
-| Compliant / on track | `--dh-status-ok` | `#0EAC97` (teal) | Compliant, Clear, Current |
-| Due soon | `--dh-status-warn` | `#B7791F` on `#FEF6E7` | Expires in 30 days |
-| Non-compliant / critical | `--dh-status-critical` | `#C2410C`, `#B91C1C` on `#FDECEC` | Expired, Excluded, Condition |
-| Informational | `--dh-status-info` | `#0462B6` on `#E8F3FD` | Planned, In review |
-| Neutral / not started | `--dh-status-neutral` | `#64748B` on `#F1F5F9` | Not started, N/A |
-| Preview banner | `--dh-preview` | `#8A5A00` on `#FFF4DB` | PREVIEW · Synthetic data only |
+Each status has three tokens: `--dh-status-<s>-icon` (glyph, at least 3:1 on its
+background), `--dh-status-<s>-text` (label, at least 4.5:1), and `--dh-status-<s>-bg`.
+
+| Status | Icon | Text on background | Lucide glyph | Label examples |
+| --- | --- | --- | --- | --- |
+| `ok`: Compliant / on track | `#0B7E6F` (teal-700) | `#0A6E61` (teal-800) on `#E7F7F4` | circle-check | Compliant, Clear, Current |
+| `warn`: Due soon | `#B7791F` | `#8A5A00` on `#FEF6E7` | clock | Expires in 30 days |
+| `critical`: Non-compliant | `#C2410C` | `#B91C1C` on `#FDECEC` | octagon-alert | Expired, Excluded, Condition |
+| `info`: Informational | `#0462B6` | `#0462B6` on `#E8F3FD` | info | Planned, In review |
+| `neutral`: Not started | `#64748B` | `#334155` on `#F1F5F9` | circle-minus | Not started, N/A, No access |
+| Preview banner | `#8A5A00` | `#8A5A00` on `#FFF4DB` | triangle-alert | PREVIEW · Synthetic data only |
 
 Contrast: every text/background pair must meet WCAG 2.1 AA (4.5:1 for body
-text, 3:1 for large text and UI glyphs). `#0EAC97` on white fails for small
-text, so teal text on white uses `--dh-teal-700: #0B7E6F`. Teal fills with
-white text use bold text of 14px or larger.
+text, 3:1 for large text and UI glyphs). `packages/ui/src/tokens.test.ts` checks
+the pairs above. Measured corrections made in S1: `#0EAC97` on white fails for
+small text, so teal text on white uses `--dh-teal-700: #0B7E6F`; `teal-700` on
+`teal-50` is 4.496:1 (just under AA), so badge labels use `teal-800`; `#B7791F`
+on `#FEF6E7` is 3.4:1, so it is used only for the warn glyph; `#64748B` on
+`#F1F5F9` is 4.3:1, so neutral labels use gray-700. Teal fills with white text
+use bold text of 14px or larger.
+
+### Focus
+
+Every interactive element uses the `focus-ring` utility: a 2px sky-500 outline
+with a 2px offset, and the offset band filled with navy-900. Sky-500 alone is
+2.8:1 on white, below the 3:1 that WCAG 1.4.11 asks of a focus indicator, so the
+navy band (12:1 on white) carries the contrast on light surfaces; on the navy
+module bar the sky ring itself is 4.5:1. Full-height items inside clipped
+containers (module bar tabs) use `focus-ring-inset` (the outline drawn 4px
+inside). In forced-colors mode the outline remains.
 
 ## 2. Typography
 
@@ -99,14 +119,17 @@ white canvas.
 ```
 
 ### 4.1 Header (white)
-- Left: the full-color logo, 32px tall, linking to Home (Command Center overview).
+- Left: the full-color logo, 32px tall, linking to Home (Command Center overview,
+  or the user's first permitted page when their role has no Command Center).
 - Search trigger: a pill input, gray-25 fill, with placeholder "Go to a module or
   page", a magnifier icon, and a `Ctrl K` / `⌘ K` keycap. Clicking it opens the
   launcher.
 - Right cluster: the tenant logo(s), then a label pair with eyebrow `HEALTH
   CENTER` over the organization name, then the user chip (initials avatar in
   navy-900, name, role, chevron) that opens the user menu (Profile, Language
-  EN/ES, Switch health center, Sign out).
+  EN/ES, Switch health center, Sign out). Without a tenant logo, a tile with the
+  tenant's initials is shown. Below 1024px the eyebrow and name collapse to the
+  tile, and below 768px the search trigger becomes a 40px icon button.
 
 ### 4.2 Module bar (navy-900)
 - Far left: the **module switcher button**, which shows the white logo mark and a
@@ -114,27 +137,44 @@ white canvas.
 - A vertical divider in `rgb(255 255 255 / 0.15)`.
 - Then the current module's pages as tabs: a Lucide icon plus the label, white at
   80% opacity. The active tab is full white on navy-700 with a 3px teal-400
-  underline.
-- When the tabs overflow, the extra ones go into a "More ▾" menu. The bar never scrolls horizontally.
+  underline and `aria-current="page"`.
+- When the tabs overflow, the extra ones go into a "More ▾" menu. The bar never scrolls
+  horizontally. Widths are measured on a hidden copy of the tabs and recomputed on resize.
+  When the active page is in "More", the More trigger shows the active style.
 
 ### 4.3 Module launcher / command palette (modal)
 This follows the DenialDesk pattern.
-- 960px wide, 14px radius, anchored 80px from the top.
+- 960px wide (at most the viewport minus 64px), 14px radius, anchored 80px from
+  the top. Below 640px it is full-screen and the two columns stack.
 - Top row: a large search input ("Go to a module or page…"), a close ×, and a
   2px sky-500 underline on focus.
 - Column headers MODULE | PAGES in a gray-25 band, 12px uppercase.
 - Each module row has:
   - Left (40%): a 40px icon tile (blue-50 fill, navy icon), the module name
-    (16px/600), a `Current` badge (teal-50 bg, teal-700 text) when it is the
+    (16px/600), a `Current` badge (teal-50 bg, teal-800 text) when it is the
     active module, and a two-line description in gray-500.
   - Right (60%): the module's pages, each shown as a Lucide icon plus a name, one per line.
 - Footer: `N modules · M pages` on the left and `Tab move  Enter open  Esc close` on the right.
 - Typing filters modules and pages together, fuzzy-matched, with the matches highlighted.
-- Keyboard: `Ctrl/⌘ K` opens it, `Esc` closes it, the arrow keys and `Tab` move
-  between items, and `Enter` opens the selection. Focus is trapped inside while
-  it is open and returns to the trigger when it closes.
+- Keyboard: `Ctrl/⌘ K` opens it, `Esc` closes it, the arrow keys and `Tab` /
+  `Shift+Tab` move between items (module, then its pages, then the next module;
+  wrapping), `Page Down` / `Page Up` jump between modules, and `Enter` opens the
+  selection. Focus stays in the search field (combobox with
+  `aria-activedescendant` over a listbox of options grouped per module), so Tab
+  does not reach the close button; `Esc` and the pointer close it. Focus is
+  trapped inside while it is open. On close it returns to the trigger (search
+  button, module switcher, or whatever had focus for `Ctrl K`); after opening a
+  page it moves to `<main>`.
+- The module switcher opens it with the current module's row selected.
+- The footer count is a polite live region, so screen readers hear
+  `N modules · M pages` as the filter changes.
+- Built on Radix Dialog (focus trap, `aria-modal`, Esc, focus return). Matching is
+  case- and accent-insensitive (`modulo` finds `Módulo`) and runs on the names in
+  the current language.
 - The data comes from the module registry (`docs/product/module-map.md` → `packages/ui/module-registry.ts`).
-  Pages the user's role cannot open are left out.
+  Pages the user's role cannot open are left out, and modules left with no pages
+  disappear. `planned` modules never appear. A `<module>:read_own` page (My tasks,
+  My profile, board meeting packets) is also shown to holders of `<module>:read`.
 
 ### 4.4 Home / module overview page
 - Eyebrow line, then the display serif greeting, then a one-sentence description.
@@ -145,32 +185,75 @@ This follows the DenialDesk pattern.
 - KPI tiles for readiness. Each tile shows a value, a label, a status badge, and
   a "View …" link. Tiles never show a number without its denominator (e.g. `117 of 124 providers ready`).
 
+### 4.5 Page states
+Every page designs four states besides the normal one:
+- **Loading:** a skeleton of the page layout (`loading.tsx`) with a visually
+  hidden `role="status"` "Loading…"; the pulse stops under reduced motion.
+- **Empty:** `EmptyState` (gradient disc with a Lucide glyph, title, one
+  sentence, optional action).
+- **Error:** heading (focused on mount), a critical `Alert` with a plain-language
+  next step, and **Try again**. Error details are never shown.
+- **No permission:** `EmptyState` with a lock, the page name, who to ask, and a
+  link to the user's home page, rendered at the same URL (and at `/no-permission`).
+
+### 4.6 Sign-in (outside the shell)
+White canvas, the full-color logo (64px tall) centred above a single card, the
+EN/ES switch at the top right, and the PREVIEW banner above everything. Steps:
+email → single sign-on or password → passkey or authenticator code, plus
+`/sign-in/recovery`. Errors are inline on the field (`aria-invalid`, message
+linked by `aria-describedby`, focus moved to the field) or a form-level `Alert`
+(wrong credentials, locked, not implemented). Messages never reveal whether an
+account exists (ADR-0006 rule 11).
+
 ## 5. Components (in `packages/ui`)
 
-Button (primary navy, secondary outline, ghost, danger) · IconTile · Badge
-(status variants) · Card · StepCard · KpiTile · DataTable (sticky header,
-column filters, CSV export, row actions) · Drawer (record detail) · Tabs ·
-Form controls with inline validation · DatePicker (UTC-safe) · FileDrop (evidence
-upload) · Timeline (audit/history) · EmptyState · Toast · ConfirmDialog
+Built in Phase 1 slice S1 (`packages/ui/src`): Button (primary navy, secondary
+outline, ghost, danger; `loading` keeps focus and uses `aria-disabled`) · Badge
+(status variants) · Card · Input (label, hint, inline error) · Alert · IconTile ·
+Keycap · Eyebrow · Highlight · LogoMark · PreviewBanner · PageHeader · StepCard /
+HowItWorks · EmptyState · Header · ModuleBar · ModuleLauncher · AppShell.
+
+Still to build: KpiTile · DataTable (sticky header, column filters, CSV export,
+row actions) · Drawer (record detail) · Tabs · other form controls with inline
+validation · DatePicker (UTC-safe) · FileDrop (evidence upload) · Timeline
+(audit/history) · Toast · ConfirmDialog
 (for approvals, requires typed reason) · CitationChip (shows `CM Ch.5` and opens
 the requirement drawer) · AssistantPanel (right-side panel, see AI agent).
 
 ## 6. Iconography & imagery
 - Use Lucide icons at a 1.75px stroke. Use 20px icons in navigation and 16px icons inline.
-- Every module has exactly one icon, which the module map assigns.
+- Every module has exactly one icon, which the module map assigns. Page icons are
+  assigned in the registry. Names are the kebab-case Lucide names; `icons.tsx`
+  maps them to components (Lucide 1.x renamed `file-signature` to
+  `file-pen-line`; the map keeps the module-map name).
+- `LogoMark` is an SVG approximation of the "D" mark (D in `currentColor`, cross
+  cut out, teal-400 check) for the white-on-navy module switcher. The full-color
+  logo is `apps/web/public/brand/deemed-health-logo.png`, cropped from
+  `assets/brand/deemed-health-logo.png`. Traced SVG exports (full color,
+  white-on-navy, mark-only) are still to do.
 - There are no stock photos. Illustrations use the brand gradient and simple geometric shapes.
 
 ## 7. Motion
 - 150ms ease-out for hover and focus, and 200ms for the launcher opening (a scale
   from 0.98 plus a fade). Respect `prefers-reduced-motion`.
 
-## 8. Tailwind mapping (sketch)
+## 8. Tailwind mapping
 
-```ts
-colors: {
-  navy:  { 900: '#043262', 700: '#0A4A85' },
-  blue:  { 50: '#E8F3FD', 600: '#0462B6', 700: '#034491' },
-  sky:   { 500: '#0BA1F1' },
-  teal:  { 50: '#E7F7F4', 400: '#18B29E', 500: '#0EAC97', 700: '#0B7E6F' },
-}
+Tailwind v4, CSS-first. `packages/ui/src/tokens.css` is the only file with color
+literals. It defines the `--dh-*` variables, clears Tailwind's default palette
+(`--color-*: initial`), and maps each token in `@theme inline`, so the only color
+utilities are brand ones: `bg-navy-900`, `text-teal-700`, `bg-status-warn-bg`,
+`text-status-critical-text`, `bg-preview-bg`, `bg-overlay`, `bg-bar-divider`, …
+It also defines `rounded-control|card|modal`, `shadow-modal`, `font-sans|serif|mono`,
+`animate-launcher-in|fade-in`, and the `focus-ring`, `focus-ring-inset`, and
+`bg-brand-gradient` utilities. Apps import it after Tailwind and add
+`@source` for `packages/ui/src`:
+
+```css
+@import 'tailwindcss';
+@import '@deemed/ui/tokens.css';
+@source '../../../packages/ui/src';
 ```
+
+A test fails when a hex value appears in `packages/ui/src` or `apps/web` outside
+`tokens.css`. Fonts are self-hosted from `@fontsource` (CSP `font-src 'self'`).
