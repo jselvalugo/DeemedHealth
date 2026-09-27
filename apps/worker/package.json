@@ -1,7 +1,8 @@
 {
-  "name": "@deemed/domain",
+  "name": "@deemed/worker",
   "version": "0.0.0",
   "private": true,
+  "description": "pg-boss workers: screening, expirations, readiness recompute, notifications (ADR-0001).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -14,5 +14,6 @@ Planned first records:
 - `0006-identity-sso-mfa.md`
 - `0007-encryption-and-key-management.md`
 - `0008-audit-log.md`
+- `0009-netlify-for-development-environments.md` (Accepted; amends 0005 for non-production)
 
 All eight must be Accepted before gate G0 in `docs/product/implementation-roadmap.md`.

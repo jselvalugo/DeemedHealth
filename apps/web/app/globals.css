@@ -1,0 +1,57 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens (docs/brand/design-system.md §1). This is the only file that
+ * holds color values; components use the Tailwind utilities mapped below.
+ */
+:root {
+  --dh-navy-900: #043262;
+  --dh-navy-700: #0a4a85;
+  --dh-blue-700: #034491;
+  --dh-blue-600: #0462b6;
+  --dh-sky-500: #0ba1f1;
+  --dh-teal-700: #0b7e6f;
+  --dh-teal-500: #0eac97;
+  --dh-teal-400: #18b29e;
+  --dh-teal-50: #e7f7f4;
+  --dh-blue-50: #e8f3fd;
+
+  --dh-white: #ffffff;
+  --dh-gray-25: #f8fafc;
+  --dh-gray-100: #eef2f6;
+  --dh-gray-200: #e2e8f0;
+  --dh-gray-500: #64748b;
+  --dh-gray-700: #334155;
+  --dh-gray-900: #0f172a;
+
+  --dh-preview-fg: #8a5a00;
+  --dh-preview-bg: #fff4db;
+}
+
+@theme inline {
+  --color-navy-900: var(--dh-navy-900);
+  --color-navy-700: var(--dh-navy-700);
+  --color-blue-700: var(--dh-blue-700);
+  --color-blue-600: var(--dh-blue-600);
+  --color-blue-50: var(--dh-blue-50);
+  --color-sky-500: var(--dh-sky-500);
+  --color-teal-700: var(--dh-teal-700);
+  --color-teal-500: var(--dh-teal-500);
+  --color-teal-400: var(--dh-teal-400);
+  --color-teal-50: var(--dh-teal-50);
+  --color-white: var(--dh-white);
+  --color-gray-25: var(--dh-gray-25);
+  --color-gray-100: var(--dh-gray-100);
+  --color-gray-200: var(--dh-gray-200);
+  --color-gray-500: var(--dh-gray-500);
+  --color-gray-700: var(--dh-gray-700);
+  --color-gray-900: var(--dh-gray-900);
+  --color-preview-fg: var(--dh-preview-fg);
+  --color-preview-bg: var(--dh-preview-bg);
+  --font-sans: Inter, system-ui, sans-serif;
+}
+
+body {
+  background: var(--dh-white);
+  color: var(--dh-gray-700);
+}

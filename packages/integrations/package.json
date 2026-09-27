@@ -1,7 +1,8 @@
 {
-  "name": "@deemed/domain",
+  "name": "@deemed/integrations",
   "version": "0.0.0",
   "private": true,
+  "description": "External source adapters with sandbox and stub paths (ADR-0005 section 5).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

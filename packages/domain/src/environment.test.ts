@@ -4,7 +4,16 @@ import { isProduction, parseDhEnv } from './environment.js';
 describe('DH_ENV', () => {
   it('treats only the exact string "production" as production', () => {
     expect(isProduction('production')).toBe(true);
-    for (const v of [undefined, '', 'Production', 'prod', 'staging', 'preview', 'local']) {
+    for (const v of [
+      undefined,
+      '',
+      'Production',
+      'prod',
+      'staging',
+      'preview',
+      'local',
+      'development',
+    ]) {
       expect(isProduction(v)).toBe(false);
     }
   });
@@ -12,5 +21,6 @@ describe('DH_ENV', () => {
     expect(() => parseDhEnv(undefined)).toThrow();
     expect(() => parseDhEnv('prod')).toThrow();
     expect(parseDhEnv('staging')).toBe('staging');
+    expect(parseDhEnv('development')).toBe('development');
   });
 });

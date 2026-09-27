@@ -1,7 +1,8 @@
 {
-  "name": "@deemed/domain",
+  "name": "@deemed/audit",
   "version": "0.0.0",
   "private": true,
+  "description": "Audit event writer (ADR-0008).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

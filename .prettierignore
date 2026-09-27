@@ -8,3 +8,5 @@ coverage
 # and removing the line here (TODO: platform-devops-engineer to follow up).
 packages/requirements-catalog
 packages/test-fixtures
+next-env.d.ts
+.netlify

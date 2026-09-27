@@ -3,7 +3,15 @@
   "references": [
     { "path": "packages/domain" },
     { "path": "packages/ui" },
+    { "path": "packages/db" },
+    { "path": "packages/dates" },
+    { "path": "packages/jobs" },
+    { "path": "packages/audit" },
+    { "path": "packages/ai-gateway" },
+    { "path": "packages/integrations" },
+    { "path": "packages/i18n" },
+    { "path": "packages/config" },
     { "path": "apps/api" },
-    { "path": "apps/web" }
+    { "path": "apps/worker" }
   ]
 }

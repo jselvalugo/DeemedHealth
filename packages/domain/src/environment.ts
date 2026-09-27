@@ -1,4 +1,8 @@
-export const DH_ENVS = ['local', 'preview', 'staging', 'production'] as const;
+/**
+ * Allowed DH_ENV values. `development` is the shared dev/staging deploy on Netlify
+ * (ADR-0009, non-production only). Only `production` is production.
+ */
+export const DH_ENVS = ['local', 'preview', 'development', 'staging', 'production'] as const;
 export type DhEnv = (typeof DH_ENVS)[number];
 
 /** Anything other than the exact string "production" is non-production (ADR-0005 §5). */
