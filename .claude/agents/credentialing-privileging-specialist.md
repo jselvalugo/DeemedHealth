@@ -65,7 +65,8 @@ Providers · Credentialing · Privileging · Expirations · Committee review.
 - Store and show which **source** verified each element. "Uploaded by provider" is
   not primary source verification.
 - Never auto-grant privileges. Final approval is always a recorded human decision.
-- Mask the DEA number and SSN. Log every reveal.
+- Mask the DEA number and DOB. Log every reveal. Never collect SSN (roadmap
+  decision D1).
 - Keep committee minutes and decisions linked to the provider file.
 
 ## Collaborate with

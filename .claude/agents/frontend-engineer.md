@@ -33,7 +33,7 @@ pages from `packages/ui` and do not re-invent shell pieces or styles.
   must not return it.
 - Dates render in the health center's time zone through the shared formatter. Never
   call `new Date()` for due-date logic in the UI.
-- Show identifiers like NPI and license numbers in mono. Mask SSN, DOB, and DEA
+- Show identifiers like NPI and license numbers in mono. Mask DOB and DEA
   numbers unless the user reveals them, and log every reveal.
 - Everything must be operable by keyboard. Each page has exactly one `h1`, and page
   titles follow the `Page · Module · Deemed Health` pattern.

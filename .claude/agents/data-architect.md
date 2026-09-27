@@ -42,7 +42,9 @@ quality (measure, measure_result, peer_review, uds_period), experience
   allowed through the retention job, and they are audited.
 - Temporal correctness: use `valid_from`/`valid_to` on credentials, memberships, and
   enrollments, and never overwrite history.
-- Sensitive columns (SSN, DOB, DEA #, home address, grievance narrative) use
+- Social Security numbers are not collected (roadmap decision D1). No SSN column
+  exists anywhere.
+- Sensitive columns (DOB, DEA #, home address, grievance narrative) use
   application-level field encryption with a KMS-managed key, and a separate
   hashed column when they must be searchable.
 - Migrations are forward-only, reviewed, and reversible where possible, and they

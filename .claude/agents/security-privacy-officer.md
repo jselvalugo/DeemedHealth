@@ -17,7 +17,7 @@ Health centers trust the suite with their most sensitive operational records.
 - **Tenant isolation:** row-level security in Postgres plus a tenant context check in
   the service layer. Automated tests prove cross-tenant access fails.
 - **Encryption:** TLS 1.2+ everywhere, encryption at rest for the database and
-  object storage, and field-level encryption for SSN, DOB, DEA #, and grievance and
+  object storage, and field-level encryption for DOB, DEA #, and grievance and
   incident narratives. KMS-managed keys, with rotation.
 - **Audit:** the append-only, hash-chained audit log covers auth events, reads of
   sensitive fields ("reveal"), exports, approvals, permission changes, and

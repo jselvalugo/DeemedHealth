@@ -65,9 +65,9 @@ These hold from the first commit and are checked at every gate.
    catalog entries are released to production tenants. `draft` entries exist
    only in non-production environments and in the analyst's review queue. They
    never appear in customer UI, exports, readiness, or AI answers.
-7. **Out of scope until an ADR says otherwise:** patient-level clinical data, EHR
-   patient feeds, 42 CFR Part 2 records, payment card data, and any submission to
-   a government system.
+7. **Out of scope until an ADR says otherwise:** Social Security numbers (see
+   §13, decision D1), patient-level clinical data, EHR patient feeds, 42 CFR Part 2
+   records, payment card data, and any submission to a government system.
 
 ## 3. Phase 0 · Foundations
 
@@ -81,7 +81,7 @@ in Phase 1 is secure by default.
 | `suite-architect` | ADR-0001 stack and repo layout; ADR-0002 tenancy and RLS; ADR-0003 catalog versioning; ADR-0004 AI gateway and guardrails | All four are `Accepted` |
 | `suite-architect` + `platform-devops-engineer` | ADR-0005 hosting, environments, and regions: a HIPAA-eligible cloud under a BAA, US regions only, separate accounts for production and non-production | `Accepted` |
 | `security-privacy-officer` | ADR-0006 identity: OIDC/SAML SSO, MFA for all roles, session and re-authentication rules, SCIM, break-glass admin | `Accepted` |
-| `security-privacy-officer` + `data-architect` | ADR-0007 encryption and key management: KMS keys per environment, field-level encryption for SSN, DOB, DEA #, home address, incident and grievance narratives, key rotation | `Accepted` |
+| `security-privacy-officer` + `data-architect` | ADR-0007 encryption and key management: KMS keys per environment, field-level encryption for DOB, DEA #, home address, incident and grievance narratives, key rotation | `Accepted` |
 | `data-architect` | ADR-0008 audit log: append-only store, hash chain, monthly partitions, retention, customer export | `Accepted` |
 | `security-privacy-officer` | Data classification scheme (public / internal / confidential / PII / PHI) and the data dictionary template | Published under `docs/security/` |
 | `security-privacy-officer` | Initial HIPAA Security Rule **risk analysis** and risk management plan for the planned system (45 CFR 164.308(a)(1)(ii)(A)–(B)) | Signed by the security officer; reviewed at every later gate |
@@ -143,8 +143,11 @@ and proven by tests. Modules in later phases inherit it and cannot bypass it.
       revokes sessions.
 - [ ] **Uploads:** an EICAR test file is rejected; a spoofed content type is
       rejected; pre-signed URLs expire.
-- [ ] **Logging hygiene:** a test seeds known fake SSNs and DOBs and asserts they
-      never appear in logs, traces, or error reports.
+- [ ] **Logging hygiene:** a test seeds known fake DOBs and DEA numbers and
+      asserts they never appear in logs, traces, or error reports.
+- [ ] **No SSN:** no form, API schema, or table has an SSN field; the importer
+      rejects columns that look like SSNs; a CI check fails on SSN-shaped values
+      in fixtures and seed data.
 - [ ] **Readiness engine:** determinism tests; date math tests for leap years,
       month ends, and time zones; snapshots keep their catalog version.
 - [ ] **Encryption:** the database, object storage, and backups are encrypted
@@ -173,8 +176,8 @@ All data is still synthetic.
 
 | # | Module | Owner(s) | Security and compliance focus |
 | --- | --- | --- | --- |
-| 1 | Providers & Credentialing | `credentialing-privileging-specialist`, `frontend-engineer` | DEA #, DOB, SSN (if collected at all) are field-encrypted, masked by default, and revealed with audit. NPDB query responses are restricted documents (confidential under 45 CFR Part 60): readable only by credentialing roles and excluded from AI, search, and exports by default. Committee decisions are human approvals. Catalog entries for CM Ch. 5 and the credentialing part of Ch. 21 verified |
-| 2 | Screening | `enrollment-screening-specialist`, `integrations-engineer` | LEIE and SAM adapters with provenance (file hash, retrieval time, raw response). A failed run never shows "clear". Possible matches are cleared only by a human, with a reason. Monthly cadence labeled as industry practice, not an HRSA rule. State Medicaid agreements may separately require monthly checks; record those as state-specific catalog entries, not HRSA requirements |
+| 1 | Providers & Credentialing | `credentialing-privileging-specialist`, `frontend-engineer` | DEA # and DOB are field-encrypted, masked by default, and revealed with audit. NPDB query responses are restricted documents (confidential under 45 CFR Part 60): readable only by credentialing roles and excluded from AI, search, and exports by default. Committee decisions are human approvals. Catalog entries for CM Ch. 5 and the credentialing part of Ch. 21 verified |
+| 2 | Screening | `enrollment-screening-specialist`, `integrations-engineer` | LEIE and SAM adapters with provenance (file hash, retrieval time, raw response). A failed run never shows "clear". Possible matches are cleared only by a human, with a reason. Matching uses name, DOB, NPI, and license number, never SSN. When a possible match can only be resolved by SSN, the health center checks it on the source's own verification tool and records the outcome and method, not the SSN. Monthly cadence labeled as industry practice, not an HRSA rule. State Medicaid agreements may separately require monthly checks; record those as state-specific catalog entries, not HRSA requirements |
 | 3 | Enrollment | `enrollment-screening-specialist` | Effective dates by payer and site; revalidation cadences from the catalog. NPPES lookups are public data; still logged with provenance |
 | 4 | Governance | `governance-board-specialist` | Board approvals modeled as board approvals linked to a meeting and minutes (Ch. 19). Composition math (Ch. 20) from catalog parameters. Applicability covers the patient-majority waiver for health centers funded only under §330(g), (h), and/or (i), public-agency co-applicant arrangements, and the exemption for Indian tribes and tribal organizations. COI disclosures readable only by authorized roles |
 | 5 | Tasks & Workflows (UI) | `frontend-engineer`, `backend-engineer` | Approvals pin the approved version; only humans approve |
@@ -339,6 +342,11 @@ BAA, with tight limits.
 
 - **Entry criterion:** the customer's BAA and terms are signed before its
   production tenant is provisioned or any import runs.
+- The pilot runs **before** the SOC 2 Type I report (decision D2). Each pilot
+  health center instead receives a security package under NDA: the risk analysis
+  summary, the penetration test summary with fix status, the subprocessor list,
+  and answers to its security questionnaire. The pilot agreement states that
+  SOC 2 Type I is in progress.
 - Pilot scope: MVP modules only; the Deemed Assistant is off. Pilot health
   centers may be §330 recipients only if Look-Alike entries are not yet verified.
 - Data loaded through the audited importer with a dry run. PHI allowed only in
@@ -355,8 +363,8 @@ BAA, with tight limits.
 - [ ] Pilot customers confirm, in writing, that the statuses matched their own
       records for a full screening cycle at the cadence each health center adopted,
       and at least one expiration cycle.
-- [ ] SOC 2 Type I report (or an equivalent independent attestation) issued, or
-      the audit scheduled with a date, as leadership decides.
+- [ ] SOC 2 Type I report issued (decision D2). General availability waits for
+      the report.
 - [ ] Pricing, contract, and onboarding materials reviewed by counsel.
 - [ ] The log-hygiene test passes; the risk analysis has been reviewed with the
       pilot findings.
@@ -386,7 +394,7 @@ switch that the customer's administrator turns on.
       and prompt injection.
 - [ ] Tools run under the user's permissions; no tool can finalize, approve,
       attest, submit, or clear anything.
-- [ ] Gateway masking of SSN, DOB, and DEA # proven by tests.
+- [ ] Gateway masking of DOB and DEA #, and rejection of SSN-shaped values, proven by tests.
 - [ ] Every output labeled "AI draft"; prompt version, model, tool calls, and the
       confirming user are audited.
 - [ ] Before capability 4 (assistant panel) ships, the threat model is updated
@@ -448,7 +456,17 @@ Where each baseline control is first built and where it is proven.
 | AI guardrails and evals | 6 | Per-capability gate |
 | Risk analysis | 0, updated 3, 4, 7 and yearly | Every gate from G0 |
 
-## 13. Open questions
+## 13. Decisions and open questions
+
+### Decisions (2026-09-27)
+
+| # | Decision | Effect |
+| --- | --- | --- |
+| D1 | **Do not collect Social Security numbers.** | No SSN fields anywhere; screening matches on name, DOB, NPI, and license number (§5); SSN-shaped values are rejected (G1). Collecting SSN later needs an ADR and a `security-privacy-officer` Approve |
+| D2 | **Run the pilot before SOC 2 Type I.** | Pilot customers get a security package instead (§8); the Type I report is required for general availability (G5) |
+| D3 | **Engage legal counsel on every item listed under "For legal counsel" below.** | Counsel's written conclusions are filed before the gate that depends on each: BAA, terms, and state breach law before G4; NPDB/CVO role before any feature that queries NPDB for a customer; FTCA claim handling before G3; state Medicaid screening before G5. Until counsel answers, the conservative default in each item stays in force |
+
+### Open questions
 
 For `hrsa-regulatory-analyst`:
 - Which Look-Alike differences affect the MVP modules? (Applicability ships in
@@ -461,12 +479,9 @@ For `hrsa-regulatory-analyst`:
   practitioners as well as LIPs.
 
 For `security-privacy-officer`:
-- Is SOC 2 Type I required before the pilot, or before general availability?
-- Should SSN be collected at all? Exclusion screening can often match on name,
-  DOB, and NPI; not collecting SSN removes a large risk.
 - Pilot customers' states and any state-law requirements beyond HIPAA.
 
-For legal counsel:
+For legal counsel (engaged per D3):
 - Customer BAA and terms of service language, including the "internal readiness,
   not an HRSA determination" limitation.
 - Whether Deemed Health may act as a credentials verification organization or NPDB

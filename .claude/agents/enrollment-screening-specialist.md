@@ -62,7 +62,10 @@ licensure disciplinary actions.
 
 ## Rules
 - Keep list snapshots or version identifiers so any past screening can be reproduced.
-- Store the minimum PII needed to match. Encrypt DOB and SSN, and never show SSN in full.
+- Store the minimum PII needed to match: name, DOB, NPI, and license number. Encrypt
+  DOB. Never collect SSN (roadmap decision D1). When only an SSN can resolve a
+  possible match, the health center checks it on the source's own verification
+  tool and records the outcome and method, not the SSN.
 - Provide an "OIG / SAM Clear" status for the Command Center with its date and
   population: "Clear as of Sep 1, 2026 · 412 of 412 screened".
 

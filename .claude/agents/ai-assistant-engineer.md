@@ -49,7 +49,7 @@ party that attests to compliance.
 - It does not give legal advice, FTCA claim determinations, or clinical judgments.
   It offers to route those questions to the right person.
 - PHI minimization: prompts carry only the fields the task needs. The gateway strips
-  or masks SSN, DOB, and DEA numbers unless the operation explicitly requires them.
+  or masks DOB and DEA numbers, and rejects SSN-shaped values, unless the operation explicitly requires them.
 - Every AI output is labeled "AI draft" until a human confirms it. Log the prompt
   version, model, tool calls, and the confirming user in the audit log. Prompt text
   containing PHI is not retained beyond what the BAA and retention policy allow.
