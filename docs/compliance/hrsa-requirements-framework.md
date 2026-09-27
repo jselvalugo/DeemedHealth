@@ -37,7 +37,7 @@ program requirements, and Chapter 21 is FTCA deeming.
 | --- | --- | --- | --- | --- |
 | 3 | Needs Assessment | Quality & UDS | Needs assessment document, date, service area data, board review | Periodic update (confirm the interval), plus with each application |
 | 4 | Required and Additional Health Services | Scope & Sites | Form 5A, provision method per service (direct / formal agreement / formal referral), agreements | On change in scope |
-| 5 | Clinical Staffing | Providers & Credentialing, Learning | Credentialing & privileging operating procedures, provider files, verification records, privilege lists, staffing plan | Re-credentialing and re-privileging interval (commonly every 2 years, so verify), plus each credential's expiration |
+| 5 | Clinical Staffing | Providers & Credentialing, Learning | Credentialing & privileging operating procedures, provider files, verification records, privilege lists, staffing plan | Re-credentialing and re-privileging interval (commonly every 2 years, so verify), plus each credential's expiration. Who grants privileges is set by the health center, not required to be the board (HRSA FAQ, unverified; see `approval-authority.md` D1) |
 | 6 | Accessible Locations and Hours | Scope & Sites | Form 5B, hours of operation, board approval of hours | On change |
 | 7 | Coverage for Medical Emergencies During and After Hours | Scope & Sites | After-hours coverage procedures, call arrangements, test logs | Periodic test |
 | 8 | Continuity of Care and Hospital Admitting | Scope & Sites, Contracts | Admitting privileges or hospitalist/transfer agreements, follow-up procedures | Agreement renewal |
@@ -51,7 +51,7 @@ program requirements, and Chapter 21 is FTCA deeming.
 | 16 | Billing and Collections | Finance & Grants, Enrollment | Billing and collections policies, fee schedule, payer participation and enrollment, waiver/reduction policy | Annual fee schedule review |
 | 17 | Budget | Finance & Grants | Annual budget with board approval, total budget including non-grant revenue | Annual |
 | 18 | Program Monitoring and Data Reporting Systems | Quality & UDS | UDS submission, data systems, board reporting of performance | Annual UDS (verify the due date per year) |
-| 19 | Board Authority | Governance | Bylaws, minutes showing board approvals (CEO selection and evaluation, budget, SFDP, QI/QA, billing, personnel policies, services, sites, hours, applications), monthly meetings | Monthly meetings (verify exceptions) |
+| 19 | Board Authority | Governance | Bylaws, minutes showing board approvals (CEO selection and evaluation, budget, SFDP, QI/QA, billing, personnel policies, services, sites, hours, applications), monthly meetings. Approval matrix and Florida overlays: `approval-authority.md` | Monthly meetings (verify exceptions). Policies in SFDP, QI/QA, billing, financial management, and personnel are evaluated at least every 3 years (unverified). The 2025 SVP changed elements a and c |
 | 20 | Board Composition | Governance | Roster with patient-majority status, demographics, industry-income test, size | On any board change |
 | 21 | FTCA Deeming Requirements | FTCA & Risk, Providers | Risk management program, quarterly risk assessments, annual risk training plan and completion, annual board risk report, claims management, C&P compliance, QI/QA, tracking systems (referrals, hospitalizations, diagnostics) | Annual deeming/redeeming application, quarterly, annual |
 
