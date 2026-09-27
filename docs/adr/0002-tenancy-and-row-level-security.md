@@ -1,6 +1,6 @@
 # ADR-0002: Tenancy and row-level security
 
-- Status: **Proposed** (only the product owner, @jselvalugo, accepts; roadmap D5)
+- Status: **Accepted** (@jselvalugo, 2026-09-27; roadmap D5)
 - Date: 2026-09-27
 - Owner: `suite-architect`; reviewers `data-architect`, `security-privacy-officer`
 - Related: ADR-0001, ADR-0005, ADR-0007, ADR-0008; `docs/compliance/florida.md` §1
@@ -96,4 +96,4 @@ reference data, not tenant data.
 
 ## Status
 
-Proposed. Awaiting acceptance by the product owner (@jselvalugo).
+Accepted by the product owner (@jselvalugo) on 2026-09-27.

@@ -1,6 +1,6 @@
 # ADR-0001: Stack and repository layout
 
-- Status: **Proposed** (only the product owner, @jselvalugo, accepts; roadmap D5)
+- Status: **Accepted** (@jselvalugo, 2026-09-27; roadmap D5)
 - Date: 2026-09-27
 - Owner: `suite-architect`
 - Related: ADR-0002 (tenancy and RLS), ADR-0003 (catalog), ADR-0004 (AI gateway), ADR-0005 (hosting), ADR-0008 (audit log); roadmap §2 and §3
@@ -156,4 +156,4 @@ Dependency rules (enforced by lint, e.g. `eslint-plugin-boundaries`):
 
 ## Status
 
-Proposed. Awaiting acceptance by the product owner (@jselvalugo).
+Accepted by the product owner (@jselvalugo) on 2026-09-27.

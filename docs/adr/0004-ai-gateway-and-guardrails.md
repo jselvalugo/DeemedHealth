@@ -1,6 +1,6 @@
 # ADR-0004: AI gateway and guardrails
 
-- Status: **Proposed** (only the product owner, @jselvalugo, accepts; roadmap D5)
+- Status: **Accepted** (@jselvalugo, 2026-09-27; roadmap D5)
 - Date: 2026-09-27
 - Owner: `suite-architect`; reviewers `ai-assistant-engineer`, `security-privacy-officer`
 - Related: ADR-0001, ADR-0002, ADR-0003, ADR-0005, ADR-0007, ADR-0008; roadmap §2 rules 4–7, §9 (Phase 6), D1, D3; `docs/compliance/florida.md` FL-PRIV-3
@@ -107,4 +107,4 @@ must be under a BAA before any customer data reaches it.
 
 ## Status
 
-Proposed. Awaiting acceptance by the product owner (@jselvalugo).
+Accepted by the product owner (@jselvalugo) on 2026-09-27.

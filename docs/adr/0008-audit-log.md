@@ -373,4 +373,4 @@ Follow-ups:
 
 ## Status
 
-Proposed (2026-09-27).
+Accepted by the product owner (@jselvalugo) on 2026-09-27.

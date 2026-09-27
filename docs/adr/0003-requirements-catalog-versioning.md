@@ -1,6 +1,6 @@
 # ADR-0003: Requirements catalog versioning
 
-- Status: **Proposed** (only the product owner, @jselvalugo, accepts; roadmap D5)
+- Status: **Accepted** (@jselvalugo, 2026-09-27; roadmap D5)
 - Date: 2026-09-27
 - Owner: `suite-architect`; content owner `hrsa-regulatory-analyst`
 - Related: ADR-0001, ADR-0002; `docs/compliance/hrsa-requirements-framework.md` §1, §4–§6; `docs/compliance/florida.md`; roadmap §2 rule 6, decisions D4, FL-D2, FL-D3
@@ -108,4 +108,4 @@ entries reach production tenants.
 
 ## Status
 
-Proposed. Awaiting acceptance by the product owner (@jselvalugo).
+Accepted by the product owner (@jselvalugo) on 2026-09-27.

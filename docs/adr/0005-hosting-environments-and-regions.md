@@ -1,6 +1,6 @@
 # ADR-0005: Hosting, environments, and regions
 
-- Status: Proposed
+- Status: **Accepted** (@jselvalugo, 2026-09-27; roadmap D5)
 - Date: 2026-09-27
 - Owners: `suite-architect`, `platform-devops-engineer`
 - Reviewers required: `security-privacy-officer` (BAA, subprocessors), product owner (@jselvalugo, decision D5)

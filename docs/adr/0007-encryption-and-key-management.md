@@ -2,7 +2,7 @@
 
 > **Draft — requires signature by the product owner/security officer.** Prepared by `security-privacy-officer` on 2026-09-27. Not in force until signed. Regulatory citations are planning assumptions to verify against the current source.
 
-**Status:** Proposed
+**Status:** Accepted (@jselvalugo, 2026-09-27; roadmap D5)
 **Owners:** `security-privacy-officer` + `data-architect` · **Decider:** @jselvalugo
 **Depends on:** ADR-0002 (tenancy), ADR-0005 (hosting, regions), ADR-0008 (audit)
 

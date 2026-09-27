@@ -1,6 +1,8 @@
 # Data Classification and Data Dictionary Template
 
-> **Draft — requires signature by the product owner/security officer.** Prepared by `security-privacy-officer` on 2026-09-27. Not in force until signed. Regulatory citations are planning assumptions to verify against the current source.
+> **Approved and signed** by @jselvalugo, product owner, HIPAA security officer
+> (45 CFR 164.308(a)(2)) and privacy officer, on 2026-09-27. In force from that date.
+> Regulatory citations remain planning assumptions to verify against the current source.
 
 Owner: `security-privacy-officer`. Every new field is classified in the data
 dictionary before its PR merges (review checklist item 1).
