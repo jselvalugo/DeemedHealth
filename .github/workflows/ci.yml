@@ -40,6 +40,10 @@ jobs:
         run: pnpm test
       - name: No SSN-shaped values (decision D1)
         run: pnpm check:no-ssn
+      - name: Build web (non-production)
+        env:
+          DH_ENV: development
+        run: pnpm --filter @deemed/web build
 
   dependency-review:
     name: dependency-review
