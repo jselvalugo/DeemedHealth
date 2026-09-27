@@ -2,7 +2,8 @@
 
 Owner: `suite-architect`. Status: plan, 2026-09-27.
 Source of scope and gate: `docs/product/implementation-roadmap.md` §4 (Phase 1,
-G1) and §13 (D1–D9). Runtime: ADR-0010 (Proposed) on top of ADR-0001 to ADR-0009.
+G1) and §13 (D1–D11). Runtime: ADR-0010 (Proposed) on top of ADR-0001 to ADR-0009.
+Operator console: ADR-0012 (Proposed). Environments: ADR-0013 (Proposed).
 
 ## 1. What is being built and why
 
@@ -66,6 +67,8 @@ identity: `UserAccount`, `AuthFactor`, `Session`, `IdpConnection`, `ScimToken`,
 | Shell | Header, module bar, launcher / command palette, PREVIEW banner, language toggle, user menu, no-permission page, not-found, error | S1 |
 | Command Center | Overview `/` as the signed-in landing: designed empty state until Phase 2 | S1 |
 | Administration | Users & roles `/admin/users` · Organization & sites `/admin/org` · Requirements catalog `/admin/catalog` · Audit log `/admin/audit` · Integrations `/admin/integrations` (empty state until Phase 2) | S7 |
+| Administration | Support access `/admin/support-access` (approve, deny, revoke, history) | S7b |
+| Operator console (internal, `apps/console`) | Tenants · Support access · Catalog releases · Feature flags · Platform health · Operators (module map, "Operator console (internal)") | S7b |
 
 The auth routes are not navigation, but routes are registry data: S1 adds an
 "Auth routes (outside the shell)" section to `docs/product/module-map.md` and the
@@ -76,12 +79,17 @@ same entries to `packages/ui/module-registry.ts` in one change, reviewed by
 
 ```
 S0 contracts + spike ──┬─> S2 db ──> S3 api, auth, RBAC ──┬─> S5 tasks, approvals, notifications ─┐
-                       │              │                    ├─> S6 evidence, field encryption ──────┤
-S1 shell + login UI ───┤              │                    └─> S7 Administration pages <───────────┤
-(starts day 1, mocks)  │              └─> S8 observability, log hygiene (closes after S6) ─────────┤
+S0b config, env matrix ┤              │                    ├─> S6 evidence, field encryption ──────┤
+S1 shell+login, day 1 ─┤              │                    ├─> S7 Administration pages <───────────┤
+                       │              │                    └─> S7b operator console (after S5, S7) ┤
+                       │              └─> S8 observability, log hygiene (closes after S6) ─────────┤
                        ├─> S4 dates (day 1) ─> catalog loader, readiness engine (after S2) ────────┤
                        └─> S9 AWS baseline IaC (parallel; deploys when the AWS org exists) ────────┴─> S10 G1 closure
 ```
+
+S0b runs beside S0 and must land before S2's migration job and S3's `buildApp()`
+read configuration. S1 starts on day 1 against mocks. S7b starts once S7's Administration shell and S5's approval
+service exist.
 
 The login page is the first thing a reviewer can use: S1 builds it on a mocked
 auth contract, S3 wires it to real sessions and MFA on the Netlify site.
@@ -116,6 +124,36 @@ G1-15 internal security review.
 | `platform-devops-engineer` | Spike: Fastify function at `/api/*` next to the Next.js runtime; scheduled function; Neon (Netlify DB) claimed, PG 16, US region; preview-branch wiring | ADR-0010 §1–§3, `netlify.toml` | Report answers each ADR-0010 follow-up; fallbacks chosen where needed |
 | `data-architect` | Spike: on Neon, create `app_owner`, `app_user`, `app_platform`, `audit_writer`; prove `FORCE RLS` and fail-closed `current_setting` as `app_user` through the pooled endpoint | ADR-0002, ADR-0010 §2 | A script shows cross-tenant read fails and missing context errors on Neon |
 | `security-privacy-officer` | Review ADR-0010; add Neon and "identity: in-house" rows to `docs/security/subprocessors.md`; answer the workforce-email question | ADR-0010, subprocessors.md | Review verdict recorded; rows merged |
+
+### S0b · Config and environment matrix
+
+- **Outputs:** ADR-0013 Accepted (roadmap D11); `@deemed/config/env` runtime module
+  with a zod schema per deployable (`web` server, `api`, `api-platform`, `worker`,
+  `console`), `loadConfig()` that fails closed and reports variable names only;
+  `DH_ENV` refinements (production forbids dev keys, test IdP, capture adapters;
+  non-production forbids `live` integrations); lint rule that only `packages/config`
+  reads `process.env`; flag definitions file and evaluation function; Netlify context
+  mapping (`deploy-preview` = `preview`, `production` = `development`, `dev` = `local`)
+  and a build guard allowing only those values; CI jobs for the Neon branch per PR
+  (from `seed-base`), ordered migrations (preview → development → staging →
+  production) with owner credentials in GitHub environments only, seed refusal in
+  production, and a nightly parity job; release workflow (tag, staging, human approval
+  in the GitHub `production` environment).
+- **G1:** G1-13 (banner driven by `DH_ENV` in every non-production environment,
+  including previews), G1-1 (parity job re-checks forced RLS on every environment's
+  database), G1-9 (production schema requires KMS configuration; `LocalKeyProvider`
+  refused), G1-7 (seed and `check:no-ssn` in every environment's seed job).
+- **Depends on:** S0 (ADR-0011 names; `parseDhEnv` in `packages/domain`). Blocks S2's
+  migration job and S3's configuration loading. The staging column waits for S9.
+
+| Agent | Task | Inputs | Done when |
+| --- | --- | --- | --- |
+| `suite-architect` | Take ADR-0013 to acceptance; keep the matrix in sync with ADR-0005, ADR-0009, ADR-0010 | ADR-0013 | Accepted by @jselvalugo; roadmap D11 row updated |
+| `backend-engineer` | `@deemed/config/env` schemas, `loadConfig()`, `process.env` lint rule, flag definitions and evaluation | ADR-0013 §3–§4 | Unit tests: missing, invalid, and production-forbidden variables stop startup with names only; unknown flag evaluates off; AI flags default off in every `DH_ENV` |
+| `platform-devops-engineer` | `netlify.toml` context mapping, build guard values, Neon branch lifecycle, ordered migration jobs, parity job, release workflow with approval | ADR-0013 §1–§2, §5–§8; ADR-0010 §2 | A PR gets its own branch and `DH_ENV=preview`; a migration cannot reach development before its preview succeeded; Netlify holds no owner credentials (check); parity job fails on an injected drift |
+| `data-architect` | Environment marker check at startup, seed refusal rules, migration checksum ledger | ADR-0013 §3, §5–§6 | Seed refuses a `production` marker or `DH_ENV`; API and worker stop when marker and `DH_ENV` differ |
+| `qa-test-engineer` | PREVIEW banner E2E against every deployed non-production environment, including each deploy preview | ADR-0013 §7 | Banner test runs on preview and development deploys and names the environment |
+| `security-privacy-officer` | Review secrets placement, access per environment, and the synthetic-only guards | ADR-0013 §1, §3, §6 | Verdict recorded in the ADR-0013 PR |
 
 ### S1 · Shell and login UI
 
@@ -264,6 +302,47 @@ G1-15 internal security review.
 | `data-architect` | Offline verifier CLI for audit exports | ADR-0008 §2 | Verifies an untampered export; fails on a tampered one |
 | `hrsa-regulatory-analyst` | Review catalog page wording and "last verified" display | Principle 3 | Verdict recorded |
 
+### S7b · Operator console
+
+- **Outputs:** ADR-0012 Accepted (roadmap D10); `apps/console` on its own origin
+  (Netlify site in development) with workforce OIDC against a synthetic operator IdP
+  in development, passkeys required, 10-minute idle and 4-hour absolute sessions,
+  re-authentication for every write; the `/platform/*` API plugin mounted only on the
+  console host; operator RBAC (`platform-admin`, `support`, `catalog-publisher`,
+  `read-only-ops`); `app_platform` `SECURITY DEFINER` functions returning metadata and
+  counts only, with the CI return-column check; tenant lifecycle (provision with Florida
+  validation, suspend, reactivate, offboard to export; crypto-shred wired to
+  `KeyProvider`, proven on KMS in `dh-nonprod` after S9); catalog release publishing
+  through the S4 publish job; per-tenant feature flags; integration, job, and audit-chain
+  health pages; support-access grants (`support_reader` role, scoped reads, dual-chain
+  audit with `actor_type = 'support'`, revocation, expiry by database clock); break-glass
+  with two-person approval and immediate customer notice; customer page
+  **Administration › Support access** (`/admin/support-access`); module map and
+  registry entries (`consoleModules` separate from the customer launcher).
+- **G1:** G1-1 (support functions cannot cross tenants; `app_platform` cannot select
+  tenant tables), G1-2 (console and support endpoints with allowed and denied role
+  tests, including another tenant), G1-3 (every console write and every support read in
+  the platform and tenant chains), G1-4 (operator MFA cannot be disabled; sessions
+  expire; re-authentication), G1-11 (grants expire and revoke like the auditor role),
+  G1-12 (customer sees support activity in its own audit log), G1-13 (banner on the
+  console), G1-14 (console and support-access page axe clean), G1-15 (in the security
+  review scope).
+- **Depends on:** S0b (config for the console and `api-platform`), S3 (auth, RBAC,
+  audit middleware), S4 (catalog publish job), S5 (Approval and Notification services),
+  S7 (Administration shell and page patterns). Crypto-shred on real KMS depends on S9.
+
+| Agent | Task | Inputs | Done when |
+| --- | --- | --- | --- |
+| `suite-architect` | Take ADR-0012 to acceptance; module map and `packages/ui/module-registry.ts` (`consoleModules`, Administration › Support access) in one PR; audit action registry entries; ADR-0002 and ADR-0008 amendment notes | ADR-0012 | Accepted by @jselvalugo; registry test proves no console route in the customer launcher |
+| `data-architect` | Platform tables, `support_access_grant` and `tenant_feature_flag` tenant tables with RLS, `support_reader` role, `app_platform` and support functions, CI return-column check, `actor_type = 'support'` | ADR-0012 §5–§8, ADR-0002, ADR-0008 | `app_platform` select on any tenant table fails; a function returning a PII column fails CI; grant checks happen in SQL |
+| `backend-engineer` | `/platform/*` plugin, operator auth (workforce OIDC, passkeys, short sessions), operator RBAC, tenant lifecycle state machine, flag writes, job retry/discard, support grant request/approve/revoke/use, break-glass flow, notifications | ADR-0012 §1–§7, ADR-0006 | Four RBAC cases per endpoint; approval pins the grant version; support read writes two audit events; reveal and export under a grant fail; expired or revoked grant fails on the next call |
+| `ux-content-writer` | EN/ES copy for the customer Support access page and notices (request, approval, first use, end, break-glass); console copy in English | ADR-0012 §6–§7 | Parity check passes for customer strings; notices name the operator, scope, and expiry |
+| `frontend-engineer` | `apps/console` pages on the shell components; customer page `/admin/support-access` with the four states | S1 components, S7b APIs | Playwright: customer approves with re-auth, operator reads in scope, customer revokes and the console session ends; axe clean |
+| `platform-devops-engineer` | Console Netlify site and, for AWS, the `api-platform` service, hostname, and WAF IP allowlist in IaC | ADR-0012 §1–§2, ADR-0013 | Console reachable only on its origin; no `app_platform` credential on the customer API |
+| `qa-test-engineer` | Support-access isolation suite (other tenant, out-of-scope entity, expired, revoked), dual-chain audit assertions, operator identity tests | ADR-0012 Consequences | Suites green in CI and listed in the G1 evidence index |
+| `security-privacy-officer` | Review guardrails, function allowlist, break-glass, and customer notices; threat model entries | ADR-0012 | Verdict Approve recorded |
+| `hrsa-regulatory-analyst` | Review catalog publishing (verified-only) and that operators cannot approve or attest | ADR-0003, ADR-0012 §4.2, §6 | Verdict recorded |
+
 ### S8 · Observability and log hygiene
 
 - **Outputs:** structured logger (pino) with correlation ids from the request
@@ -305,7 +384,7 @@ G1-15 internal security review.
   signed document), manual keyboard and screen-reader scripts run, threat model
   updated with what was built, internal security review, sign-offs.
 - **G1:** G1-14 (manual part), G1-15, and the evidence for all others.
-- **Depends on:** S1–S9 and **G0 closed** (decision D9).
+- **Depends on:** S0b, S1–S9, S7b, and **G0 closed** (decision D9).
 
 | Agent | Task | Inputs | Done when |
 | --- | --- | --- | --- |
@@ -318,20 +397,20 @@ G1-15 internal security review.
 
 | G1 checkbox | Proven in | Where the proof runs |
 | --- | --- | --- |
-| G1-1 Tenant isolation | S2 (DB), S3 (API) | CI Testcontainers; nightly Neon branch |
-| G1-2 Authorization | S3, S5, S6, S7 | CI (route manifest) |
-| G1-3 Audit | S2, S3, S5, S6, S7 | CI |
-| G1-4 Identity | S3 | CI (fake clock, test IdP); E2E on preview |
+| G1-1 Tenant isolation | S2 (DB), S3 (API), S7b (support functions), S0b (parity) | CI Testcontainers; nightly Neon branch |
+| G1-2 Authorization | S3, S5, S6, S7, S7b | CI (route manifest) |
+| G1-3 Audit | S2, S3, S5, S6, S7, S7b | CI |
+| G1-4 Identity | S3, S7b (operators) | CI (fake clock, test IdP); E2E on preview |
 | G1-5 Uploads | S6 | CI (MinIO, ClamAV) |
 | G1-6 Logging hygiene | S8 | CI |
-| G1-7 No SSN | S2 (schema lint, import column guard), S0 (contracts) | CI (`check:no-ssn`, schema lint, guard tests) |
+| G1-7 No SSN | S2 (schema lint, import column guard), S0 (contracts), S0b (seed jobs) | CI (`check:no-ssn`, schema lint, guard tests) |
 | G1-8 Readiness engine | S4 | CI |
-| G1-9 Encryption (KMS) | S9 (config), S6 (library) | Policy-as-code in CI; nightly on `dh-nonprod` |
+| G1-9 Encryption (KMS) | S9 (config), S6 (library), S0b (production config schema) | Policy-as-code in CI; nightly on `dh-nonprod` |
 | G1-10 Storage | S6 (behavior), S9 (config) | CI (MinIO); `dh-nonprod` |
-| G1-11 Roles | S3, S7 | CI (fake clock) |
-| G1-12 Customer audit access | S7 | CI + E2E |
-| G1-13 PREVIEW banner | S1 | E2E on every Netlify deploy |
-| G1-14 Accessibility | S1, S7, S10 | CI axe; manual scripts |
+| G1-11 Roles | S3, S7, S7b (grant expiry) | CI (fake clock) |
+| G1-12 Customer audit access | S7, S7b (support events) | CI + E2E |
+| G1-13 PREVIEW banner | S1, S0b (every environment), S7b (console) | E2E on every non-production deploy |
+| G1-14 Accessibility | S1, S7, S7b, S10 | CI axe; manual scripts |
 | G1-15 Security review | S10 | Signed review |
 
 Nothing in G1 is proven only on Netlify. The Netlify site is where reviewers see
@@ -349,6 +428,9 @@ the platform; CI and the AWS configuration tests are where G1 is proven
 | Function path `/api/*` collides with the Next.js runtime | S0 spike; fallback is a `/_api/*` path with the same-origin cookie | `platform-devops-engineer` |
 | Owning `packages/auth` is more code than a framework | Only session bookkeeping is ours; protocol libraries are maintained; `security-privacy-officer` reviews every auth PR; G4 pen test covers it | `backend-engineer`, `security-privacy-officer` |
 | ADR-0002 and ADR-0008 naming drift leaks into migrations | ADR-0011 before S2's first migration | `suite-architect` |
+| An `app_platform` function leaks PII to operators | CI return-column check against sensitivity classes; `security-privacy-officer` reviews every function | `data-architect`, `security-privacy-officer` |
+| Customers do not answer support requests, so support stalls | Requests notify all administrators; break-glass for emergencies only; tenant opt-out is explicit | `suite-architect`, `ux-content-writer` |
+| Neon branch per preview cannot be wired (ADR-0010 §2) | Fallback in ADR-0013 alternatives: shared development database with migration ordering | `platform-devops-engineer` |
 | The synthetic-only rule is broken by a reviewer typing real data | PREVIEW banner, synthetic personas only, no importer, sign-up off; `security-privacy-officer` spot checks | `security-privacy-officer` |
 | Readiness shown from draft entries is read as real | Draft badge everywhere; production bundle excludes drafts; "internal readiness" wording | `hrsa-regulatory-analyst`, `ux-content-writer` |
 
@@ -371,9 +453,16 @@ the platform; CI and the AWS configuration tests are where G1 is proven
 - Which AWS malware scanner for evidence (S6), and which error tracker for S8?
 - Is an offline breached-password list acceptable in place of a live k-anonymity
   API call (ADR-0006 rule 2)?
+- Support grants: is 4 hours the right maximum, and is individual audit of every
+  support read (not only writes) the right level (ADR-0012 §6)?
+- May support grants cover the tenant audit log (amending ADR-0008 §6), or should that
+  remain break-glass only?
 
 ## 7. ADRs
 
 - **ADR-0010** Development runtime on Netlify (Proposed, this change).
 - **ADR-0011** Tenancy naming reconciliation (to write in S0, before S2).
+- **ADR-0012** Platform operator console and customer-approved support access
+  (Proposed; roadmap D10; slice S7b).
+- **ADR-0013** Environment management (Proposed; roadmap D11; slice S0b).
 - Revisit ADR-0010 when `dh-nonprod` exists or before G4.

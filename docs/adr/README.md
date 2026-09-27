@@ -16,5 +16,7 @@ Planned first records:
 - `0008-audit-log.md`
 - `0009-netlify-for-development-environments.md` (Accepted; amends 0005 for non-production)
 - `0010-development-runtime-on-netlify.md` (Proposed; API, database, jobs, storage, and auth for the Netlify development environment)
+- `0012-platform-operator-console.md` (Proposed; Loogo Labs operator console and customer-approved support access)
+- `0013-environment-management.md` (Proposed; environment matrix, typed config, flags, migrations, promotion)
 
 All eight must be Accepted before gate G0 in `docs/product/implementation-roadmap.md`.
