@@ -15,7 +15,14 @@
  * their own transaction or they roll back. Errors use the stable model in errors.ts.
  */
 import { randomUUID } from 'node:crypto';
-import { AuthError, SESSION_POLICY, isUuid, safeEqual, type ActiveSession } from '@deemed/auth';
+import {
+  AuthError,
+  SESSION_POLICY,
+  ipPrefix,
+  isUuid,
+  safeEqual,
+  type ActiveSession,
+} from '@deemed/auth';
 import { appendAuditEvent, type Actor } from '@deemed/db';
 import {
   activeRoleIds,
@@ -123,13 +130,17 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.decorateRequest('ctx', null as unknown as RequestContext);
 
-  // Per client address (after trustProxy). Routes must be registered after this plugin
-  // has loaded, or they would not get their per-route limit: see registerRoutes below.
+  // Per client network (after trustProxy): the IPv4 address or the IPv6 /64, the same
+  // key sign-in throttling uses, so rotating addresses inside one /64 buys nothing.
+  // Counters live in this process's memory: a shared store (e.g. Redis) is required
+  // before production runs more than one API task (ADR-0006 open items; phase-1-plan S9).
+  // Routes must be registered after this plugin has loaded, or they would not get their
+  // per-route limit: see registerRoutes below.
   void app.register(rateLimit, {
     global: true,
     max: limits.globalPerMinute,
     timeWindow: 60_000,
-    keyGenerator: (req) => req.ip,
+    keyGenerator: (req) => ipPrefix(req.ip),
     errorResponseBuilder: () => new ApiError('too_many_attempts'),
   });
 

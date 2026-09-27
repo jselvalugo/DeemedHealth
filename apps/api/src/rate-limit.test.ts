@@ -63,6 +63,20 @@ describe('rate limits', () => {
     await a.close();
   });
 
+  it('count an IPv6 client by its /64, however the address is written', async () => {
+    const a = app({ rateLimit: { globalPerMinute: 3, signinPerMinute: 100 } });
+    const hit = async (remoteAddress: string) =>
+      (await a.inject({ url: '/api/health', remoteAddress })).statusCode;
+    // Three hosts of one /64 (compressed, full, upper case) share one budget.
+    expect(await hit('2001:db8::1')).toBe(200);
+    expect(await hit('2001:0db8:0000:0000:0000:0000:0000:0002')).toBe(200);
+    expect(await hit('2001:DB8::FFFF:3')).toBe(200);
+    expect(await hit('2001:db8::4')).toBe(429);
+    // The next /64 has its own.
+    expect(await hit('2001:db8:0:1::1')).toBe(200);
+    await a.close();
+  });
+
   it('limit sign-in steps more tightly than the rest (per route)', async () => {
     const a = app({ rateLimit: { globalPerMinute: 100, signinPerMinute: 2 } });
     const codes: number[] = [];

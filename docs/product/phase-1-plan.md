@@ -424,6 +424,7 @@ G1-15 internal security review.
 | `platform-devops-engineer` | IaC modules and policy-as-code checks in CI | ADR-0005, ADR-0007, ADR-0008 §9 | Checks fail on an unencrypted bucket, missing rotation, or public access |
 | `platform-devops-engineer` | Deploy the `dh-nonprod` evidence bucket and KMS key; set `DH_EVIDENCE_STORE=s3` on Netlify | ADR-0010 §4 | Synthetic upload works on the dev site; nightly configuration test passes on the deployed account |
 | `security-privacy-officer` | Review key policies and bucket policies | ADR-0007 rule 5 | Verdict recorded |
+| `platform-devops-engineer` + `backend-engineer` | Shared store for the API rate limiter (for example ElastiCache Redis). Today the limits count in each process's memory, keyed by IPv4 address or IPv6 /64; sign-in lockout is already shared (PostgreSQL) | ADR-0006 open items; S3 rate limiting | Required before production runs more than one API task: the limiter uses the shared store in production, and a test with two app instances on one store sees one budget |
 
 ### S10 · G1 closure
 

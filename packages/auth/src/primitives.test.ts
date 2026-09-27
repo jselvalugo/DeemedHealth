@@ -158,8 +158,33 @@ describe('throttling with a fake clock (ADR-0006 rule 11)', () => {
 
   it('keys by email and IP prefix, never by the raw value', () => {
     expect(accountKey('A@B.example').hash.equals(accountKey(' a@b.example ').hash)).toBe(true);
-    expect(ipPrefix('2001:db8:1:2:3:4:5:6')).toBe('2001:db8:1:2');
+    expect(ipPrefix('2001:db8:1:2:3:4:5:6')).toBe('2001:db8:1:2::/64');
     expect(ipPrefix('::ffff:192.0.2.7')).toBe('192.0.2.7');
     expect(ipKey('192.0.2.7').hash).toHaveLength(32);
+  });
+
+  it('normalizes IPv6 to its /64, whatever the spelling (compressed, case, zeros, zone)', () => {
+    const net = '2001:db8:0:0::/64';
+    for (const spelling of [
+      '2001:db8::1',
+      '2001:db8::ffff:2',
+      '2001:DB8:0:0:1:2:3:4',
+      '2001:0db8:0000:0000:0000:0000:0000:0001',
+      '2001:db8:0:0::',
+    ]) {
+      expect(ipPrefix(spelling), spelling).toBe(net);
+    }
+    // Compressed forms used to keep the whole address (every host its own key).
+    expect(ipKey('2001:db8::1').hash).toEqual(ipKey('2001:db8::2').hash);
+    // Another /64 is another key; a group after `::` is not part of the prefix.
+    expect(ipPrefix('2001:db8:0:1::1')).toBe('2001:db8:0:1::/64');
+    expect(ipPrefix('2001:db8::1:0:0:1')).toBe(net);
+    expect(ipPrefix('::1')).toBe('0:0:0:0::/64');
+    expect(ipPrefix('fe80::1%eth0')).toBe('fe80:0:0:0::/64');
+    expect(ipPrefix('64:ff9b::192.0.2.1')).toBe('64:ff9b:0:0::/64');
+    // IPv4-mapped, dotted or hex, is the IPv4 address.
+    expect(ipPrefix('::ffff:c000:207')).toBe('192.0.2.7');
+    expect(ipPrefix(' 192.0.2.7 ')).toBe('192.0.2.7');
+    expect(ipPrefix('not-an-address')).toBe('not-an-address');
   });
 });
