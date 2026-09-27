@@ -70,6 +70,7 @@ export const es: Record<keyof typeof en, string> = {
   'release.next': 'Próxima versión',
   'release.planned': 'Planificado',
 
+  'role.org_admin.name': 'Administrador del centro de salud',
   'role.executive.name': 'Ejecutivo',
   'role.compliance_officer.name': 'Oficial de cumplimiento',
   'role.credentialing_coordinator.name': 'Coordinador de credenciales',
@@ -196,6 +197,9 @@ export const es: Record<keyof typeof en, string> = {
   'mfa.setup.secret.label': 'Clave de configuración para su aplicación de autenticación',
   'mfa.setup.secret.hint':
     'En su aplicación de autenticación, agregue una cuenta e ingrese esta clave. Luego escriba el código de 6 dígitos que aparece.',
+  'mfa.setup.token.label': 'Código de configuración de su administrador',
+  'mfa.setup.token.hint':
+    'Su administrador se lo envía cuando crea su cuenta o restablece sus métodos de inicio de sesión.',
   'mfa.setup.submit': 'Terminar la configuración',
 
   // Diálogo de nueva autenticación
@@ -234,6 +238,8 @@ export const es: Record<keyof typeof en, string> = {
   'apiError.unsupported': 'Esta opción no está disponible para su cuenta.',
   'apiError.not_configured':
     'Este entorno aún no está conectado a su base de datos. Intente más tarde.',
+  'apiError.enrollment_token_invalid':
+    'Ese código de configuración no funcionó. Puede haber vencido o ya se usó. Pida uno nuevo al administrador de su centro de salud.',
   'apiError.internal':
     'Algo salió mal de nuestro lado. Intente de nuevo. Si sigue ocurriendo, comuníquese con soporte e indique el número de referencia.',
 };

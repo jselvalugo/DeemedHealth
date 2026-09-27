@@ -19,7 +19,11 @@ export default async function MfaPage({
   const locale = await getLocale();
   if (authMode() === 'api') {
     const pending = await hasPendingSignIn();
-    if (pending && (await searchParams).setup === '1') return <ApiMfaSetup locale={locale} />;
+    const params = await searchParams;
+    if (pending && params.setup === '1') {
+      const code = typeof params.code === 'string' ? params.code : undefined;
+      return <ApiMfaSetup locale={locale} {...(code ? { initialCode: code } : {})} />;
+    }
     return <ApiMfaForm locale={locale} expired={!pending} />;
   }
   // In production the stubs answer "not implemented", so show the form rather than

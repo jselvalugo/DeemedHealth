@@ -25,6 +25,7 @@ export const API_ERROR_CODES = [
   'reauth_required',
   'mfa_required',
   'mfa_enrollment_required',
+  'enrollment_token_invalid',
   'invalid_credentials',
   'invalid_code',
   'too_many_attempts',
@@ -87,6 +88,25 @@ export type LoginResponse = z.infer<typeof LoginResponse>;
 
 export const TotpCodeRequest = z.object({ code: z.string().trim().min(6).max(8) }).strict();
 export type TotpCodeRequest = z.infer<typeof TotpCodeRequest>;
+
+/**
+ * First-factor enrollment needs the single-use enrollment token that an administrator
+ * (MFA reset) or an invitation delivered out of band.
+ */
+export const EnrollmentStartRequest = z
+  .object({ enrollmentToken: z.string().min(1).max(200) })
+  .strict();
+export type EnrollmentStartRequest = z.infer<typeof EnrollmentStartRequest>;
+
+export const TotpEnrollmentVerifyRequest = z
+  .object({ enrollmentToken: z.string().min(1).max(200), code: z.string().trim().min(6).max(8) })
+  .strict();
+export type TotpEnrollmentVerifyRequest = z.infer<typeof TotpEnrollmentVerifyRequest>;
+
+export const PasskeyEnrollmentVerifyRequest = z
+  .object({ enrollmentToken: z.string().min(1).max(200), response: z.record(z.unknown()) })
+  .strict();
+export type PasskeyEnrollmentVerifyRequest = z.infer<typeof PasskeyEnrollmentVerifyRequest>;
 
 export const TotpEnrollmentResponse = z.object({
   /** otpauth:// URI for a QR code, and the base32 secret for manual entry. */
@@ -189,6 +209,13 @@ export type MfaResetRequest = z.infer<typeof MfaResetRequest>;
 export const MfaResetResponse = z.object({
   factorsRevoked: z.number().int(),
   sessionsRevoked: z.number().int(),
+  enrollmentExpiresAt: z.string(),
+  /**
+   * NON-PRODUCTION ONLY: the new enrollment token, so a synthetic persona can enroll
+   * again. In production it is delivered to the user out of band (S5 notifications)
+   * and never returned by the API.
+   */
+  enrollmentToken: z.string().optional(),
 });
 export type MfaResetResponse = z.infer<typeof MfaResetResponse>;
 

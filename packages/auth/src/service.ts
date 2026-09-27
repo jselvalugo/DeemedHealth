@@ -15,7 +15,7 @@
  *    tenant), and they are throttled exactly like known ones.
  */
 import { hkdfSync } from 'node:crypto';
-import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import {
   appendAuditEvent,
   schema,
@@ -31,15 +31,8 @@ import { AuthError } from './errors.js';
 import { verifyPassword } from './password.js';
 import { SESSION_POLICY } from './policy.js';
 import { open, seal, type SecretBoxKey } from './secret-box.js';
-import {
-  accountKey,
-  ipKey,
-  isLocked,
-  recordFailure,
-  type ThrottleKey,
-  type ThrottleState,
-} from './throttle.js';
-import { csrfTokenFor, issueToken, parseToken } from './tokens.js';
+import { accountKey, ipKey, isLocked, type ThrottleKey, type ThrottleState } from './throttle.js';
+import { csrfTokenFor, issueToken, parseToken, sha256 } from './tokens.js';
 import { newTotpSecret, totpUri, verifyTotp } from './totp.js';
 import {
   passkeyAuthenticationOptions,
@@ -52,6 +45,16 @@ import {
 } from './webauthn.js';
 
 const TOTP_PURPOSE = 'totp-secret';
+/**
+ * Password verifications per sign-in, whatever the number of matching accounts: an
+ * unknown email, one account, or several health centers all cost the same Argon2 work.
+ * An email in more than this many health centers must name the organization.
+ */
+const LOGIN_VERIFY_SLOTS = 3;
+/** Pending sign-ins (password done, second factor not yet) kept open per user. */
+const MAX_OPEN_ATTEMPTS = 3;
+/** Enrollment token lifetimes (hours). */
+const ENROLLMENT_HOURS = { invite: 72, mfa_reset: 24 } as const;
 const SYSTEM: Actor = { type: 'system', label: 'sign-in service' };
 
 /** Request facts every auth event records (ADR-0008 section 4: auth needs IP and UA). */
@@ -261,20 +264,29 @@ export class AuthService {
     });
   }
 
-  /** Records one failure per key; returns whether the account key just locked. */
+  /**
+   * Records one failure per key, each with one atomic statement in the database
+   * (auth.throttle_fail), so concurrent failures are all counted. Returns whether the
+   * account key just locked.
+   */
   private async fail(keys: ThrottleKey[]): Promise<boolean> {
     const now = this.clock.now();
-    const states = await this.readThrottle(keys);
     let accountLocked = false;
-    await this.db.withPlatform(SYSTEM, async (tx) => {
-      for (const key of keys) {
-        const next = recordFailure(key.scope, states.get(key.hash.toString('hex')), now);
-        if (key.scope === 'account' && next.lockedNow) accountLocked = true;
-        await tx.execute(sql`SELECT auth.throttle_write(${key.hash}, ${key.scope}, ${next.failures},
-          ${next.windowStartedAt.toISOString()}::timestamptz, ${next.lockedUntil?.toISOString() ?? null}::timestamptz)`);
-      }
-    });
+    for (const key of keys) {
+      const result = await this.db.withPlatform(SYSTEM, (tx) =>
+        tx.execute<{ locked_now: boolean }>(
+          sql`SELECT locked_now FROM auth.throttle_fail(${key.hash}, ${key.scope}, ${now.toISOString()}::timestamptz)`,
+        ),
+      );
+      if (key.scope === 'account' && result.rows[0]?.locked_now) accountLocked = true;
+    }
     return accountLocked;
+  }
+
+  private async accountLocked(email: string): Promise<boolean> {
+    const key = accountKey(email);
+    const state = (await this.readThrottle([key])).get(key.hash.toString('hex'));
+    return isLocked(state, this.clock.now());
   }
 
   private async clearThrottle(key: ThrottleKey): Promise<void> {
@@ -318,8 +330,12 @@ export class AuthService {
       candidates = candidates.filter((c) => c.organizationId === input.organizationId);
     }
 
+    // Same Argon2 work for unknown, single-, and multi-organization emails.
+    candidates = candidates.slice(0, LOGIN_VERIFY_SLOTS);
+    for (let i = candidates.length; i < LOGIN_VERIFY_SLOTS; i++) {
+      await verifyPassword(undefined, input.password);
+    }
     const matches: typeof candidates = [];
-    if (candidates.length === 0) await verifyPassword(undefined, input.password);
     for (const c of candidates) {
       const phc = await this.db.withTenant(
         c.organizationId,
@@ -379,6 +395,25 @@ export class AuthService {
       match.organizationId,
       SYSTEM,
       async (tx) => {
+        // At most MAX_OPEN_ATTEMPTS pending sign-ins per user: close the oldest.
+        const open = await tx
+          .select({ id: schema.loginAttempt.id })
+          .from(schema.loginAttempt)
+          .where(
+            and(
+              eq(schema.loginAttempt.userAccountId, match.userAccountId),
+              isNull(schema.loginAttempt.consumedAt),
+              gt(schema.loginAttempt.expiresAt, now),
+            ),
+          )
+          .orderBy(asc(schema.loginAttempt.createdAt))
+          .for('update');
+        for (const old of open.slice(0, Math.max(0, open.length - (MAX_OPEN_ATTEMPTS - 1)))) {
+          await tx
+            .update(schema.loginAttempt)
+            .set({ consumedAt: now })
+            .where(and(eq(schema.loginAttempt.id, old.id), isNull(schema.loginAttempt.consumedAt)));
+        }
         await tx.insert(schema.loginAttempt).values({
           organizationId: match.organizationId,
           userAccountId: match.userAccountId,
@@ -431,6 +466,9 @@ export class AuthService {
       { requestId: meta.requestId },
     );
     if (!found) throw new AuthError('session_expired');
+    // Second-factor failures count per user (the account key), across every pending
+    // sign-in; while the account is locked no attempt may answer.
+    if (await this.accountLocked(found.account.email)) throw new AuthError('too_many_attempts');
     return this.db.withTenant(
       parsed.organizationId,
       userActor(found.account),
@@ -534,6 +572,113 @@ export class AuthService {
     };
   }
 
+  /**
+   * Accepts a TOTP time step for a factor only if it is newer than the stored one, in
+   * one conditional UPDATE: of two concurrent requests with the same code, one wins.
+   */
+  private async consumeTotpStep(
+    tx: Tx,
+    factorId: string,
+    step: number,
+    now: Date,
+  ): Promise<boolean> {
+    const rows = await tx
+      .update(schema.authFactor)
+      .set({ totpLastStep: step, lastUsedAt: now })
+      .where(
+        and(
+          eq(schema.authFactor.id, factorId),
+          or(isNull(schema.authFactor.totpLastStep), lt(schema.authFactor.totpLastStep, step)),
+        ),
+      )
+      .returning({ id: schema.authFactor.id });
+    return rows.length === 1;
+  }
+
+  /**
+   * First-factor enrollment needs a single-use enrollment token for this user, issued by
+   * an invitation or an administrator's MFA reset and delivered out of band. `consume`
+   * spends it atomically (the finishing step); otherwise it is only checked.
+   */
+  private async useEnrollmentToken(
+    tx: Tx,
+    attempt: AttemptRow,
+    account: Account,
+    token: string | undefined,
+    consume: boolean,
+  ): Promise<void> {
+    const parsed = parseToken(token);
+    const now = this.clock.now();
+    if (!parsed || parsed.organizationId !== attempt.organizationId) {
+      throw new AuthError('enrollment_token_invalid');
+    }
+    const open = and(
+      eq(schema.enrollmentToken.tokenHash, parsed.hash),
+      eq(schema.enrollmentToken.userAccountId, account.id),
+      isNull(schema.enrollmentToken.consumedAt),
+      isNull(schema.enrollmentToken.revokedAt),
+      gt(schema.enrollmentToken.expiresAt, now),
+    );
+    const rows = consume
+      ? await tx
+          .update(schema.enrollmentToken)
+          .set({ consumedAt: now })
+          .where(open)
+          .returning({ id: schema.enrollmentToken.id })
+      : await tx
+          .select({ id: schema.enrollmentToken.id })
+          .from(schema.enrollmentToken)
+          .where(open)
+          .limit(1);
+    if (rows.length !== 1) throw new AuthError('enrollment_token_invalid');
+  }
+
+  /**
+   * Issues a single-use enrollment token (the previous open ones are revoked) and audits
+   * it. Returns the token for out-of-band delivery; it is stored only as a digest.
+   */
+  async issueEnrollmentToken(
+    tx: Tx,
+    ctx: TransactionContext,
+    userAccountId: string,
+    purpose: 'invite' | 'mfa_reset',
+    meta: RequestMeta,
+  ): Promise<{ token: string; expiresAt: Date }> {
+    if (ctx.organizationId === null) throw new Error('issueEnrollmentToken needs a tenant');
+    const now = this.clock.now();
+    await tx
+      .update(schema.enrollmentToken)
+      .set({ revokedAt: now })
+      .where(
+        and(
+          eq(schema.enrollmentToken.userAccountId, userAccountId),
+          isNull(schema.enrollmentToken.consumedAt),
+          isNull(schema.enrollmentToken.revokedAt),
+        ),
+      );
+    const issued = issueToken(ctx.organizationId);
+    const expiresAt = new Date(now.getTime() + ENROLLMENT_HOURS[purpose] * 3_600_000);
+    await tx.insert(schema.enrollmentToken).values({
+      organizationId: ctx.organizationId,
+      userAccountId,
+      tokenHash: issued.hash,
+      purpose,
+      createdAt: now,
+      expiresAt,
+      issuedBy: ctx.actor.userId ?? null,
+    });
+    await appendAuditEvent(
+      tx,
+      ctx,
+      authEvent(meta, 'mfa.enrollment_issued', {
+        targetTable: 'user_account',
+        targetId: userAccountId,
+        metadata: { purpose, expires_at: expiresAt.toISOString() },
+      }),
+    );
+    return { token: issued.token, expiresAt };
+  }
+
   private async afterSignIn(email: string): Promise<void> {
     await this.clearThrottle(accountKey(email));
   }
@@ -545,12 +690,14 @@ export class AuthService {
   /** First sign-in without any factor: create an unverified TOTP factor. */
   async startTotpEnrollment(
     loginToken: string | undefined,
+    enrollmentToken: string | undefined,
     meta: RequestMeta,
   ): Promise<{ otpauthUri: string; secret: string }> {
     return this.withAttempt(loginToken, meta, async (tx, _ctx, attempt, account) => {
       if ((await activeFactors(tx, account.id)).length > 0) {
         throw new AuthError('mfa_required', 'user already has a factor; enrollment refused');
       }
+      await this.useEnrollmentToken(tx, attempt, account, enrollmentToken, false);
       const secret = newTotpSecret();
       await tx.insert(schema.authFactor).values({
         organizationId: attempt.organizationId,
@@ -565,6 +712,7 @@ export class AuthService {
 
   async finishTotpEnrollment(
     loginToken: string | undefined,
+    enrollmentToken: string | undefined,
     code: string,
     meta: RequestMeta,
   ): Promise<IssuedSession> {
@@ -592,10 +740,13 @@ export class AuthService {
       const secret = this.totpSecret(attempt.organizationId, pending.totpSecretEnc);
       const step = secret && verifyTotp(secret, code, now, null);
       if (!step) return null;
-      await tx
+      await this.useEnrollmentToken(tx, attempt, account, enrollmentToken, true);
+      const done = await tx
         .update(schema.authFactor)
         .set({ verifiedAt: now, totpLastStep: step, lastUsedAt: now })
-        .where(eq(schema.authFactor.id, pending.id));
+        .where(and(eq(schema.authFactor.id, pending.id), isNull(schema.authFactor.verifiedAt)))
+        .returning({ id: schema.authFactor.id });
+      if (done.length !== 1) return null;
       await appendAuditEvent(
         tx,
         ctx,
@@ -631,11 +782,7 @@ export class AuthService {
         if (f.kind !== 'totp' || !f.totpSecretEnc) continue;
         const secret = this.totpSecret(attempt.organizationId, f.totpSecretEnc);
         const step = secret && verifyTotp(secret, code, now, f.totpLastStep);
-        if (!step) continue;
-        await tx
-          .update(schema.authFactor)
-          .set({ totpLastStep: step, lastUsedAt: now })
-          .where(eq(schema.authFactor.id, f.id));
+        if (!step || !(await this.consumeTotpStep(tx, f.id, step, now))) continue;
         await appendAuditEvent(
           tx,
           ctx,
@@ -666,11 +813,16 @@ export class AuthService {
   // Step 2: passkeys
   // -------------------------------------------------------------------------
 
-  async passkeyEnrollmentOptions(loginToken: string | undefined, meta: RequestMeta) {
+  async passkeyEnrollmentOptions(
+    loginToken: string | undefined,
+    enrollmentToken: string | undefined,
+    meta: RequestMeta,
+  ) {
     return this.withAttempt(loginToken, meta, async (tx, _ctx, attempt, account) => {
       if ((await activeFactors(tx, account.id)).length > 0) {
         throw new AuthError('mfa_required', 'user already has a factor; enrollment refused');
       }
+      await this.useEnrollmentToken(tx, attempt, account, enrollmentToken, false);
       const options = await passkeyRegistrationOptions(
         this.webauthn,
         { userAccountId: account.id, email: account.email, displayName: account.label },
@@ -686,6 +838,7 @@ export class AuthService {
 
   async finishPasskeyEnrollment(
     loginToken: string | undefined,
+    enrollmentToken: string | undefined,
     response: unknown,
     meta: RequestMeta,
   ): Promise<IssuedSession> {
@@ -696,8 +849,14 @@ export class AuthService {
       }
       const challenge = attempt.webauthnChallenge;
       if (!challenge) return null;
+      // Single use: the challenge is cleared before the response is verified.
+      await tx
+        .update(schema.loginAttempt)
+        .set({ webauthnChallenge: null })
+        .where(eq(schema.loginAttempt.id, attempt.id));
       const credential = await verifyPasskeyRegistration(this.webauthn, response, challenge);
       if (!credential) return null;
+      await this.useEnrollmentToken(tx, attempt, account, enrollmentToken, true);
       const [factor] = await tx
         .insert(schema.authFactor)
         .values({
@@ -714,10 +873,6 @@ export class AuthService {
         })
         .returning({ id: schema.authFactor.id });
       const factorId = (factor as { id: string }).id;
-      await tx
-        .update(schema.loginAttempt)
-        .set({ webauthnChallenge: null })
-        .where(eq(schema.loginAttempt.id, attempt.id));
       await appendAuditEvent(
         tx,
         ctx,
@@ -1018,11 +1173,7 @@ export class AuthService {
         if (f.kind !== 'totp' || !f.totpSecretEnc) continue;
         const secret = this.totpSecret(session.organizationId, f.totpSecretEnc);
         const step = secret && verifyTotp(secret, code, now, f.totpLastStep);
-        if (!step) continue;
-        await tx
-          .update(schema.authFactor)
-          .set({ totpLastStep: step, lastUsedAt: now })
-          .where(eq(schema.authFactor.id, f.id));
+        if (!step || !(await this.consumeTotpStep(tx, f.id, step, now))) continue;
         return this.stepUpDone(tx, ctx, session, meta, 'totp');
       }
       return null;
@@ -1140,8 +1291,23 @@ export class AuthService {
     targetUserAccountId: string,
     reason: string,
     meta: RequestMeta,
-  ): Promise<{ factorsRevoked: number; sessionsRevoked: number }> {
+  ): Promise<{
+    factorsRevoked: number;
+    sessionsRevoked: number;
+    enrollmentToken: string;
+    enrollmentExpiresAt: Date;
+  }> {
     const now = this.clock.now();
+    // Pending sign-ins that passed the password before the reset can no longer finish.
+    await tx
+      .update(schema.loginAttempt)
+      .set({ consumedAt: now })
+      .where(
+        and(
+          eq(schema.loginAttempt.userAccountId, targetUserAccountId),
+          isNull(schema.loginAttempt.consumedAt),
+        ),
+      );
     const factors = await tx
       .update(schema.authFactor)
       .set({ revokedAt: now, revokeReason: 'mfa_reset' })
@@ -1168,15 +1334,29 @@ export class AuthService {
       authEvent(meta, 'mfa.reset', {
         targetTable: 'user_account',
         targetId: targetUserAccountId,
-        reason,
         metadata: {
           factors_revoked: factors.length,
           sessions_revoked: sessions.length,
+          // Free text stays out of the log (PII class): length and digest only.
+          reason_length: [...reason].length,
+          reason_sha256: sha256(reason).toString('hex'),
           user_notification: 'pending (S5 notifications)',
         },
       }),
     );
-    return { factorsRevoked: factors.length, sessionsRevoked: sessions.length };
+    const enrollment = await this.issueEnrollmentToken(
+      tx,
+      ctx,
+      targetUserAccountId,
+      'mfa_reset',
+      meta,
+    );
+    return {
+      factorsRevoked: factors.length,
+      sessionsRevoked: sessions.length,
+      enrollmentToken: enrollment.token,
+      enrollmentExpiresAt: enrollment.expiresAt,
+    };
   }
 
   /** After a privilege change: the user's sessions rotate their token on the next request. */

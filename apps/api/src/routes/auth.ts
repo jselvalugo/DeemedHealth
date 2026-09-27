@@ -5,9 +5,12 @@
  */
 import { SESSION_POLICY, type IssuedSession } from '@deemed/auth';
 import {
+  EnrollmentStartRequest,
   LoginRequest,
+  PasskeyEnrollmentVerifyRequest,
   PasskeyResponseRequest,
   TotpCodeRequest,
+  TotpEnrollmentVerifyRequest,
   type LoginResponse,
   type ReauthResponse,
   type SessionIssuedResponse,
@@ -43,14 +46,21 @@ export const authHandlers = {
     return { next: step.next, methods: step.methods };
   },
 
-  'auth.totp.enroll': async (_req, _reply, h) =>
-    h.services.auth.startTotpEnrollment(h.cookie('signin'), h.ctx.meta),
+  'auth.totp.enroll': async (_req, _reply, h) => {
+    const { enrollmentToken } = h.body(EnrollmentStartRequest);
+    return h.services.auth.startTotpEnrollment(h.cookie('signin'), enrollmentToken, h.ctx.meta);
+  },
 
   'auth.totp.enroll.verify': async (_req, _reply, h) => {
-    const { code } = h.body(TotpCodeRequest);
+    const { code, enrollmentToken } = h.body(TotpEnrollmentVerifyRequest);
     return signedIn(
       h,
-      await h.services.auth.finishTotpEnrollment(h.cookie('signin'), code, h.ctx.meta),
+      await h.services.auth.finishTotpEnrollment(
+        h.cookie('signin'),
+        enrollmentToken,
+        code,
+        h.ctx.meta,
+      ),
     );
   },
 
@@ -59,14 +69,25 @@ export const authHandlers = {
     return signedIn(h, await h.services.auth.verifyTotpLogin(h.cookie('signin'), code, h.ctx.meta));
   },
 
-  'auth.passkey.enroll.options': async (_req, _reply, h) =>
-    h.services.auth.passkeyEnrollmentOptions(h.cookie('signin'), h.ctx.meta),
+  'auth.passkey.enroll.options': async (_req, _reply, h) => {
+    const { enrollmentToken } = h.body(EnrollmentStartRequest);
+    return h.services.auth.passkeyEnrollmentOptions(
+      h.cookie('signin'),
+      enrollmentToken,
+      h.ctx.meta,
+    );
+  },
 
   'auth.passkey.enroll.verify': async (_req, _reply, h) => {
-    const { response } = h.body(PasskeyResponseRequest);
+    const { response, enrollmentToken } = h.body(PasskeyEnrollmentVerifyRequest);
     return signedIn(
       h,
-      await h.services.auth.finishPasskeyEnrollment(h.cookie('signin'), response, h.ctx.meta),
+      await h.services.auth.finishPasskeyEnrollment(
+        h.cookie('signin'),
+        enrollmentToken,
+        response,
+        h.ctx.meta,
+      ),
     );
   },
 

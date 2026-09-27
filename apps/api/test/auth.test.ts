@@ -46,9 +46,13 @@ async function passwordStep(user: TestUser, client = new Client(api)) {
 /** Enrolls a passkey as the user's first factor; returns the signed-in client. */
 async function enrollPasskey(user: TestUser): Promise<Client> {
   const { client } = await passwordStep(user);
-  const options = (await client.post('/api/auth/mfa/passkey/enroll/options')).json();
+  const enrollmentToken = user.enrollmentToken;
+  const options = (
+    await client.post('/api/auth/mfa/passkey/enroll/options', { enrollmentToken })
+  ).json();
   user.passkey = new SoftwareAuthenticator(RP_ID, ORIGIN);
   const res = await client.post('/api/auth/mfa/passkey/enroll/verify', {
+    enrollmentToken,
     response: user.passkey.register(options),
   });
   expect(res.statusCode).toBe(200);
@@ -117,13 +121,18 @@ defineRouteTests('auth.login', {
 
 defineRouteTests('auth.totp.enroll', {
   allowed: async () => {
-    const { client } = await passwordStep(await staff());
-    const res = await client.post('/api/auth/mfa/totp/enroll');
+    const user = await staff();
+    const { client } = await passwordStep(user);
+    const res = await client.post('/api/auth/mfa/totp/enroll', {
+      enrollmentToken: user.enrollmentToken,
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json().otpauthUri).toMatch(/^otpauth:\/\/totp\/Deemed%20Health:/);
   },
   noPendingSignIn: async () => {
-    const res = await new Client(api).post('/api/auth/mfa/totp/enroll');
+    const res = await new Client(api).post('/api/auth/mfa/totp/enroll', {
+      enrollmentToken: 'v1.none',
+    });
     expect(res.statusCode).toBe(401);
     expect(res.json().error.code).toBe('session_expired');
   },
@@ -132,8 +141,51 @@ defineRouteTests('auth.totp.enroll', {
     const user = await staff();
     await signIn(api, user);
     const { client } = await passwordStep(user);
-    expect((await client.post('/api/auth/mfa/totp/enroll')).statusCode).toBe(403);
-    expect((await client.post('/api/auth/mfa/passkey/enroll/options')).statusCode).toBe(403);
+    const enrollmentToken = user.enrollmentToken;
+    expect((await client.post('/api/auth/mfa/totp/enroll', { enrollmentToken })).statusCode).toBe(
+      403,
+    );
+    expect(
+      (await client.post('/api/auth/mfa/passkey/enroll/options', { enrollmentToken })).statusCode,
+    ).toBe(403);
+  },
+  refusedWithoutAValidEnrollmentToken: async () => {
+    // A password alone cannot enroll a first factor either (security review finding 1).
+    const user = await staff();
+    const other = await staff();
+    const { client } = await passwordStep(user);
+    for (const enrollmentToken of ['', 'v1.garbage', other.enrollmentToken]) {
+      const res = await client.post('/api/auth/mfa/totp/enroll', { enrollmentToken });
+      expect([400, 403]).toContain(res.statusCode);
+      if (res.statusCode === 403) expect(res.json().error.code).toBe('enrollment_token_invalid');
+    }
+    const passkey = await client.post('/api/auth/mfa/passkey/enroll/options', {
+      enrollmentToken: other.enrollmentToken,
+    });
+    expect(passkey.json().error.code).toBe('enrollment_token_invalid');
+    // Expired after 72 hours.
+    api.clock.advance({ hours: 73 });
+    const late = await passwordStep(user);
+    const expired = await late.client.post('/api/auth/mfa/totp/enroll', {
+      enrollmentToken: user.enrollmentToken,
+    });
+    expect(expired.json().error.code).toBe('enrollment_token_invalid');
+  },
+  tokenIsSingleUse: async () => {
+    const user = await staff();
+    const first = await signIn(api, user);
+    expect(first.sessionToken).toBeDefined();
+    // Even after an MFA reset by SQL (no new token), the old token stays spent.
+    await api.admin.query(
+      `UPDATE auth.auth_factor SET revoked_at = now(), revoke_reason = 'mfa_reset'
+       WHERE user_account_id = $1 AND revoked_at IS NULL`,
+      [user.userAccountId],
+    );
+    const { client } = await passwordStep(user);
+    const again = await client.post('/api/auth/mfa/totp/enroll', {
+      enrollmentToken: user.enrollmentToken,
+    });
+    expect(again.json().error.code).toBe('enrollment_token_invalid');
   },
 });
 
@@ -147,8 +199,12 @@ defineRouteTests('auth.totp.enroll.verify', {
   },
   noPendingSignIn: async () => {
     expect(
-      (await new Client(api).post('/api/auth/mfa/totp/enroll/verify', { code: '123456' }))
-        .statusCode,
+      (
+        await new Client(api).post('/api/auth/mfa/totp/enroll/verify', {
+          code: '123456',
+          enrollmentToken: 'v1.none',
+        })
+      ).statusCode,
     ).toBe(401);
   },
 });
@@ -204,8 +260,11 @@ defineRouteTests('auth.totp.verify', {
 
 defineRouteTests('auth.passkey.enroll.options', {
   allowed: async () => {
-    const { client } = await passwordStep(await staff());
-    const res = await client.post('/api/auth/mfa/passkey/enroll/options');
+    const user = await staff();
+    const { client } = await passwordStep(user);
+    const res = await client.post('/api/auth/mfa/passkey/enroll/options', {
+      enrollmentToken: user.enrollmentToken,
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       rp: { id: RP_ID },
@@ -213,9 +272,13 @@ defineRouteTests('auth.passkey.enroll.options', {
     });
   },
   noPendingSignIn: async () => {
-    expect((await new Client(api).post('/api/auth/mfa/passkey/enroll/options')).statusCode).toBe(
-      401,
-    );
+    expect(
+      (
+        await new Client(api).post('/api/auth/mfa/passkey/enroll/options', {
+          enrollmentToken: 'v1.none',
+        })
+      ).statusCode,
+    ).toBe(401);
   },
 });
 
@@ -227,8 +290,12 @@ defineRouteTests('auth.passkey.enroll.verify', {
   },
   noPendingSignIn: async () => {
     expect(
-      (await new Client(api).post('/api/auth/mfa/passkey/enroll/verify', { response: {} }))
-        .statusCode,
+      (
+        await new Client(api).post('/api/auth/mfa/passkey/enroll/verify', {
+          response: {},
+          enrollmentToken: 'v1.none',
+        })
+      ).statusCode,
     ).toBe(401);
   },
 });
@@ -480,9 +547,11 @@ describeDb('sessions (fake clock)', () => {
     const user = await staff();
     const client = new Client(api);
     await client.post('/api/auth/login', { email: user.email, password: TEST_PASSWORD });
-    const enroll = await client.post('/api/auth/mfa/totp/enroll');
+    const enrollmentToken = user.enrollmentToken;
+    const enroll = await client.post('/api/auth/mfa/totp/enroll', { enrollmentToken });
     user.totpSecret = (await import('@deemed/auth')).secretFromBase32(enroll.json().secret);
     const done = await client.post('/api/auth/mfa/totp/enroll/verify', {
+      enrollmentToken,
       code: nextCode(api, user),
     });
     const cookies = ([] as string[]).concat(done.headers['set-cookie'] as string | string[]);
@@ -626,6 +695,87 @@ describeDb('error model and request checks', () => {
     const crossSite = await client.post('/api/auth/logout', {}, { 'sec-fetch-site': 'cross-site' });
     expect(crossSite.json().error.code).toBe('csrf_failed');
     expect((await client.post('/api/auth/logout')).statusCode).toBe(204);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Second-factor brute force and races (security review findings 2 and 3)
+// ---------------------------------------------------------------------------
+
+describeDb('second factor across pending sign-ins', () => {
+  it('counts wrong codes per user, across attempts, and locks every open attempt', async () => {
+    const user = await staff();
+    await signIn(api, user);
+    const a = await passwordStep(user);
+    const b = await passwordStep(user);
+    for (const { client } of [a, a, a, b, b, b]) {
+      await client.post('/api/auth/mfa/totp/verify', { code: '000000' });
+    }
+    // The sixth wrong code locked the account: the right code no longer helps.
+    const res = await a.client.post('/api/auth/mfa/totp/verify', { code: nextCode(api, user) });
+    expect(res.statusCode).toBe(429);
+    expect(res.json().error.code).toBe('too_many_attempts');
+    expect(a.client.sessionToken).toBeUndefined();
+  });
+
+  it('keeps at most three pending sign-ins per user, closing the oldest', async () => {
+    const user = await staff();
+    await signIn(api, user);
+    const attempts = [];
+    for (let i = 0; i < 4; i++) attempts.push(await passwordStep(user));
+    const oldest = await attempts[0]!.client.post('/api/auth/mfa/totp/verify', {
+      code: nextCode(api, user),
+    });
+    expect(oldest.json().error.code).toBe('session_expired');
+    const newest = await attempts[3]!.client.post('/api/auth/mfa/totp/verify', {
+      code: nextCode(api, user),
+    });
+    expect(newest.statusCode).toBe(200);
+  });
+
+  it('lets only one of two concurrent requests use the same TOTP code', async () => {
+    const user = await staff();
+    await signIn(api, user);
+    const code = nextCode(api, user);
+    const [x, y] = [await passwordStep(user), await passwordStep(user)];
+    const results = await Promise.all([
+      x.client.post('/api/auth/mfa/totp/verify', { code }),
+      y.client.post('/api/auth/mfa/totp/verify', { code }),
+    ]);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 401]);
+  });
+
+  it('lets only one of two concurrent enrollments spend the same enrollment token', async () => {
+    const user = await staff();
+    const [x, y] = [await passwordStep(user), await passwordStep(user)];
+    const enrollmentToken = user.enrollmentToken;
+    const secrets = await Promise.all(
+      [x, y].map(async ({ client }) =>
+        (await import('@deemed/auth')).secretFromBase32(
+          (await client.post('/api/auth/mfa/totp/enroll', { enrollmentToken })).json().secret,
+        ),
+      ),
+    );
+    api.clock.advance({ seconds: 30 });
+    const now = api.clock.now();
+    const { generateTotp } = await import('@deemed/auth');
+    const results = await Promise.all(
+      [x, y].map(({ client }, i) =>
+        client.post('/api/auth/mfa/totp/enroll/verify', {
+          enrollmentToken,
+          code: generateTotp(secrets[i]!, now),
+        }),
+      ),
+    );
+    // Exactly one wins; the other is refused (spent token or a newer pending secret).
+    expect(results.filter((r) => r.statusCode === 200)).toHaveLength(1);
+    expect(results.find((r) => r.statusCode !== 200)?.statusCode).toBeGreaterThanOrEqual(400);
+    const { rows } = await api.admin.query(
+      `SELECT count(*)::int AS n FROM auth.auth_factor
+       WHERE user_account_id = $1 AND verified_at IS NOT NULL AND revoked_at IS NULL`,
+      [user.userAccountId],
+    );
+    expect(rows[0]).toEqual({ n: 1 });
   });
 });
 

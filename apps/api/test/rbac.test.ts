@@ -12,6 +12,7 @@ import {
   auditFor,
   createUser,
   nextCode,
+  TEST_PASSWORD,
   signIn,
   startApi,
   stepUp,
@@ -493,8 +494,19 @@ defineRouteTests('admin.mfa.reset', {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ factorsRevoked: 1, sessionsRevoked: 1 });
-    const actions = (await auditFor(api, res)).map((e) => e.action);
-    expect(actions).toEqual(['session.revoked', 'mfa.reset']);
+    // Non-production only: the new single-use enrollment token comes back so a synthetic
+    // persona can enroll again (production delivers it out of band, S5).
+    const enrollmentToken = res.json().enrollmentToken as string;
+    expect(enrollmentToken).toMatch(/^v1\./);
+    const events = await auditFor(api, res);
+    expect(events.map((e) => e.action)).toEqual([
+      'session.revoked',
+      'mfa.reset',
+      'mfa.enrollment_issued',
+    ]);
+    // The free-text reason never enters the log (PII class): length and digest only.
+    expect(JSON.stringify(events)).not.toContain('lost phone');
+    expect(events[1]?.metadata).toMatchObject({ reason_length: 40 });
     // The target's session ended, and MFA is still mandatory: the next sign-in enrolls again.
     expect((await clients.target.get('/api/me')).statusCode).toBe(401);
     const again = new Client(api);
@@ -504,5 +516,23 @@ defineRouteTests('admin.mfa.reset', {
     });
     expect(login.json()).toEqual({ next: 'mfa_enroll', methods: [] });
     expect(again.sessionToken).toBeUndefined();
+    // The old invitation is spent; only the token from the reset enrolls.
+    users.target.enrollmentToken = enrollmentToken;
+    clients.target = await signIn(api, users.target);
+    expect((await clients.target.get('/api/me')).statusCode).toBe(200);
+  },
+  consumesPendingSignIns: async () => {
+    // A sign-in that passed the password before the reset cannot finish afterwards.
+    const victim = await createUser(api, 'xyz', [{ roleId: 'staff_provider', siteId: S1 }]);
+    await signIn(api, victim);
+    const pending = new Client(api);
+    await pending.post('/api/auth/login', { email: victim.email, password: TEST_PASSWORD });
+    await fresh('co');
+    const reset = await clients.co.post(`/api/admin/users/${victim.userAccountId}/mfa-reset`, {
+      reason: 'suspected compromise',
+    });
+    expect(reset.statusCode).toBe(200);
+    const late = await pending.post('/api/auth/mfa/totp/verify', { code: nextCode(api, victim) });
+    expect(late.json().error.code).toBe('session_expired');
   },
 });

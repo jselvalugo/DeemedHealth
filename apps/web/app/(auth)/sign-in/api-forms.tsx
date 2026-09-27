@@ -42,6 +42,7 @@ function errorFor(code: ApiErrorCode | 'network', step: 'password' | 'code'): Au
     invalid_code: 'code_invalid',
     session_expired: 'expired',
     unauthenticated: 'expired',
+    enrollment_token_invalid: 'enrollment_invalid',
   };
   const mapped = map[code] ?? 'unexpected';
   return mapped === 'code_invalid'
@@ -133,13 +134,17 @@ export function ApiMfaForm({ locale, expired }: { locale: Locale; expired: boole
 }
 
 /** First sign-in: the user must set up a passkey (preferred) or an authenticator app. */
-export function ApiMfaSetup({ locale }: { locale: Locale }) {
+export function ApiMfaSetup({ locale, initialCode }: { locale: Locale; initialCode?: string }) {
   const tr = (k: Parameters<typeof t>[1]) => t(locale, k);
   const [secret, setSecret] = useState<string | null>(null);
+  // The single-use setup code an administrator sent (invitation or MFA reset). A link
+  // may carry it as ?code=; otherwise the person types it.
+  const [enrollmentToken, setEnrollmentToken] = useState(initialCode ?? '');
 
   const [keyState, keyAction, keyPending] = useActionState(async (): Promise<AuthFormState> => {
     const options = await apiPost<Parameters<typeof startRegistration>[0]['optionsJSON']>(
       '/api/auth/mfa/passkey/enroll/options',
+      { enrollmentToken },
     );
     if (!options.ok) return errorFor(options.code, 'code');
     let response: unknown;
@@ -148,7 +153,10 @@ export function ApiMfaSetup({ locale }: { locale: Locale }) {
     } catch {
       return { status: 'error', code: 'unexpected' };
     }
-    const done = await apiPost('/api/auth/mfa/passkey/enroll/verify', { response });
+    const done = await apiPost('/api/auth/mfa/passkey/enroll/verify', {
+      enrollmentToken,
+      response,
+    });
     if (!done.ok) return errorFor(done.code, 'code');
     navigation.go('/');
     return IDLE;
@@ -156,7 +164,9 @@ export function ApiMfaSetup({ locale }: { locale: Locale }) {
 
   const [startState, startAction, startPending] = useActionState(
     async (): Promise<AuthFormState> => {
-      const res = await apiPost<TotpEnrollmentResponse>('/api/auth/mfa/totp/enroll');
+      const res = await apiPost<TotpEnrollmentResponse>('/api/auth/mfa/totp/enroll', {
+        enrollmentToken,
+      });
       if (!res.ok) return errorFor(res.code, 'code');
       setSecret(res.data.secret);
       return IDLE;
@@ -169,7 +179,7 @@ export function ApiMfaSetup({ locale }: { locale: Locale }) {
       const code = compactCode(field(form, 'code'));
       const invalid = validateTotp(code);
       if (invalid) return { status: 'error', code: invalid, field: 'code' };
-      const res = await apiPost('/api/auth/mfa/totp/enroll/verify', { code });
+      const res = await apiPost('/api/auth/mfa/totp/enroll/verify', { code, enrollmentToken });
       if (!res.ok) return errorFor(res.code, 'code');
       navigation.go('/');
       return IDLE;
@@ -182,6 +192,19 @@ export function ApiMfaSetup({ locale }: { locale: Locale }) {
   return (
     <Card className="p-6 sm:p-8">
       <SignInHeading title={tr('mfa.setup.title')} body={tr('mfa.setup.body')} />
+      <Input
+        id="enrollment-code"
+        name="enrollmentToken"
+        type="text"
+        autoComplete="off"
+        spellCheck={false}
+        className="mb-6 [&_input]:font-mono"
+        label={tr('mfa.setup.token.label')}
+        hint={tr('mfa.setup.token.hint')}
+        value={enrollmentToken}
+        onChange={(e) => setEnrollmentToken(e.target.value.trim())}
+        required
+      />
       <form action={keyAction}>
         <FormError state={keyState} locale={locale} />
         <Button

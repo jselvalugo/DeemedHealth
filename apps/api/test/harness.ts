@@ -4,7 +4,14 @@
  * No network: requests go through Fastify's inject().
  */
 import { randomBytes, randomUUID } from 'node:crypto';
-import { AuthService, FakeClock, generateTotp, hashPassword, secretFromBase32 } from '@deemed/auth';
+import {
+  AuthService,
+  FakeClock,
+  generateTotp,
+  hashPassword,
+  issueToken,
+  secretFromBase32,
+} from '@deemed/auth';
 import { createDatabase, schema, type Database } from '@deemed/db';
 import type { RoleId } from '@deemed/domain';
 import pg from 'pg';
@@ -45,6 +52,8 @@ export async function startApi(): Promise<TestApi> {
     dhEnv: 'local',
     allowedOrigins: [ORIGIN],
     secureCookies: true,
+    // Rate limits are tested on their own (src/rate-limit.test.ts).
+    rateLimit: { globalPerMinute: 1_000_000, signinPerMinute: 1_000_000 },
   });
   await app.ready();
   const admin = new pg.Client({ connectionString: c.adminUrl });
@@ -137,6 +146,8 @@ export interface TestUser {
   userAccountId: string;
   personId: string;
   email: string;
+  /** Single-use code for enrolling the first factor (an invitation, delivered out of band). */
+  enrollmentToken: string;
   totpSecret?: Buffer;
   passkey?: SoftwareAuthenticator;
 }
@@ -173,6 +184,7 @@ export async function createUser(
     max: 1,
   });
   const now = api.clock.now();
+  const enrollment = issueToken(organizationId);
   try {
     await setup.withTenant(organizationId, { type: 'system', label: 'test setup' }, async (tx) => {
       await tx.insert(schema.person).values({
@@ -199,6 +211,14 @@ export async function createUser(
         passwordHash: hash,
         passwordSetAt: now,
       });
+      await tx.insert(schema.enrollmentToken).values({
+        organizationId,
+        userAccountId,
+        tokenHash: enrollment.hash,
+        purpose: 'invite',
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + 72 * 3_600_000),
+      });
       for (const g of grants) {
         const validFrom = new Date(now.getTime() - 60_000);
         await tx.insert(schema.roleAssignment).values({
@@ -219,7 +239,7 @@ export async function createUser(
   } finally {
     await setup.close();
   }
-  return { organizationId, userAccountId, personId, email };
+  return { organizationId, userAccountId, personId, email, enrollmentToken: enrollment.token };
 }
 
 /** The next valid code, moving the fake clock one TOTP step so codes never replay. */
@@ -241,9 +261,14 @@ export async function signIn(
   if (login.statusCode !== 200) throw new Error(`login failed: ${login.statusCode} ${login.body}`);
   const step = login.json() as { next: string };
   if (step.next === 'mfa_enroll') {
-    const enroll = await client.post('/api/auth/mfa/totp/enroll');
+    const enrollmentToken = user.enrollmentToken;
+    const enroll = await client.post('/api/auth/mfa/totp/enroll', { enrollmentToken });
+    if (enroll.statusCode !== 200) {
+      throw new Error(`enroll failed: ${enroll.statusCode} ${enroll.body}`);
+    }
     user.totpSecret = secretFromBase32((enroll.json() as { secret: string }).secret);
     const done = await client.post('/api/auth/mfa/totp/enroll/verify', {
+      enrollmentToken,
       code: nextCode(api, user),
     });
     if (done.statusCode !== 200) throw new Error(`enroll failed: ${done.statusCode} ${done.body}`);

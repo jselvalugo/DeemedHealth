@@ -10,6 +10,7 @@ import {
   MfaResetRequest,
   RevokeRoleRequest,
   getRole,
+  isProduction,
   type MfaResetResponse,
   type RoleAssignmentView,
 } from '@deemed/domain';
@@ -147,7 +148,6 @@ export const adminHandlers = {
         'role.grant',
         created,
         assignmentDiff(null, created),
-        body.reason,
       );
       return view(created);
     });
@@ -187,7 +187,6 @@ export const adminHandlers = {
         'role.revoke',
         revoked,
         assignmentDiff(existing, revoked),
-        reason,
       );
       return view(revoked);
     });
@@ -201,7 +200,14 @@ export const adminHandlers = {
       await requireUser(tx, userAccountId);
       // MFA reset is organization-wide: a site-scoped administrator cannot do it.
       h.authorize('admin:write', { siteId: null }, { table: 'user_account', id: userAccountId });
-      return h.services.auth.resetMfa(tx, txCtx, userAccountId, reason, h.ctx.meta);
+      const result = await h.services.auth.resetMfa(tx, txCtx, userAccountId, reason, h.ctx.meta);
+      return {
+        factorsRevoked: result.factorsRevoked,
+        sessionsRevoked: result.sessionsRevoked,
+        enrollmentExpiresAt: result.enrollmentExpiresAt.toISOString(),
+        // Synthetic environments only: production delivers it out of band (S5).
+        ...(isProduction(h.services.dhEnv) ? {} : { enrollmentToken: result.enrollmentToken }),
+      };
     });
   },
 } satisfies Partial<Record<RouteId, Handler>>;
@@ -213,15 +219,14 @@ async function appendPermissionEvent(
   action: 'role.grant' | 'role.revoke',
   row: AssignmentRow,
   diff: ReturnType<typeof redactedDiff>,
-  reason: string,
 ) {
+  // The free-text reason is in the diff as length and digest only (PII class).
   await appendAuditEvent(tx, txCtx, {
     category: 'permission',
     action,
     targetTable: 'role_assignment',
     targetId: row.id,
     ...(row.siteId ? { siteId: row.siteId } : {}),
-    reason,
     diff,
     metadata: { subject_user_account_id: row.userAccountId, role: row.roleKey },
     sessionId: h.session().id,

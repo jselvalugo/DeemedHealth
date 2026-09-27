@@ -73,6 +73,7 @@ export const en = {
   'release.planned': 'Planned',
 
   // Roles (module map "Default roles"; keys match RoleDefinition.nameKey in @deemed/domain)
+  'role.org_admin.name': 'Health center administrator',
   'role.executive.name': 'Executive',
   'role.compliance_officer.name': 'Compliance officer',
   'role.credentialing_coordinator.name': 'Credentialing coordinator',
@@ -197,6 +198,9 @@ export const en = {
   'mfa.setup.secret.label': 'Setup key for your authenticator app',
   'mfa.setup.secret.hint':
     'In your authenticator app, add an account and enter this key. Then type the 6-digit code it shows.',
+  'mfa.setup.token.label': 'Setup code from your administrator',
+  'mfa.setup.token.hint':
+    'Your administrator sends it to you when your account is created or your sign-in methods are reset.',
   'mfa.setup.submit': 'Finish setup',
 
   // Re-authentication dialog (ADR-0006 rule 5)
@@ -232,6 +236,8 @@ export const en = {
   'apiError.unsupported': 'This option isn’t available for your account.',
   'apiError.not_configured':
     'This environment isn’t connected to its database yet. Try again later.',
+  'apiError.enrollment_token_invalid':
+    'That setup code didn’t work. It may have expired or been used already. Ask your health center administrator for a new one.',
   'apiError.internal':
     'Something went wrong on our side. Try again. If it keeps happening, contact support with the reference number.',
 } as const;

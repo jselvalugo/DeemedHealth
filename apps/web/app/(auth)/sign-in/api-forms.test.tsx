@@ -115,6 +115,7 @@ describe('sign-in against apps/api', () => {
     );
     expect(screen.getByRole('button', { name: 'Create a passkey' })).toBeTruthy();
     expect(await axeViolations()).toEqual([]);
+    await user.type(screen.getByLabelText('Setup code from your administrator'), 'v1.setup-code');
     await user.click(screen.getByRole('button', { name: 'Use an authenticator app instead' }));
     expect((await screen.findByTestId('totp-secret')).textContent).toBe('JBSWY3DPEHPK3PXP');
     await user.type(screen.getByLabelText('Code from your authenticator app'), '123456');
@@ -124,6 +125,10 @@ describe('sign-in against apps/api', () => {
       '/api/auth/mfa/totp/enroll',
       '/api/auth/mfa/totp/enroll/verify',
     ]);
+    // Both steps carry the single-use setup code from the administrator.
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(JSON.parse(init!.body as string).enrollmentToken).toBe('v1.setup-code');
+    }
     unmount();
     render(
       <main>
