@@ -44,15 +44,20 @@ describe('loadApiConfig', () => {
 
 describe('DH_DEV_ROOT_KEY and DH_TRUST_PROXY', () => {
   it('accept only canonical base64 of exactly 32 bytes (openssl rand -base64 32)', () => {
-    const good = randomBytes(32).toString('base64');
+    // Fixed inputs only: a random key can land on a canonical value by chance.
+    const good = 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc='; // 32 bytes of 0x07
     expect(isCanonicalKey32(good)).toBe(true);
+    expect(isCanonicalKey32('+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/s=')).toBe(true);
     expect(loadApiConfig({ ...base, DH_DEV_ROOT_KEY: good }).secretRootKey).toHaveLength(32);
+    expect(isCanonicalKey32('')).toBe(false);
+    expect(() => loadApiConfig({ ...base, DH_DEV_ROOT_KEY: '' })).toThrow(ConfigError);
     for (const bad of [
-      randomBytes(48).toString('base64'), // too long
-      randomBytes(16).toString('base64'), // too short
-      good.slice(0, 43) + '*', // not base64
-      good.slice(0, 42) + '==', // truncated bytes, still 44 chars
-      randomBytes(32).toString('base64url') + '=', // url-safe alphabet
+      Buffer.alloc(48, 7).toString('base64'), // too long
+      Buffer.alloc(16, 7).toString('base64'), // too short
+      'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw*=', // not base64
+      'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==', // 31 bytes, still 44 chars
+      'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwd=', // nonzero padding bits
+      '-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_s=', // url-safe alphabet
     ]) {
       expect(isCanonicalKey32(bad), bad).toBe(false);
       expect(() => loadApiConfig({ ...base, DH_DEV_ROOT_KEY: bad })).toThrow(/exactly 32 bytes/);
