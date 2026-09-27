@@ -40,7 +40,7 @@ except S4 and S5, which cite catalog `requirementId`s through their fixtures.
 - No real person, organization, or credential enters any environment
   (roadmap §2 rule 1). Dev accounts are synthetic personas (ADR-0010 §2).
 - Landing and marketing pages are out of scope. Unauthenticated visitors to any
-  route are sent to `/login`.
+  route are sent to `/sign-in`.
 
 ## 2. Affected modules, entities, and pages
 
@@ -63,7 +63,7 @@ identity: `UserAccount`, `AuthFactor`, `Session`, `IdpConnection`, `ScimToken`,
 
 | Area | Pages (route) | Slice |
 | --- | --- | --- |
-| Auth (outside the shell) | Sign in `/login` · Set up MFA `/login/mfa/setup` · Verify MFA `/login/mfa` · Sign in with your organization `/login/sso` · Signed out `/logout` · Session expired `/login?reason=expired` · Re-authentication dialog (modal on any page) | S1 (UI), S3 (wired) |
+| Auth (outside the shell) | Sign in `/sign-in` · Set up MFA `/sign-in/mfa/setup` · Verify MFA `/sign-in/mfa` · Recovery `/sign-in/recovery` · Sign in with your organization `/sign-in/sso` · Signed out `/sign-in?reason=signed-out` · Session expired `/sign-in?reason=expired` · Re-authentication dialog (modal on any page) | S1 (UI), S3 (wired) |
 | Shell | Header, module bar, launcher / command palette, PREVIEW banner, language toggle, user menu, no-permission page, not-found, error | S1 |
 | Command Center | Overview `/` as the signed-in landing: designed empty state until Phase 2 | S1 |
 | Administration | Users & roles `/admin/users` · Organization & sites `/admin/org` · Requirements catalog `/admin/catalog` · Audit log `/admin/audit` · Integrations `/admin/integrations` (empty state until Phase 2) | S7 |
@@ -172,7 +172,7 @@ G1-15 internal security review.
 | `design-system-engineer` | Tokens, Tailwind preset, header, module bar, launcher / command palette (Ctrl K), PREVIEW banner that cannot be dismissed, four page states | `docs/brand/design-system.md` §1–§8, module map | Stories render; axe clean; no hex values in components (lint) |
 | `suite-architect` | `packages/ui/module-registry.ts` from the module map, including the auth routes section; permission key per page | Module map, S0 `Permission` | Registry test: every module-map row and route present; module map and registry updated in one PR |
 | `ux-content-writer` | EN/ES strings for shell, auth, MFA enrollment, re-auth, errors (generic, no user enumeration), empty states | ADR-0006 rules 3, 5, 11; design system | Key parity check passes; no determination wording |
-| `frontend-engineer` | `/login`, `/login/mfa/setup` (passkey first, TOTP second), `/login/mfa`, `/login/sso`, `/logout`, expired state, re-auth dialog; shell layout; Overview empty state | S1 components, strings, mocked auth client | Playwright: flows pass in EN and ES against the mock; axe clean |
+| `frontend-engineer` | `/sign-in`, `/sign-in/mfa/setup` (passkey first, TOTP second), `/sign-in/mfa`, `/sign-in/sso`, sign-out, expired state, re-auth dialog; shell layout; Overview empty state | S1 components, strings, mocked auth client | Playwright: flows pass in EN and ES against the mock; axe clean |
 | `qa-test-engineer` | Playwright + axe harness; visual snapshots for shell and launcher; PREVIEW banner E2E | Test strategy §1 | Tests run in CI on every PR and against the Netlify preview |
 
 ### S2 · Database package
