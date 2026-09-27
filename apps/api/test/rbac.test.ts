@@ -560,4 +560,36 @@ defineRouteTests('admin.mfa.reset', {
     const late = await pending.post('/api/auth/mfa/totp/verify', { code: nextCode(api, victim) });
     expect(late.json().error.code).toBe('session_expired');
   },
+  omitsTheEnrollmentTokenInProduction: async () => {
+    // Production never returns the new single-use code: it is delivered out of band
+    // (S5 notifications; tracked in phase-1-plan). It is still issued and audited.
+    const prod = await startApi({ dhEnv: 'production' });
+    try {
+      const admin = await createUser(prod, 'xyz', [{ roleId: 'compliance_officer' }]);
+      const target = await createUser(prod, 'xyz', [{ roleId: 'staff_provider', siteId: S1 }]);
+      const client = await signIn(prod, admin);
+      await stepUp(prod, admin, client);
+      const res = await client.post(`/api/admin/users/${target.userAccountId}/mfa-reset`, {
+        reason: 'lost phone, identity confirmed in person',
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body).not.toHaveProperty('enrollmentToken');
+      expect(Object.keys(body).sort()).toEqual([
+        'enrollmentExpiresAt',
+        'factorsRevoked',
+        'sessionsRevoked',
+      ]);
+      expect(res.body).not.toContain('v1.');
+      expect((await auditFor(prod, res)).map((e) => e.action)).toContain('mfa.enrollment_issued');
+      const { rows } = await prod.admin.query(
+        `SELECT purpose FROM auth.enrollment_token
+         WHERE user_account_id = $1 AND consumed_at IS NULL AND revoked_at IS NULL`,
+        [target.userAccountId],
+      );
+      expect(rows.map((r) => r.purpose)).toContain('mfa_reset');
+    } finally {
+      await prod.close();
+    }
+  },
 });
