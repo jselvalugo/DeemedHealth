@@ -54,6 +54,22 @@ support grant or break-glass.
 Operator roles: `platform-admin`, `support`, `catalog-publisher`, `read-only-ops` (capability
 matrix in ADR-0012 §3).
 
+## Auth routes (outside the shell)
+
+These pages are not navigation: they never appear in the launcher or the module
+bar, and they render without the header and module bar (the PREVIEW banner still
+shows). They are registry data (`AUTH_ROUTES` in `packages/ui/module-registry.ts`)
+so routes stay in one place. Added in Phase 1 slice S1.
+
+| Page | Route | Purpose |
+|---|---|---|
+| Sign in | `/sign-in` | Work email, then single sign-on or password (ADR-0006 rules 1–2) |
+| Verify it's you | `/sign-in/mfa` | Second step: passkey or authenticator code; no SMS or email codes (ADR-0006 rule 3) |
+| Can't sign in? | `/sign-in/recovery` | Recovery code, or how to ask an administrator for a reset (ADR-0006 rule 11) |
+| No permission | `/no-permission` | Inside the shell: shown when a role includes no page to land on |
+
+States on `/sign-in`: `?reason=expired` (idle timeout) and `?reason=signed-out`.
+
 The **Deemed Assistant** is not a module. It is a right-side panel that can be
 opened from any page, plus a "Deemed briefs" card on the Command Center. See
 `.claude/agents/ai-assistant-engineer.md`.
