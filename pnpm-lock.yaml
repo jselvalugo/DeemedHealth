@@ -111,6 +111,9 @@ importers:
         specifier: ^19.2.0
         version: 19.3.0(react@19.3.0)
     devDependencies:
+      '@netlify/plugin-nextjs':
+        specifier: ^5.16.0
+        version: 5.16.0
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3
@@ -777,6 +780,10 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
+
+  '@netlify/plugin-nextjs@5.16.0':
+    resolution: {integrity: sha512-ys9G34vifslRRy1VwbOMVNFSKU/vuWdNGcYqvAsCAB8VlDFnZDUBM1WUDjDjXOnNXb8kLXA3hX5LgISEONAhAA==}
+    engines: {node: '>=18.0.0'}
 
   '@next/env@16.3.6':
     resolution: {integrity: sha512-x9Vblze1EbtltQYnNH38xCPWU3TVfBd1eXqA3+w9+BTpedkkdNpAaltXlGQ/nsc1+E0mVTNrtcbX3GoO09zeLQ==}
@@ -3598,6 +3605,8 @@ snapshots:
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
+
+  '@netlify/plugin-nextjs@5.16.0': {}
 
   '@next/env@16.3.6': {}
 
