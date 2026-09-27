@@ -493,6 +493,11 @@ For `hrsa-regulatory-analyst`:
 For `security-privacy-officer`:
 - Florida privacy items FL-PRIV-1 to FL-PRIV-4 in `docs/compliance/florida.md`.
 
+For @jselvalugo (market requirements, `docs/compliance/market-requirements.md` §3):
+- MR-D1 ONC certification, MR-D2 UDS from patient-level data, and MR-D3
+  encounter-level Medicaid PPS billing. Each would replace standing rule 7 and
+  needs an ADR. Until decided, the defaults there hold.
+
 For legal counsel (engaged per D3):
 - Customer BAA and terms of service language, including the "internal readiness,
   not an HRSA determination" limitation.

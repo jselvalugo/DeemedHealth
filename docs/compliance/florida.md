@@ -49,6 +49,9 @@ one.
 | `FL-456` | Fla. Stat. ch. 456 and the practice acts (for example ch. 458, 459, 464, 466) | License types, renewal cycles, and practitioner requirements | draft |
 | `FL-435` | Fla. Stat. ch. 435 and §408.809 (Level 2 background screening, AHCA Clearinghouse) | Whether any health center staff need Level 2 screening. Likely out of scope for the MVP (§4) | draft |
 | `FL-SUNSHINE` | Fla. Stat. ch. 119 (public records) and ch. 286 (open meetings) | Governance, for health centers that are public agencies or public-agency co-applicants | draft |
+| `FL-MEDICAID-PPS` | AHCA Florida Medicaid FQHC coverage and reimbursement policy (PPS encounter rate, encounter definition, same-day visits, SMMC wraparound or supplemental payments) | Finance & Grants tracking of rates, deadlines, and reconciliation. See `market-requirements.md` MR-5 | draft |
+| `FL-RECORDS` | Fla. Stat. §456.057 and the practice board record rules (for example Fla. Admin. Code 64B8-10.002) | Retention periods. See MR-7 | draft |
+| `FL-TELEHEALTH` | Fla. Stat. §456.47 | Telehealth provider registration and credentialing. See MR-7 | draft |
 
 ## 3. Privacy and breach items (for `security-privacy-officer` and counsel)
 
