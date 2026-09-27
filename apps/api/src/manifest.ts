@@ -18,8 +18,12 @@ export type Access =
   | { kind: 'signin' }
   /** Any signed-in user; the handler only touches the user's own records. */
   | { kind: 'session' }
-  /** A signed-in user whose roles grant `permission` (checked again per record). */
-  | { kind: 'permission'; permission: Permission; recentAuth?: boolean };
+  /**
+   * A signed-in user whose roles grant `permission`. `record: true`: the handler must
+   * also authorize the record it touches (site scope, ownership, approval area) before
+   * its transaction commits, or the request fails. Every `approve` route needs it.
+   */
+  | { kind: 'permission'; permission: Permission; recentAuth?: boolean; record?: boolean };
 
 export interface RouteSpec {
   method: 'GET' | 'POST';
@@ -143,7 +147,7 @@ export const ROUTES = {
   'readiness.instance.get': {
     method: 'GET',
     url: '/api/readiness/requirement-instances/:id',
-    access: { kind: 'permission', permission: 'readiness:read' },
+    access: { kind: 'permission', permission: 'readiness:read', record: true },
     audit: null,
     summary: 'One requirement instance (site scope and record rules apply)',
   },
@@ -157,21 +161,21 @@ export const ROUTES = {
   'admin.roles.grant': {
     method: 'POST',
     url: '/api/admin/role-assignments',
-    access: { kind: 'permission', permission: 'admin:write', recentAuth: true },
+    access: { kind: 'permission', permission: 'admin:write', recentAuth: true, record: true },
     audit: { action: 'role.grant' },
     summary: 'Grant a role (site scope, auditor end date, executive approval area)',
   },
   'admin.roles.revoke': {
     method: 'POST',
     url: '/api/admin/role-assignments/:id/revoke',
-    access: { kind: 'permission', permission: 'admin:write', recentAuth: true },
+    access: { kind: 'permission', permission: 'admin:write', recentAuth: true, record: true },
     audit: { action: 'role.revoke' },
     summary: 'Revoke a role grant',
   },
   'admin.mfa.reset': {
     method: 'POST',
     url: '/api/admin/users/:userAccountId/mfa-reset',
-    access: { kind: 'permission', permission: 'admin:write', recentAuth: true },
+    access: { kind: 'permission', permission: 'admin:write', recentAuth: true, record: true },
     audit: { action: 'mfa.reset' },
     summary: "Reset a user's MFA: revoke factors and sessions; enrollment at next sign-in",
   },

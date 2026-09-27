@@ -8,6 +8,7 @@
  *  - `chainSeq` lets the request transaction prove that a mutation wrote an event.
  *  - `deniedEvent` shapes the event for a refused request (outcome = denied).
  */
+import { createHash } from 'node:crypto';
 import { DATA_DICTIONARY, type AuditEventInput, type Tx } from '@deemed/db';
 import {
   AUDIT_ACTIONS,
@@ -26,6 +27,17 @@ function plain(value: JsonValue | Date | undefined): JsonValue {
   return value instanceof Date ? value.toISOString() : value;
 }
 
+/** Free text (reasons, comments): never the words, only length and SHA-256 (ADR-0008 section 5). */
+function redactText(value: JsonValue): JsonValue {
+  if (value === null) return null;
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  return {
+    redacted: true,
+    length: [...text].length,
+    sha256: createHash('sha256').update(text).digest('hex'),
+  };
+}
+
 /** `{ fields: { column: { before, after } } }` for changed columns, redacted by class. */
 export function redactedDiff(table: string, before: Row | null, after: Row | null): JsonValue {
   const entry = DATA_DICTIONARY[table];
@@ -38,7 +50,9 @@ export function redactedDiff(table: string, before: Row | null, after: Row | nul
     const b = plain(before?.[column]);
     const a = plain(after?.[column]);
     if (JSON.stringify(b) === JSON.stringify(a)) continue;
-    if (spec.encryption || spec.class === 'PII' || spec.class === 'PHI') {
+    if (spec.freeText) {
+      fields[column] = { before: redactText(b), after: redactText(a) };
+    } else if (spec.encryption || spec.class === 'PII' || spec.class === 'PHI') {
       fields[column] = { changed: true, redacted: true };
     } else {
       fields[column] = { before: b, after: a };

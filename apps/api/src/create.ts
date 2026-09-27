@@ -32,6 +32,7 @@ export function createApi(
     dhEnv: config.dhEnv,
     allowedOrigins: config.allowedOrigins,
     secureCookies: config.secureCookies,
+    trustProxy: config.trustProxy.length > 0 ? config.trustProxy : false,
     logger: options.logger ?? {
       level: 'info',
       // Never log cookies, tokens, or bodies.

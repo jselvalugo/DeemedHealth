@@ -25,7 +25,9 @@ import {
   type Permission,
   type PolicyContext,
 } from '@deemed/domain';
+import rateLimit from '@fastify/rate-limit';
 import Fastify, {
+  LogController,
   type FastifyError,
   type FastifyInstance,
   type FastifyReply,
@@ -44,9 +46,29 @@ import { authHandlers } from './routes/auth.js';
 import { meHandlers } from './routes/me.js';
 import { readinessHandlers } from './routes/readiness.js';
 
+export interface RateLimitOptions {
+  /** Requests per minute per client address, every route (default 300). */
+  globalPerMinute?: number;
+  /** Requests per minute per client address on sign-in and step-up routes (default 30). */
+  signinPerMinute?: number;
+}
+
 export interface BuildAppOptions extends AppServices {
-  /** Fastify logger options; false in tests. Never logs bodies or cookies. */
+  /** Fastify logger options; false in tests. Never logs bodies, cookies, or addresses. */
   logger?: FastifyServerOptions['logger'];
+  rateLimit?: RateLimitOptions;
+  /**
+   * Which proxies may set X-Forwarded-For (Fastify trustProxy). Default false: the
+   * socket address is the client. On AWS, the ALB subnets (CIDRs).
+   */
+  trustProxy?: boolean | string | string[];
+}
+
+export const RATE_LIMIT_DEFAULTS = { globalPerMinute: 300, signinPerMinute: 30 } as const;
+
+/** Routes that take a password or a second factor get the tighter limit. */
+function isSigninStep(spec: RouteSpec, id: RouteId): boolean {
+  return spec.access.kind === 'signin' || id === 'auth.login' || id.startsWith('auth.reauth.');
 }
 
 const HANDLERS: Record<RouteId, Handler> = {
@@ -83,8 +105,13 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   };
   const names = cookieNames(services.secureCookies);
 
+  const limits = { ...RATE_LIMIT_DEFAULTS, ...options.rateLimit };
   const app = Fastify({
     logger: options.logger ?? false,
+    // No per-request log lines from Fastify (they carry the client address); the
+    // onResponse hook below logs request id, route id, status, and duration only.
+    logController: new LogController({ disableRequestLogging: true }),
+    trustProxy: options.trustProxy ?? false,
     bodyLimit: 256 * 1024,
     // The correlation id: a caller-supplied UUID (from apps/web) or a new one.
     genReqId: (req) => {
@@ -95,6 +122,28 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   });
 
   app.decorateRequest('ctx', null as unknown as RequestContext);
+
+  // Per client address (after trustProxy). Routes must be registered after this plugin
+  // has loaded, or they would not get their per-route limit: see registerRoutes below.
+  void app.register(rateLimit, {
+    global: true,
+    max: limits.globalPerMinute,
+    timeWindow: 60_000,
+    keyGenerator: (req) => req.ip,
+    errorResponseBuilder: () => new ApiError('too_many_attempts'),
+  });
+
+  app.addHook('onResponse', async (req, reply) => {
+    req.log.info(
+      {
+        requestId: req.id,
+        routeId: req.ctx?.routeId ?? null,
+        statusCode: reply.statusCode,
+        durationMs: Math.round(reply.elapsedTime),
+      },
+      'request completed',
+    );
+  });
 
   app.addHook('onRequest', async (req, reply) => {
     const routeId = req.routeOptions.config.routeId ?? null;
@@ -200,6 +249,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       return result.data;
     };
     const mutation = MUTATING.has(spec.method) && spec.audit !== null && spec.audit.by !== 'auth';
+    // Routes marked `record` must check the record itself (site scope, ownership, the
+    // executive approval area) before their transaction commits.
+    const needsRecordCheck = spec.access.kind === 'permission' && spec.access.record === true;
+    let recordChecked = false;
     const setCookie = (value: string) => {
       const existing = reply.getHeader('set-cookie');
       const list =
@@ -233,6 +286,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
             if (mutation && (await chainSeq(tx, s.organizationId)) === before) {
               throw new Error('audit middleware: a mutation wrote no audit event');
             }
+            if (needsRecordCheck && !recordChecked) {
+              throw new Error('policy middleware: a record route never authorized its record');
+            }
             return result;
           },
           {
@@ -257,6 +313,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           policyContext(ctx),
         );
         if (!decision.allowed) throw new DeniedError(decision.reason, target);
+        recordChecked = true;
       },
       async recordView(tx, txCtx, target) {
         if (!auditsEveryView(principal(), services.clock.now())) return;
@@ -293,26 +350,33 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     return h;
   }
 
-  for (const id of ROUTE_IDS) {
-    const spec: RouteSpec = ROUTES[id];
-    const handler = HANDLERS[id];
-    app.route({
-      method: spec.method,
-      url: spec.url,
-      config: { routeId: id },
-      preHandler: async (req, reply) => {
-        req.ctx.routeId = id;
-        checkOrigin(req);
-        if (spec.access.kind === 'session' || spec.access.kind === 'permission') {
-          await authenticate(req, reply, spec);
-        }
-      },
-      handler: async (req, reply) => {
-        const result = await handler(req, reply, helpers(req, reply, spec));
-        return result ?? reply.send();
-      },
-    });
-  }
+  const registerRoutes = async (scope: FastifyInstance) => {
+    for (const id of ROUTE_IDS) {
+      const spec: RouteSpec = ROUTES[id];
+      const handler = HANDLERS[id];
+      scope.route({
+        method: spec.method,
+        url: spec.url,
+        config: {
+          routeId: id,
+          ...(isSigninStep(spec, id)
+            ? { rateLimit: { max: limits.signinPerMinute, timeWindow: 60_000 } }
+            : {}),
+        },
+        preHandler: async (req, reply) => {
+          req.ctx.routeId = id;
+          checkOrigin(req);
+          if (spec.access.kind === 'session' || spec.access.kind === 'permission') {
+            await authenticate(req, reply, spec);
+          }
+        },
+        handler: async (req, reply) => {
+          const result = await handler(req, reply, helpers(req, reply, spec));
+          return result ?? reply.send();
+        },
+      });
+    }
+  };
 
   app.setNotFoundHandler((req, reply) => {
     reply.status(404).send(errorBody('not_found', req.id));
@@ -376,6 +440,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     }
     reply.status(STATUS[apiError.code]).send(errorBody(apiError.code, req.id, apiError.fields));
   });
+
+  // After the rate-limit plugin (plugin order is preserved), so every route gets both
+  // the global and its own limit.
+  void app.register(registerRoutes);
 
   return app;
 }

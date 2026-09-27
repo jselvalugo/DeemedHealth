@@ -99,6 +99,20 @@ describe('route manifest', () => {
     }
   });
 
+  it('makes every approve route (and every route that loads one record) check the record', () => {
+    for (const id of ROUTE_IDS) {
+      const access = ROUTES[id].access as RouteSpec['access'];
+      if (access.kind !== 'permission') continue;
+      if (access.permission.endsWith(':approve')) {
+        // The executive approval-area rule only runs when a record is authorized.
+        expect(access.record, `${id}: approve routes need record: true`).toBe(true);
+      }
+      if (ROUTES[id].url.includes('/:')) {
+        expect(access.record ?? id === 'admin.roles.list', `${id}: record route`).toBe(true);
+      }
+    }
+  });
+
   it('has the required integration tests for every endpoint (allowed, denied role, other site, other tenant)', () => {
     const source = testSources();
     const problems: string[] = [];

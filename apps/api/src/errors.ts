@@ -18,6 +18,7 @@ export const STATUS: Record<ApiErrorCode, number> = {
   reauth_required: 401,
   mfa_required: 403,
   mfa_enrollment_required: 403,
+  enrollment_token_invalid: 403,
   invalid_credentials: 401,
   invalid_code: 401,
   too_many_attempts: 429,

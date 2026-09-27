@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { redactedDiff } from './audit.js';
-import { ConfigError, loadApiConfig } from './config.js';
+import { ConfigError, isCanonicalKey32, loadApiConfig } from './config.js';
 import { clearCookie, cookieNames, readCookie, serializeCookie } from './cookies.js';
 
 const base = {
@@ -42,6 +42,33 @@ describe('loadApiConfig', () => {
   });
 });
 
+describe('DH_DEV_ROOT_KEY and DH_TRUST_PROXY', () => {
+  it('accept only canonical base64 of exactly 32 bytes (openssl rand -base64 32)', () => {
+    const good = randomBytes(32).toString('base64');
+    expect(isCanonicalKey32(good)).toBe(true);
+    expect(loadApiConfig({ ...base, DH_DEV_ROOT_KEY: good }).secretRootKey).toHaveLength(32);
+    for (const bad of [
+      randomBytes(48).toString('base64'), // too long
+      randomBytes(16).toString('base64'), // too short
+      good.slice(0, 43) + '*', // not base64
+      good.slice(0, 42) + '==', // truncated bytes, still 44 chars
+      randomBytes(32).toString('base64url') + '=', // url-safe alphabet
+    ]) {
+      expect(isCanonicalKey32(bad), bad).toBe(false);
+      expect(() => loadApiConfig({ ...base, DH_DEV_ROOT_KEY: bad })).toThrow(/exactly 32 bytes/);
+    }
+  });
+
+  it('parse trusted proxy CIDRs and refuse anything else', () => {
+    expect(loadApiConfig(base).trustProxy).toEqual([]);
+    expect(
+      loadApiConfig({ ...base, DH_TRUST_PROXY: '10.0.0.0/16, 10.1.0.0/16' }).trustProxy,
+    ).toEqual(['10.0.0.0/16', '10.1.0.0/16']);
+    expect(() => loadApiConfig({ ...base, DH_TRUST_PROXY: 'true' })).toThrow(ConfigError);
+    expect(() => loadApiConfig({ ...base, DH_TRUST_PROXY: '10.0.0.0/8;rm' })).toThrow(ConfigError);
+  });
+});
+
 describe('cookies', () => {
   it('are host-prefixed, HttpOnly, SameSite=Lax, and Secure', () => {
     const names = cookieNames(true);
@@ -78,6 +105,19 @@ describe('redactedDiff (ADR-0008 section 5)', () => {
       redactedDiff('public.role_assignment', null, { role_key: 'finance', site_id: null }),
     ).toEqual({
       fields: { role_key: { before: null, after: 'finance' } },
+    });
+  });
+
+  it('keeps only the length and SHA-256 of free-text reasons', () => {
+    const diff = redactedDiff('public.role_assignment', null, {
+      role_key: 'finance',
+      grant_reason: 'Covering for María Delgado while on leave',
+    }) as { fields: Record<string, { after: Record<string, unknown> }> };
+    expect(JSON.stringify(diff)).not.toContain('María');
+    expect(diff.fields.grant_reason?.after).toEqual({
+      redacted: true,
+      length: 41,
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
   });
 

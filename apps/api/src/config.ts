@@ -4,6 +4,11 @@
  *
  * INTERIM: @deemed/config/env (slice S0b) will own this schema; entry points pass
  * process.env in so nothing else here reads it.
+ *
+ *   DH_DEV_ROOT_KEY   canonical base64 of exactly 32 random bytes (non-production):
+ *                     generate with `openssl rand -base64 32`
+ *   DH_TRUST_PROXY    optional comma-separated proxy CIDRs allowed to set
+ *                     X-Forwarded-For (on AWS: the ALB subnets). Unset: none.
  */
 import { DH_ENVS, isProduction, type DhEnv } from '@deemed/domain';
 import { z } from 'zod';
@@ -17,6 +22,27 @@ export interface ApiConfig {
   secureCookies: boolean;
   secretRootKey: Buffer;
   webauthn: { rpId: string; rpName: string; origins: string[] };
+  /** Proxy CIDRs trusted for X-Forwarded-For; empty = trust no proxy. */
+  trustProxy: string[];
+}
+
+/** True for canonical base64 of exactly 32 bytes (what `openssl rand -base64 32` prints). */
+export function isCanonicalKey32(value: string): boolean {
+  if (value.length !== 44) return false;
+  const bytes = Buffer.from(value, 'base64');
+  return bytes.length === 32 && bytes.toString('base64') === value;
+}
+
+/** A CIDR or address, checked with a loop (digits, hex, '.', ':', '/'). */
+function isProxyEntry(value: string): boolean {
+  if (value.length === 0 || value.length > 64) return false;
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    const ok =
+      (c >= 48 && c <= 58) || (c >= 97 && c <= 102) || (c >= 65 && c <= 70) || c === 46 || c === 47;
+    if (!ok) return false;
+  }
+  return true;
 }
 
 const Env = z.object({
@@ -25,6 +51,7 @@ const Env = z.object({
   DH_PUBLIC_ORIGIN: z.string().url(),
   DH_DEV_ROOT_KEY: z.string().min(1).optional(),
   DH_INSECURE_COOKIES: z.enum(['0', '1']).optional(),
+  DH_TRUST_PROXY: z.string().optional(),
 });
 
 export class ConfigError extends Error {
@@ -56,11 +83,19 @@ export function loadApiConfig(env: Record<string, string | undefined>): ApiConfi
   if (!e.DH_DEV_ROOT_KEY) {
     throw new ConfigError('invalid or missing configuration: DH_DEV_ROOT_KEY', ['DH_DEV_ROOT_KEY']);
   }
+  if (!isCanonicalKey32(e.DH_DEV_ROOT_KEY)) {
+    throw new ConfigError(
+      'invalid configuration: DH_DEV_ROOT_KEY must be base64 of exactly 32 bytes (openssl rand -base64 32)',
+      ['DH_DEV_ROOT_KEY'],
+    );
+  }
   const root = Buffer.from(e.DH_DEV_ROOT_KEY, 'base64');
-  if (root.length < 32) {
-    throw new ConfigError('invalid or missing configuration: DH_DEV_ROOT_KEY (32+ bytes, base64)', [
-      'DH_DEV_ROOT_KEY',
-    ]);
+  const trustProxy = (e.DH_TRUST_PROXY ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+  if (!trustProxy.every(isProxyEntry)) {
+    throw new ConfigError('invalid configuration: DH_TRUST_PROXY', ['DH_TRUST_PROXY']);
   }
   const origin = new URL(e.DH_PUBLIC_ORIGIN);
   const insecure = e.DH_INSECURE_COOKIES === '1';
@@ -74,5 +109,6 @@ export function loadApiConfig(env: Record<string, string | undefined>): ApiConfi
     secureCookies: !insecure,
     secretRootKey: root,
     webauthn: { rpId: origin.hostname, rpName: 'Deemed Health', origins: [origin.origin] },
+    trustProxy,
   };
 }

@@ -23,7 +23,7 @@ export default async (request: Request, context: NetlifyContext): Promise<Respon
       DH_PUBLIC_ORIGIN:
         process.env.DH_PUBLIC_ORIGIN ?? process.env.DEPLOY_PRIME_URL ?? process.env.URL,
     },
-    { clientAddress: (req) => clientIps.get(req) },
+    { clientAddress: (req) => clientIps.get(req), requireClientAddress: true },
   );
   if (context?.ip) clientIps.set(request, context.ip);
   return handler(request);

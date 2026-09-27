@@ -37,6 +37,17 @@ describe('serverless entry (Netlify function)', () => {
     expect(log.mock.calls.flat().join(' ')).not.toContain(configured.DH_DEV_ROOT_KEY);
   });
 
+  it('refuses a request whose client address the host did not report (no fallback)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const handle = createApiHandler(configured, {
+      clientAddress: () => undefined,
+      requireClientAddress: true,
+    });
+    const res = await handle(new Request('https://deemed-health-dev.netlify.app/api/health'));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error.code).toBe('not_configured');
+  });
+
   it('serves the real API when configured', async () => {
     const handle = createApiHandler(configured, { clientAddress: () => '192.0.2.9' });
     const res = await handle(new Request('https://deemed-health-dev.netlify.app/api/health'));
