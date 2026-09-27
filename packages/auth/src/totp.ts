@@ -25,6 +25,11 @@ function totp(secretBytes: Buffer, label = 'account'): TOTP {
   });
 }
 
+/** Secret bytes from the base32 form shown at enrollment. */
+export function secretFromBase32(base32: string): Buffer {
+  return Buffer.from(Secret.fromBase32(base32).bytes);
+}
+
 export function totpUri(secretBytes: Buffer, label: string): string {
   return totp(secretBytes, label).toString();
 }

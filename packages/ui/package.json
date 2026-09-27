@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./module-registry": {
+      "types": "./dist/module-registry.d.ts",
+      "default": "./dist/module-registry.js"
+    },
     "./tokens.css": "./src/tokens.css"
   },
   "sideEffects": [

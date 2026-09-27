@@ -92,6 +92,16 @@ importers:
       zod:
         specifier: ^3.25.76
         version: 3.25.76
+    devDependencies:
+      '@simplewebauthn/server':
+        specifier: ^13.3.3
+        version: 13.3.3
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
 
   apps/web:
     dependencies:

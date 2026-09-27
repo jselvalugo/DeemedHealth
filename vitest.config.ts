@@ -8,8 +8,9 @@ export default defineConfig({
   resolve: {
     // Tests run against package sources, so no build is needed first.
     alias: [
+      { find: '@deemed/ui/module-registry', replacement: `${packages}ui/src/module-registry.ts` },
       {
-        find: /^@deemed\/(domain|i18n|ui)$/,
+        find: /^@deemed\/(domain|i18n|ui|db|auth)$/,
         replacement: `${packages}$1/src/index.ts`,
       },
     ],

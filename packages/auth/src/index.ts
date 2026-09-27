@@ -15,6 +15,7 @@ export {
   generateTotp,
   isTotpFormat,
   newTotpSecret,
+  secretFromBase32,
   totpStep,
   totpUri,
   verifyTotp,

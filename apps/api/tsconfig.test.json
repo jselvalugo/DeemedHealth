@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "lib": ["ES2023", "DOM"],
+    "paths": {
+      "@deemed/domain": ["../../packages/domain/src/index.ts"],
+      "@deemed/db": ["../../packages/db/src/index.ts"],
+      "@deemed/auth": ["../../packages/auth/src/index.ts"],
+      "@deemed/i18n": ["../../packages/i18n/src/index.ts"],
+      "@deemed/ui/module-registry": ["../../packages/ui/src/module-registry.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}
