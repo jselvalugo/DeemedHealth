@@ -26,7 +26,7 @@ Keep `packages/test-fixtures` with synthetic organizations that each exercise on
 edge:
 - a board with exactly 51% patients, a board with 50%, a board with 8 members, a board
   over the industry-income limit, and a special-population waiver;
-- a provider whose license expires on Feb 29, on a month end, and in another time zone;
+- a provider whose license expires on Feb 29, on a month end, and at a Central-time Panhandle site versus an Eastern-time site (Florida has both);
 - a provider with privileges at 2 of 3 sites and a lapsed BLS;
 - a possible OIG match that turns out to be a different person (same name, different DOB);
 - a Look-Alike versus a §330 recipient, to test applicability;

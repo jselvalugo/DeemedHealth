@@ -42,7 +42,7 @@ volunteers where the policy requires it, contractors, subrecipients, and vendors
 
 **Sources:** the OIG List of Excluded Individuals/Entities (LEIE), SAM.gov exclusions
 (which also cover debarment for contracts and subawards under 2 CFR 180), state
-Medicaid exclusion lists for the states the health center operates in, and optionally
+Medicaid exclusion lists (Florida only: the AHCA list; see `docs/compliance/florida.md`), and optionally
 licensure disciplinary actions.
 
 **Workflow:**

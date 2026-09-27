@@ -25,7 +25,8 @@ source wins. Update this file in the same change.
 | UDS Manual (per reporting year) | `UDS-YYYY` | Annual data reporting |
 | HRSA Office of Pharmacy Affairs (340B) guidance | `340B` | Planned. Recertification and program integrity |
 | HIPAA Privacy/Security Rules (45 CFR 160, 164); 42 CFR Part 2 | `HIPAA`, `PART2` | Owned with `security-privacy-officer` |
-| OIG LEIE, SAM.gov exclusions, state Medicaid exclusion lists | `EXCL` | Screening sources |
+| OIG LEIE, SAM.gov exclusions, state Medicaid exclusion lists | `EXCL` | Screening sources. Florida only: AHCA sanctioned-provider list |
+| Florida statutes and agency sources | `FL-*` | Deemed Health operates only in Florida. See `docs/compliance/florida.md` |
 
 ## 2. Compliance Manual chapters → modules
 

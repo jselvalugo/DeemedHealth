@@ -9,6 +9,11 @@ board approved, which evidence is missing, and what is due next.
 
 Logo: `assets/brand/deemed-health-logo.png`. Tagline: "FQHC Compliance Software".
 
+> **Operating scope: Florida only.** Every customer health center and site is in
+> Florida. Florida sources, time zones, and state rules are in
+> `docs/compliance/florida.md`. Decision owner for roadmap decisions, counsel
+> engagement, and HRSA project officer contact: the product owner (@jselvalugo).
+
 > Status: pre-build. This repository currently holds the agent definitions and
 > the specs they work from. No application code exists yet.
 
@@ -40,6 +45,7 @@ Logo: `assets/brand/deemed-health-logo.png`. Tagline: "FQHC Compliance Software"
 | `docs/product/module-map.md` | The module and page registry — the single source for navigation |
 | `docs/product/implementation-roadmap.md` | Build phases and the security/compliance gates each one must pass before real data is allowed |
 | `docs/compliance/hrsa-requirements-framework.md` | HRSA requirements mapped to modules, evidence, and cadences |
+| `docs/compliance/florida.md` | Florida operating profile: state sources, privacy and breach rules, time zones |
 | `docs/adr/` | Architecture Decision Records (`NNNN-title.md`) |
 | `assets/brand/` | Logo and brand assets |
 

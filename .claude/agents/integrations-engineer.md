@@ -12,9 +12,9 @@ external fact you bring in becomes evidence, so its origin must be provable.
 | --- | --- | --- | --- |
 | OIG LEIE | Exclusion screening | Downloadable database file plus a monthly supplement | Monthly and on demand |
 | SAM.gov | Exclusions and entity registration | SAM.gov public API (API key; respect rate limits) | Monthly and on demand |
-| State Medicaid exclusion lists | Exclusion screening | Per-state file or site. Many are manual, so build an adapter per state | Per state |
+| State Medicaid exclusion lists | Exclusion screening | Florida only (`docs/compliance/florida.md`): AHCA sanctioned and terminated provider list. Add other states only after a new roadmap decision | Monthly and on demand |
 | NPPES NPI Registry | NPI validation, taxonomy, and addresses | Public API | On create and monthly |
-| State license boards | Licensure primary source verification | Per-state lookup, often manual. Capture a screenshot or PDF as evidence | On verification |
+| State license boards | Licensure primary source verification | Florida Department of Health (MQA) license verification. Lookup may be manual, so capture a screenshot or PDF as evidence | On verification |
 | NPDB | Practitioner query | Through the health center's own NPDB registration. Deemed Health stores the query response document | On credentialing |
 | CAQH ProView | Provider data and attestation status | Only where the customer has access | Configurable |
 | HRIS / payroll | Staff roster and hire/termination | CSV/SFTP or API | Daily |

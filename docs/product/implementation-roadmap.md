@@ -177,7 +177,7 @@ All data is still synthetic.
 | # | Module | Owner(s) | Security and compliance focus |
 | --- | --- | --- | --- |
 | 1 | Providers & Credentialing | `credentialing-privileging-specialist`, `frontend-engineer` | DEA # and DOB are field-encrypted, masked by default, and revealed with audit. NPDB query responses are restricted documents (confidential under 45 CFR Part 60): readable only by credentialing roles and excluded from AI, search, and exports by default. Committee decisions are human approvals. Catalog entries for CM Ch. 5 and the credentialing part of Ch. 21 verified |
-| 2 | Screening | `enrollment-screening-specialist`, `integrations-engineer` | LEIE and SAM adapters with provenance (file hash, retrieval time, raw response). A failed run never shows "clear". Possible matches are cleared only by a human, with a reason. Matching uses name, DOB, NPI, and license number, never SSN. When a possible match can only be resolved by SSN, the health center checks it on the source's own verification tool and records the outcome and method, not the SSN. Monthly cadence labeled as industry practice, not an HRSA rule. State Medicaid agreements may separately require monthly checks; record those as state-specific catalog entries, not HRSA requirements |
+| 2 | Screening | `enrollment-screening-specialist`, `integrations-engineer` | LEIE and SAM adapters with provenance (file hash, retrieval time, raw response). A failed run never shows "clear". Possible matches are cleared only by a human, with a reason. Matching uses name, DOB, NPI, and license number, never SSN. When a possible match can only be resolved by SSN, the health center checks it on the source's own verification tool and records the outcome and method, not the SSN. Monthly cadence labeled as industry practice, not an HRSA rule. Florida sources: the AHCA sanctioned-provider list is the only state adapter (D4). Any cadence required by the Florida Medicaid agreement or SMMC plans is an `FL-*` catalog entry, not an HRSA requirement |
 | 3 | Enrollment | `enrollment-screening-specialist` | Effective dates by payer and site; revalidation cadences from the catalog. NPPES lookups are public data; still logged with provenance |
 | 4 | Governance | `governance-board-specialist` | Board approvals modeled as board approvals linked to a meeting and minutes (Ch. 19). Composition math (Ch. 20) from catalog parameters. Applicability covers the patient-majority waiver for health centers funded only under §330(g), (h), and/or (i), public-agency co-applicant arrangements, and the exemption for Indian tribes and tribal organizations. COI disclosures readable only by authorized roles |
 | 5 | Tasks & Workflows (UI) | `frontend-engineer`, `backend-engineer` | Approvals pin the approved version; only humans approve |
@@ -291,8 +291,9 @@ Built by `platform-devops-engineer`, defined and reviewed by
 - Workforce training current; sanctions policy; access reviews scheduled
   (quarterly).
 - Cyber liability insurance in place.
-- Counsel review of state privacy and breach-notification laws in the pilot
-  customers' states.
+- Counsel review of Florida privacy and breach-notification law (FIPA, Fla. Stat.
+  §501.171) and Florida's data-location rule (§408.051). See
+  `docs/compliance/florida.md` §3.
 
 ### Operations
 
@@ -322,7 +323,8 @@ Built by `platform-devops-engineer`, defined and reviewed by
       documentation (policies, risk analyses, training records) is kept for
       6 years (45 CFR 164.316(b)(2)).
 - [ ] A scan finds no production data in any non-production environment.
-- [ ] Counsel's memo on state breach-notification law is filed.
+- [ ] Counsel's memo on Florida law (FIPA breach notice, §408.051 data location)
+      is filed, and the breach procedure uses the strictest applicable deadline.
 - [ ] `hrsa-regulatory-analyst` re-verified every production catalog entry
       against the current source within the 60 days before G4. Any PAL, PIN, or
       manual revision since G2 is processed as a changeset. The production
@@ -422,8 +424,9 @@ The table flags extra controls.
 
 - SOC 2 Type II, then yearly.
 - Annual penetration test, annual risk analysis update, annual tabletop.
-- Additional state Medicaid exclusion adapters, each with a manual-with-evidence
-  fallback and a terms-of-use review.
+- Additional state Medicaid exclusion adapters only if a new decision adds a state
+  beyond Florida (D4), each with a manual-with-evidence fallback and a terms-of-use
+  review.
 - Multi-region disaster recovery, still inside the US.
 - Regular regulatory watch: `hrsa-regulatory-analyst` checks for new PALs, PINs,
   Compliance Manual revisions, UDS manual changes, and FTCA manual changes, and
@@ -464,6 +467,8 @@ Where each baseline control is first built and where it is proven.
 | --- | --- | --- |
 | D1 | **Do not collect Social Security numbers.** | No SSN fields anywhere; screening matches on name, DOB, NPI, and license number (§5); SSN-shaped values are rejected (G1). Collecting SSN later needs an ADR and a `security-privacy-officer` Approve |
 | D2 | **Run the pilot before SOC 2 Type I.** | Pilot customers get a security package instead (§8); the Type I report is required for general availability (G5) |
+| D4 | **Operate in Florida only.** | All customers, sites, and pilots are in Florida. State sources, the AHCA exclusion adapter, both Florida time zones, and FIPA breach rules are in `docs/compliance/florida.md`. Adding a state needs a new decision |
+| D5 | **The product owner (@jselvalugo) owns every decision, the counsel engagement, and HRSA project officer contact.** | Where a gate says "Loogo Labs leadership", the product owner signs |
 | D3 | **Engage legal counsel on every item listed under "For legal counsel" below.** | Counsel's written conclusions are filed before the gate that depends on each: BAA, terms, and state breach law before G4; NPDB/CVO role before any feature that queries NPDB for a customer; FTCA claim handling before G3; state Medicaid screening before G5. Until counsel answers, the conservative default in each item stays in force |
 
 ### Open questions
@@ -479,7 +484,7 @@ For `hrsa-regulatory-analyst`:
   practitioners as well as LIPs.
 
 For `security-privacy-officer`:
-- Pilot customers' states and any state-law requirements beyond HIPAA.
+- Florida privacy items FL-PRIV-1 to FL-PRIV-4 in `docs/compliance/florida.md`.
 
 For legal counsel (engaged per D3):
 - Customer BAA and terms of service language, including the "internal readiness,
@@ -487,5 +492,5 @@ For legal counsel (engaged per D3):
 - Whether Deemed Health may act as a credentials verification organization or NPDB
   agent. Until counsel says yes, the health center runs its own NPDB queries and
   uploads the response.
-- Limits on FTCA claim-handling features, and state Medicaid screening obligations
-  in the pilot states.
+- Limits on FTCA claim-handling features, and Florida Medicaid screening
+  obligations.
