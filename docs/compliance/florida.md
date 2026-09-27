@@ -14,6 +14,16 @@ one.
 > the current Florida source. Record the statute or rule section, the URL, and the
 > date you checked it, then change its status in the table to `verified`. Legal
 > items go to counsel (roadmap decision D3).
+>
+> **Verification attempt, 2026-09-27 (`hrsa-regulatory-analyst` agent): not
+> completed.** The session's network egress proxy blocked every official source
+> (leg.state.fl.us, flsenate.gov, ahca.myflorida.com, flhealthsource.gov), so the
+> text of §501.171 and §408.051 was not read. A web-search summary (not the
+> statute) was consistent with the 30-day individual notice and the 500-person
+> Department of Legal Affairs notice in FL-PRIV-1. That is not verification. The
+> 1,000 consumer-reporting-agency threshold, the 10-day third-party agent
+> deadline, and the §408.051 data-location text are unconfirmed. All items stay
+> `draft` and all counsel items stay open.
 
 ## 1. What Florida-only means for the product
 
