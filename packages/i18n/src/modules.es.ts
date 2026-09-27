@@ -133,4 +133,5 @@ export const modulesEs: Record<keyof typeof modulesEn, string> = {
   'page.admin.integrations': 'Integraciones',
   'page.admin.catalog': 'Catálogo de requisitos',
   'page.admin.audit': 'Registro de auditoría',
+  'page.admin.supportAccess': 'Acceso de soporte',
 };

@@ -131,4 +131,5 @@ export const modulesEn = {
   'page.admin.integrations': 'Integrations',
   'page.admin.catalog': 'Requirements catalog',
   'page.admin.audit': 'Audit log',
+  'page.admin.supportAccess': 'Support access',
 } as const;

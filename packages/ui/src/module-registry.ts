@@ -745,6 +745,15 @@ export const MODULES: readonly ModuleEntry[] = [
         icon: 'scroll-text',
         permission: 'admin:read',
       },
+      {
+        id: 'support-access',
+        name: 'page.admin.supportAccess',
+        route: '/admin/support-access',
+        icon: 'shield-check',
+        // Page visibility needs admin:read; approving or revoking a grant is an
+        // action the API checks separately (ADR-0012 §6).
+        permission: 'admin:read',
+      },
     ],
   },
 ];

@@ -122,9 +122,9 @@ describe('ModuleLauncher', () => {
     await user.keyboard('{Shift>}{Tab}{/Shift}{ArrowUp}');
     expect(activeOption()?.getAttribute('data-kind')).toBe('module');
     await user.keyboard('{ArrowUp}'); // wraps to the last page
-    expect(activeOption()?.textContent).toBe('Audit log');
+    expect(activeOption()?.textContent).toBe('Support access');
     await user.keyboard('{Enter}');
-    expect(onNavigate).toHaveBeenCalledWith('/admin/audit');
+    expect(onNavigate).toHaveBeenCalledWith('/admin/support-access');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement?.id).toBe('main');
   });
