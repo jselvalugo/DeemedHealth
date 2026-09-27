@@ -155,6 +155,18 @@ export const roleAssignment = pgTable('role_assignment', {
   revokedBy: uuid('revoked_by'),
   revokeReason: text('revoke_reason'),
   ...rowMeta(),
+  /** Executive grants only: the approval area (public.approval_area). */
+  approvalArea: text('approval_area'),
+});
+
+/** Global reference data: executive approval areas (PROPOSED until confirmed). */
+export const approvalArea = pgTable('approval_area', {
+  key: text('key').primaryKey(),
+  modules: text('modules').array().notNull(),
+  descriptionEn: text('description_en').notNull(),
+  status: text('status', { enum: ['proposed', 'confirmed'] })
+    .notNull()
+    .default('proposed'),
 });
 
 export const requirementInstance = pgTable('requirement_instance', {

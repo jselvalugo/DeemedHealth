@@ -3,7 +3,7 @@
 <!-- Generated from packages/db/src/data-dictionary.ts by `pnpm --filter @deemed/db dictionary`. Do not edit by hand. -->
 
 Owner: `data-architect`. Classes follow `docs/security/data-classification.md`.
-Every column of every table in the `public`, `audit`, and `platform` schemas is listed;
+Every column of every table in the `public`, `audit`, `auth`, and `platform` schemas is listed;
 the `@deemed/db` tests fail when a column is missing here. No SSN column exists (decision D1).
 
 Scope: **tenant** = `organization_id` (or `organization.id`) with forced RLS;
@@ -141,6 +141,105 @@ Role granted to a user, optionally limited to a site and optionally expiring. Sc
 | `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
 | `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+| `approval_area` | internal | Executive grants only: approval area (public.approval_area) | at rest | no | shown |
+
+## `public.approval_area`
+
+Executive approval areas: which modules an executive grant may approve. PROPOSED until the product owner confirms. Scope: global. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `key` | internal | Area key | at rest | no | shown |
+| `modules` | internal | Module ids the area covers | at rest | no | shown |
+| `description_en` | internal | Description (English) | at rest | no | shown |
+| `status` | internal | proposed or confirmed | at rest | no | shown |
+
+## `auth.local_credential`
+
+Local account password (ADR-0006 rule 2). Argon2id hash only. Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Credential id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account the password belongs to | at rest | no | shown |
+| `password_hash` | confidential | Argon2id PHC string; never plaintext | at rest | no | hidden |
+| `password_set_at` | internal | When the password was set | at rest | no | shown |
+| `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
+| `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
+| `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
+| `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+
+## `auth.auth_factor`
+
+MFA factor: passkey (WebAuthn) or TOTP. No SMS or email codes (ADR-0006 rule 3). Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Factor id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account the factor belongs to | at rest | no | shown |
+| `kind` | internal | totp or passkey | at rest | no | shown |
+| `label` | internal | Name shown to the user (e.g. "Authenticator app") | at rest | no | shown |
+| `totp_secret_enc` | PII | TOTP secret, AES-256-GCM envelope | field | to_verify | hidden |
+| `totp_last_step` | internal | Last accepted TOTP time step (replay guard) | at rest | no | shown |
+| `webauthn_credential_id` | internal | Passkey credential id (base64url) | at rest | no | shown |
+| `webauthn_public_key` | internal | Passkey COSE public key | at rest | no | shown |
+| `webauthn_counter` | internal | Passkey signature counter | at rest | no | shown |
+| `webauthn_transports` | internal | Passkey transports hint | at rest | no | shown |
+| `verified_at` | internal | When the factor was proven during enrollment | at rest | no | shown |
+| `last_used_at` | internal | Last successful use | at rest | no | shown |
+| `revoked_at` | internal | When the factor was revoked (MFA reset) | at rest | no | shown |
+| `revoke_reason` | confidential | Why the factor was revoked | at rest | no | shown |
+| `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
+| `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
+| `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
+| `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+
+## `auth.login_attempt`
+
+A sign-in between the password and the second factor (10 minutes at most). Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Attempt id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account signing in | at rest | no | shown |
+| `token_hash` | confidential | SHA-256 of the pending sign-in cookie | at rest | no | hidden |
+| `created_at` | internal | Start of the attempt | at rest | no | shown |
+| `expires_at` | internal | End of the attempt | at rest | no | shown |
+| `password_verified_at` | internal | When the password was verified | at rest | no | shown |
+| `webauthn_challenge` | internal | Outstanding WebAuthn challenge | at rest | no | shown |
+| `failed_mfa_count` | internal | Wrong second-factor answers in this attempt | at rest | no | shown |
+| `consumed_at` | internal | When the attempt became a session | at rest | no | shown |
+| `ip_address` | PII | Client IP address | at rest | no | masked |
+| `user_agent` | internal | Client user agent | at rest | no | shown |
+
+## `auth.session`
+
+Server-side session (ADR-0006 rule 4): 15-minute idle, 12-hour absolute, one tenant, MFA required. Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Session id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Signed-in account | at rest | no | shown |
+| `token_hash` | confidential | SHA-256 of the session cookie | at rest | no | hidden |
+| `issued_at` | internal | Sign-in time | at rest | no | shown |
+| `last_seen_at` | internal | Last request (idle timeout) | at rest | no | shown |
+| `absolute_expires_at` | internal | Absolute end (at most 12 hours) | at rest | no | shown |
+| `idle_timeout_seconds` | internal | Idle timeout (at most 900 seconds) | at rest | no | shown |
+| `mfa_method` | internal | Second factor used at sign-in | at rest | no | shown |
+| `mfa_factor_id` | internal | Factor used at sign-in | at rest | no | shown |
+| `mfa_at` | internal | When the second factor was verified | at rest | no | shown |
+| `reauth_at` | internal | Last step-up (re-authentication) | at rest | no | shown |
+| `reauth_challenge` | internal | Outstanding WebAuthn challenge for a passkey step-up | at rest | no | shown |
+| `rotate_required` | internal | Token must rotate on the next request (privilege change) | at rest | no | shown |
+| `rotated_at` | internal | Last token rotation | at rest | no | shown |
+| `revoked_at` | internal | When the session ended | at rest | no | shown |
+| `revoke_reason` | internal | logout, idle, absolute, mfa_reset, deprovisioned, admin | at rest | no | shown |
+| `ip_address` | PII | Client IP address at sign-in | at rest | no | masked |
+| `user_agent` | internal | Client user agent at sign-in | at rest | no | shown |
 
 ## `public.requirement_instance`
 
@@ -275,3 +374,28 @@ Cross-tenant registry for platform jobs; no runtime role reads it directly. Scop
 | `is_test_record` | internal | Synthetic tenant | at rest | no | shown |
 | `provisioned_at` | internal | When the tenant was provisioned | at rest | no | shown |
 | `provisioned_by` | internal | Platform actor label or database user that provisioned it | at rest | no | shown |
+
+## `platform.login_directory`
+
+Login email to tenant for sign-in; read only through auth.resolve_login (ids only). Scope: platform. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account | at rest | no | shown |
+| `email_lower` | PII | Login email, lower case | at rest | to_verify | hidden |
+| `is_active` | internal | Account can sign in | at rest | no | shown |
+| `updated_at` | internal | Last sync from user_account | at rest | no | shown |
+
+## `platform.auth_throttle`
+
+Sign-in throttle and lockout state per account or IP prefix, keyed by a SHA-256 digest. Scope: platform. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `key_hash` | internal | SHA-256 of "account:<email>" or "ip:<prefix>" | at rest | no | shown |
+| `scope` | internal | account or ip | at rest | no | shown |
+| `failures` | internal | Failures in the current window | at rest | no | shown |
+| `window_started_at` | internal | Start of the counting window | at rest | no | shown |
+| `locked_until` | internal | Locked until this time | at rest | no | shown |
+| `updated_at` | internal | Last change | at rest | no | shown |

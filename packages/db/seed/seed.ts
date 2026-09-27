@@ -46,6 +46,15 @@ export function assertSeedAllowed(dhEnv: string | undefined): void {
 
 const SEED_ACTOR: Actor = { type: 'system', label: 'synthetic seed' };
 
+export interface SeedTenantOptions {
+  /**
+   * Argon2id PHC hash of the shared synthetic persona password (non-production only).
+   * When set, every fixture account gets a local credential; the persona still has to
+   * enroll a passkey or TOTP at first sign-in (ADR-0006 rule 3, ADR-0010 section 2).
+   */
+  personaPasswordHash?: string;
+}
+
 export interface SeedResult {
   organizationId: string;
   created: boolean;
@@ -79,6 +88,7 @@ export async function seedTenant(
   db: Db,
   fixture: TenantFixture,
   now: Date = new Date(),
+  options: SeedTenantOptions = {},
 ): Promise<SeedResult> {
   const id = (kind: number, n: number) => fixtureId(fixture.idPrefix, kind, n);
   const organizationId = id(KIND.organization, 1);
@@ -178,13 +188,21 @@ export async function seedTenant(
           status: 'active',
           isTestRecord: true,
         });
+        if (options.personaPasswordHash !== undefined) {
+          await tx.insert(schema.localCredential).values({
+            organizationId,
+            userAccountId: userId,
+            passwordHash: options.personaPasswordHash,
+            passwordSetAt: now,
+          });
+        }
         await audit(
           tx,
           ctx,
           'user_account.create',
           'user_account',
           userId,
-          created({ status: 'active' }),
+          created({ status: 'active', local_password: options.personaPasswordHash !== undefined }),
         );
         for (const r of p.account.roles) {
           grant += 1;
@@ -350,6 +368,8 @@ export interface RunSeedOptions {
   dhEnv: string | undefined;
   fixtures: readonly TenantFixture[];
   now?: Date;
+  /** See SeedTenantOptions.personaPasswordHash. */
+  personaPasswordHash?: string;
 }
 
 export async function runSeed(options: RunSeedOptions): Promise<SeedResult[]> {
@@ -359,7 +379,16 @@ export async function runSeed(options: RunSeedOptions): Promise<SeedResult[]> {
     const db = drizzle(pool, { schema });
     const results: SeedResult[] = [];
     for (const fixture of options.fixtures)
-      results.push(await seedTenant(db, fixture, options.now));
+      results.push(
+        await seedTenant(
+          db,
+          fixture,
+          options.now,
+          options.personaPasswordHash === undefined
+            ? {}
+            : { personaPasswordHash: options.personaPasswordHash },
+        ),
+      );
     return results;
   } finally {
     await pool.end();
