@@ -470,6 +470,8 @@ Where each baseline control is first built and where it is proven.
 | D2 | **Run the pilot before SOC 2 Type I.** | Pilot customers get a security package instead (§8); the Type I report is required for general availability (G5) |
 | D4 | **Operate in Florida only.** | All customers, sites, and pilots are in Florida. State sources, the AHCA exclusion adapter, both Florida time zones, and FIPA breach rules are in `docs/compliance/florida.md`. Adding a state needs a new decision |
 | D5 | **The product owner (@jselvalugo) owns every decision, the counsel engagement, and HRSA project officer contact.** | Where a gate says "Loogo Labs leadership", the product owner signs |
+| D6 | **Confirmed Phase 0 values.** | Sessions: 15-minute idle and 12-hour absolute timeout, re-authentication within 5 minutes for sensitive actions (ADR-0006). RPO 1 hour, RTO 8 hours. Audit log retention 7 years (ADR-0008). Customer breach notice within 5 business days in the BAA template, pending counsel on the FIPA 10-day rule. AWS us-east-1 / us-east-2 for production (ADR-0005) |
+| D7 | **Develop on Netlify for now.** | Netlify hosts non-production environments only, with synthetic data and the PREVIEW banner (ADR-0009). Production stays on AWS; Netlify never receives customer data |
 | D3 | **Engage legal counsel on every item listed under "For legal counsel" below.** | Counsel's written conclusions are filed before the gate that depends on each: BAA, terms, and state breach law before G4; NPDB/CVO role before any feature that queries NPDB for a customer; FTCA claim handling before G3; state Medicaid screening before G5. Until counsel answers, the conservative default in each item stays in force |
 
 ### Open questions
