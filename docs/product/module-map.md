@@ -27,7 +27,32 @@ Status: `MVP` = first release, `Next` = second release, `Planned` = shown in
 | 13 | **Learning** | `graduation-cap` | Required trainings, assignments, and completion evidence by role. | Catalog `/learning` · Assignments `/learning/assignments` · Completions `/learning/completions` | Ch. 5, 21 | Next |
 | 14 | **Tasks & Workflows** | `list-checks` | Every action item across modules, with owners, due dates, and approvals. | My tasks `/tasks` · Team queue `/tasks/team` · Workflows `/tasks/workflows` · Approvals `/tasks/approvals` | All | MVP |
 | 15 | **Self-Service** | `user-round-check` | Staff and board members update their own documents, attestations, and trainings. | My profile `/me` · My documents `/me/documents` · My attestations `/me/attestations` | Ch. 5, 13 | Next |
-| 16 | **Administration** | `settings` | Users, roles, sites, integrations, audit log, and health center settings. | Users & roles `/admin/users` · Organization & sites `/admin/org` · Integrations `/admin/integrations` · Requirements catalog `/admin/catalog` · Audit log `/admin/audit` | — | MVP |
+| 16 | **Administration** | `settings` | Users, roles, sites, integrations, audit log, and health center settings. | Users & roles `/admin/users` · Organization & sites `/admin/org` · Integrations `/admin/integrations` · Requirements catalog `/admin/catalog` · Audit log `/admin/audit` · Support access `/admin/support-access` | — | MVP |
+
+**Support access** (`/admin/support-access`, permission `admin.support_access.approve`,
+default Compliance officer) is where a customer administrator approves or denies Loogo Labs
+support-access requests, revokes active grants, and views grant history with links to the
+matching audit events (ADR-0012 §6).
+
+## Operator console (internal)
+
+Loogo Labs operators only. A separate app (`apps/console`) on its own subdomain, with workforce
+SSO and passkeys (ADR-0012). **Not in the customer launcher, module bar, or command palette**;
+it has its own navigation from a separate `consoleModules` registry export. Operators see
+metadata and aggregate counts only; tenant data is reachable only through a customer-approved
+support grant or break-glass.
+
+| # | Area | Icon | Description | Pages (route) | Roles |
+| --- | --- | --- | --- | --- | --- |
+| C1 | **Tenants** | `building-2` | Provision, suspend, and offboard health centers (Florida only). | Tenants `/tenants` · New tenant `/tenants/new` · Tenant detail `/tenants/:organizationId` · Offboarding `/tenants/offboarding` | platform-admin (write); all (read) |
+| C2 | **Support access** | `life-buoy` | Request and use customer-approved, time-boxed support grants; break-glass. | Requests `/support-access` · Active sessions `/support-access/sessions` · Break-glass `/break-glass` | support, platform-admin |
+| C3 | **Catalog releases** | `book-check` | Publish verified catalog releases and see their aggregate impact. | Releases `/catalog/releases` · Release detail `/catalog/releases/:version` | catalog-publisher (publish); all (read) |
+| C4 | **Feature flags** | `toggle-right` | Flag values per environment and per tenant; AI off by default. | Flags `/flags` · Tenant flags `/flags/tenants` | platform-admin (write); all (read) |
+| C5 | **Platform health** | `gauge` | Integration runs, job queues, and audit chain verification. | Integrations `/health/integrations` · Job queues `/health/jobs` · Audit chain `/health/audit-chain` | all (read); platform-admin (job retry/discard) |
+| C6 | **Operators** | `shield-user` | Operator accounts, roles, and the platform audit log. | Operators & roles `/operators` · Platform audit log `/audit` | platform-admin |
+
+Operator roles: `platform-admin`, `support`, `catalog-publisher`, `read-only-ops` (capability
+matrix in ADR-0012 §3).
 
 The **Deemed Assistant** is not a module. It is a right-side panel that can be
 opened from any page, plus a "Deemed briefs" card on the Command Center. See
