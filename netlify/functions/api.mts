@@ -7,7 +7,8 @@
  * Non-production only (ADR-0009): loadApiConfig refuses DH_ENV=production. Until the
  * site has DATABASE_URL and DH_DEV_ROOT_KEY, every request answers 503 not_configured.
  */
-import { createApiHandler } from '../../apps/api/dist/index.js';
+// A self-contained bundle built by `pnpm --filter @deemed/api build`.
+import { createApiHandler } from '../../apps/api/dist/serverless/api.mjs';
 
 type NetlifyContext = { ip?: string };
 

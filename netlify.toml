@@ -5,7 +5,8 @@
 [build]
   base = "apps/web"
   # The guard fails the build if DH_ENV is "production" or missing.
-  # apps/api is built first: netlify/functions/api.mts bundles its dist (ADR-0010 section 1).
+  # apps/api is built first: its build writes dist/serverless/api.mjs, one self-contained
+  # bundle that netlify/functions/api.mts imports (ADR-0010 section 1).
   command = "node ../../scripts/assert-non-production.mjs && pnpm --filter @deemed/api build && DH_API_URL=\"${DH_API_URL:-$DEPLOY_PRIME_URL}\" pnpm run build"
   publish = ".next"
   # Netlify skips a build when nothing changed under the base directory
@@ -21,11 +22,17 @@
   package = "@netlify/plugin-nextjs"
 
 # The API: one function at /api/* on the same origin as the web app (ADR-0010 section 1).
-# Paths are relative to the base directory. Argon2 is a native module: keep it external.
+# Paths are relative to the base directory. Everything is inside the prebuilt bundle except
+# the native Argon2 module: ship the root node_modules link and its pnpm store targets (the
+# host's tracer does not follow pnpm workspace links). Verified by running the unzipped
+# function: see the S3 PR notes.
 [functions]
   directory = "../../netlify/functions"
-  node_bundler = "esbuild"
   external_node_modules = ["@node-rs/argon2"]
+  included_files = [
+    "../../node_modules/@node-rs/**",
+    "../../node_modules/.pnpm/@node-rs+argon2*/node_modules/@node-rs/**",
+  ]
 
 [build.environment]
   NODE_VERSION = "22"
