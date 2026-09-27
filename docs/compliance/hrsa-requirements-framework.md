@@ -93,7 +93,10 @@ sources:
     url: <official URL>
     verifiedOn: 2026-09-27
     verifiedBy: <reviewer>
-appliesTo: { staffTypes: [LIP], siteScope: all }
+layer: requirement             # requirement | best_practice | state_requirement
+appliesTo: { awardTypes: [section330, lookalike], subPrograms: null, siteTypes: null, staffTypes: [LIP] }  # omitted = all
+notApplicable: { allowed: false }   # or { allowed: true, reason: ... }; each N/A decision also needs its own reason
+parameters: {}
 evidence: [license_verification_record]
 cadence: { trigger: on_hire_and_expiration, renewalMonths: null, leadDays: [90, 60, 30] }
 severity: critical            # critical | high | medium | low
@@ -101,6 +104,8 @@ effective: { from: 2018-08-20, to: null }
 supersedes: []
 status: verified              # draft | verified | retired
 ```
+
+Schema of record: `packages/requirements-catalog/src/schema.ts` (added 2026-09-27: `layer`, `appliesTo` by award type/sub-program/site type/staff type replacing `siteScope`, `notApplicable`, `parameters`). Only `verified` entries reach production (`productionEntries()`). Source register: `packages/requirements-catalog/sources/sources.yaml`.
 
 ## 5. Policy update workflow (PAL/PIN)
 

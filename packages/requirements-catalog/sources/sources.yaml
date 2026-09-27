@@ -1,0 +1,236 @@
+# Source register. Owner: hrsa-regulatory-analyst.
+# Every entry is status: draft with url/version/verifiedOn null: none of these
+# sources were fetched and checked when this file was created (2026-09-27).
+# To verify: open the official source, fill url, locator, version, verifiedOn,
+# verifiedBy, and set status: verified. Never verify from memory.
+sources:
+  - key: PHSA-330
+    title: "Public Health Service Act §330 (42 U.S.C. 254b)"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+  - key: CFR-51c
+    title: "42 CFR Part 51c, Grants for community health services"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+  - key: CFR-56
+    title: "42 CFR Part 56, Grants for migrant health services"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+  - key: UG
+    title: "Uniform Guidance, 2 CFR 200 as adopted by HHS (2 CFR 300); legacy 45 CFR 75"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Confirm which applies per budget period."
+  - key: CFR-180
+    title: "2 CFR Part 180 and HHS 2 CFR Part 376, suspension and debarment"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+  - key: CM
+    title: "HRSA Health Center Program Compliance Manual"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Chapters 3-21."
+  - key: SVP
+    title: "HRSA Health Center Program Site Visit Protocol (OSV)"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+  - key: PAL
+    title: "HRSA Program Assistance Letters (register each as PAL-YYYY-NN)"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Family placeholder; each PAL is registered individually as a changeset."
+  - key: PIN
+    title: "HRSA Policy Information Notices (register each as PIN-YYYY-NN)"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Family placeholder; each PIN is registered individually as a changeset."
+  - key: FTCA
+    title: "FTCA Health Center Policy Manual; 42 U.S.C. 233(g)-(n)"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+  - key: UDS
+    title: "UDS Manual (register each reporting year as UDS-YYYY)"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Family placeholder."
+  - key: 340B
+    title: "HRSA Office of Pharmacy Affairs 340B guidance"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Planned module."
+  - key: HIPAA
+    title: "HIPAA Privacy, Security and Breach Notification Rules, 45 CFR Parts 160 and 164"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Co-owned with security-privacy-officer."
+  - key: PART2
+    title: "42 CFR Part 2, Confidentiality of SUD patient records"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Out of scope until an ADR (roadmap §2 rule 7)."
+  - key: EXCL-LEIE
+    title: "HHS OIG List of Excluded Individuals/Entities"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Part of EXCL group."
+  - key: EXCL-SAM
+    title: "SAM.gov exclusions"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Part of EXCL group."
+  - key: FL-FIPA
+    title: "Florida Information Protection Act, Fla. Stat. §501.171"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: florida
+    status: draft
+  - key: FL-EHR-LOC
+    title: "Fla. Stat. §408.051 (2023 amendment), EHR data location"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: florida
+    status: draft
+    notes: "Applicability to a business associate needs legal counsel."
+  - key: FL-AHCA-SANC
+    title: "AHCA sanctioned and terminated Florida Medicaid providers list"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: florida
+    status: draft
+    notes: "State exclusion source (EXCL group)."
+  - key: FL-MEDICAID
+    title: "Florida Medicaid provider enrollment (AHCA) and SMMC plan credentialing"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: florida
+    status: draft
+  - key: FL-DOH-MQA
+    title: "Florida DOH, Division of Medical Quality Assurance, license verification"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: florida
+    status: draft
+  - key: FL-456
+    title: "Fla. Stat. ch. 456 and practice acts (e.g. ch. 458, 459, 464, 466)"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: florida
+    status: draft
+  - key: FL-435
+    title: "Fla. Stat. ch. 435 and §408.809, Level 2 background screening"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: florida
+    status: draft
+    notes: "Likely out of MVP scope."
+  - key: FL-SUNSHINE
+    title: "Fla. Stat. ch. 119 (public records) and ch. 286 (open meetings)"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: florida
+    status: draft
+    notes: "Only for public-agency health centers or co-applicants."
