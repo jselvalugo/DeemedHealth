@@ -796,8 +796,11 @@ export function launcherModules(
 
 export function normalizeRoute(pathname: string): string {
   const path = pathname.split(/[?#]/, 1)[0] ?? '/';
-  const trimmed = path.length > 1 ? path.replace(/\/+$/, '') : path;
-  return trimmed === '' ? '/' : trimmed;
+  // Trim trailing slashes with a loop, not /\/+$/, which backtracks
+  // polynomially on long slash runs (CodeQL js/polynomial-redos).
+  let end = path.length;
+  while (end > 1 && path.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  return end === 0 ? '/' : path.slice(0, end);
 }
 
 export type RouteMatch = { module: ModuleEntry; page: PageEntry };

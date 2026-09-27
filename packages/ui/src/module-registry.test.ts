@@ -10,6 +10,7 @@ import {
   homeRoute,
   launcherModules,
   matchModule,
+  normalizeRoute,
   type ModuleEntry,
 } from './module-registry.js';
 
@@ -166,6 +167,18 @@ describe('launcherModules', () => {
 });
 
 describe('route helpers', () => {
+  it('normalizes trailing slashes, query, and hash in linear time', () => {
+    expect(normalizeRoute('')).toBe('/');
+    expect(normalizeRoute('/')).toBe('/');
+    expect(normalizeRoute('//')).toBe('/');
+    expect(normalizeRoute('/providers///')).toBe('/providers');
+    expect(normalizeRoute('/providers/?x=1#y')).toBe('/providers');
+    const long = '/a' + '/'.repeat(100_000) + 'x';
+    const start = performance.now();
+    expect(normalizeRoute(long)).toBe(long);
+    expect(performance.now() - start).toBeLessThan(250);
+  });
+
   it('finds exact routes and nested module routes', () => {
     expect(findRoute('/providers/expirations')?.page.id).toBe('expirations');
     expect(findRoute('/providers/expirations/')?.page.id).toBe('expirations');
