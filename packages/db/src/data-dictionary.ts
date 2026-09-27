@@ -20,6 +20,11 @@ export interface ColumnEntry {
   fipa?: 'yes' | 'no' | 'to_verify';
   /** UI and API default. Masked/hidden fields need an audited reveal. */
   display?: 'shown' | 'masked' | 'hidden';
+  /**
+   * Free text people type (reasons, comments). It may hold anything, so it is PII and
+   * the audit diff keeps only its length and SHA-256 (ADR-0008 section 5).
+   */
+  freeText?: boolean;
 }
 
 export interface TableEntry {
@@ -182,24 +187,24 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       site_id: c('internal', 'Site scope; NULL means all sites'),
       valid_from: c('internal', 'Start of the grant'),
       expires_at: c('internal', 'End of the grant; required for auditors (max 30 days)'),
-      grant_reason: c('confidential', 'Why the role was granted'),
+      grant_reason: c('PII', 'Why the role was granted (free text)', { freeText: true }),
       revoked_at: c('internal', 'When the grant was revoked'),
       revoked_by: c('internal', 'Who revoked it (NULL for a service actor)'),
-      revoke_reason: c('confidential', 'Why the grant was revoked'),
+      revoke_reason: c('PII', 'Why the grant was revoked (free text)', { freeText: true }),
       ...rowMeta,
       approval_area: c('internal', 'Executive grants only: approval area (public.approval_area)'),
     },
   },
   'public.approval_area': {
     description:
-      'Executive approval areas: which modules an executive grant may approve. PROPOSED until the product owner confirms.',
+      'Executive approval areas: which modules an executive grant may approve. Confirmed by the product owner (D16).',
     scope: 'global',
     owner: 'security-privacy-officer',
     columns: {
       key: c('internal', 'Area key'),
       modules: c('internal', 'Module ids the area covers'),
       description_en: c('internal', 'Description (English)'),
-      status: c('internal', 'proposed or confirmed'),
+      status: c('internal', 'confirmed (or proposed for a new area awaiting sign-off)'),
     },
   },
   'auth.local_credential': {
@@ -241,7 +246,7 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       verified_at: c('internal', 'When the factor was proven during enrollment'),
       last_used_at: c('internal', 'Last successful use'),
       revoked_at: c('internal', 'When the factor was revoked (MFA reset)'),
-      revoke_reason: c('confidential', 'Why the factor was revoked'),
+      revoke_reason: c('internal', 'Why the factor was revoked (code, e.g. mfa_reset)'),
       ...rowMeta,
     },
   },
@@ -262,6 +267,24 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       consumed_at: c('internal', 'When the attempt became a session'),
       ip_address: c('PII', 'Client IP address', { fipa: 'no', display: 'masked' }),
       user_agent: c('internal', 'Client user agent'),
+    },
+  },
+  'auth.enrollment_token': {
+    description:
+      'Single-use, expiring token that allows enrolling a first MFA factor; issued by invitation or MFA reset and delivered out of band.',
+    scope: 'tenant',
+    owner: 'security-privacy-officer',
+    columns: {
+      id: c('internal', 'Token id'),
+      ...tenantKey,
+      user_account_id: c('internal', 'Account the token lets enroll'),
+      token_hash: c('confidential', 'SHA-256 of the token', { display: 'hidden' }),
+      purpose: c('internal', 'invite or mfa_reset'),
+      created_at: c('internal', 'When the token was issued'),
+      expires_at: c('internal', 'When it stops working (at most 7 days)'),
+      consumed_at: c('internal', 'When it was used to enroll'),
+      revoked_at: c('internal', 'When it was revoked (superseded or MFA reset)'),
+      issued_by: c('internal', 'user_account that issued it (NULL for the platform)'),
     },
   },
   'auth.session': {
@@ -308,7 +331,9 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       site_id: c('internal', 'Site the instance belongs to, if any'),
       owner_person_id: c('internal', 'Accountable person'),
       status: c('internal', 'met, due_soon, overdue, missing, not_applicable'),
-      not_applicable_reason: c('confidential', 'Required reason when status is not_applicable'),
+      not_applicable_reason: c('PII', 'Required reason when status is not_applicable (free text)', {
+        freeText: true,
+      }),
       next_due_on: c('internal', 'Next due date (site or organization time zone)'),
       status_computed_at: c('internal', 'When the readiness engine last computed the status'),
       ...rowMeta,
@@ -349,7 +374,7 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
         'Approving user account; must be the transaction actor',
       ),
       decision: c('internal', 'approved or rejected'),
-      comment: c('confidential', 'Approver comment'),
+      comment: c('PII', 'Approver comment (free text)', { freeText: true }),
       requirement_ids: c('public', 'Catalog requirementIds the decision supports'),
       decided_at: c('internal', 'Decision time (UTC)'),
       ...rowMeta,

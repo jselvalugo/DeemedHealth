@@ -29,6 +29,7 @@ const EXPECTED_TENANT_TABLES = [
   'audit.audit_event',
   'audit.chain_head',
   'auth.auth_factor',
+  'auth.enrollment_token',
   'auth.local_credential',
   'auth.login_attempt',
   'auth.session',

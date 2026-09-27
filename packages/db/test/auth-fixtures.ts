@@ -31,6 +31,15 @@ export async function seedAuthIsolationRows(
               verifiedAt: now,
             })
             .returning({ id: schema.authFactor.id });
+          await tx.insert(schema.enrollmentToken).values({
+            organizationId: t.organizationId,
+            userAccountId: t.userAccountId,
+            tokenHash: randomBytes(32),
+            purpose: 'invite',
+            createdAt: now,
+            expiresAt: new Date(now.getTime() + 3_600_000),
+            revokedAt: now,
+          });
           await tx.insert(schema.loginAttempt).values({
             organizationId: t.organizationId,
             userAccountId: t.userAccountId,

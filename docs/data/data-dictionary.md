@@ -133,10 +133,10 @@ Role granted to a user, optionally limited to a site and optionally expiring. Sc
 | `site_id` | internal | Site scope; NULL means all sites | at rest | no | shown |
 | `valid_from` | internal | Start of the grant | at rest | no | shown |
 | `expires_at` | internal | End of the grant; required for auditors (max 30 days) | at rest | no | shown |
-| `grant_reason` | confidential | Why the role was granted | at rest | no | shown |
+| `grant_reason` | PII | Why the role was granted (free text) | at rest | no | shown |
 | `revoked_at` | internal | When the grant was revoked | at rest | no | shown |
 | `revoked_by` | internal | Who revoked it (NULL for a service actor) | at rest | no | shown |
-| `revoke_reason` | confidential | Why the grant was revoked | at rest | no | shown |
+| `revoke_reason` | PII | Why the grant was revoked (free text) | at rest | no | shown |
 | `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
 | `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
@@ -145,14 +145,14 @@ Role granted to a user, optionally limited to a site and optionally expiring. Sc
 
 ## `public.approval_area`
 
-Executive approval areas: which modules an executive grant may approve. PROPOSED until the product owner confirms. Scope: global. Owner: `security-privacy-officer`.
+Executive approval areas: which modules an executive grant may approve. Confirmed by the product owner (D16). Scope: global. Owner: `security-privacy-officer`.
 
 | Column | Class | Description | Encryption | FIPA PI | Display |
 | --- | --- | --- | --- | --- | --- |
 | `key` | internal | Area key | at rest | no | shown |
 | `modules` | internal | Module ids the area covers | at rest | no | shown |
 | `description_en` | internal | Description (English) | at rest | no | shown |
-| `status` | internal | proposed or confirmed | at rest | no | shown |
+| `status` | internal | confirmed (or proposed for a new area awaiting sign-off) | at rest | no | shown |
 
 ## `auth.local_credential`
 
@@ -190,7 +190,7 @@ MFA factor: passkey (WebAuthn) or TOTP. No SMS or email codes (ADR-0006 rule 3).
 | `verified_at` | internal | When the factor was proven during enrollment | at rest | no | shown |
 | `last_used_at` | internal | Last successful use | at rest | no | shown |
 | `revoked_at` | internal | When the factor was revoked (MFA reset) | at rest | no | shown |
-| `revoke_reason` | confidential | Why the factor was revoked | at rest | no | shown |
+| `revoke_reason` | internal | Why the factor was revoked (code, e.g. mfa_reset) | at rest | no | shown |
 | `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
 | `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
@@ -214,6 +214,23 @@ A sign-in between the password and the second factor (10 minutes at most). Scope
 | `consumed_at` | internal | When the attempt became a session | at rest | no | shown |
 | `ip_address` | PII | Client IP address | at rest | no | masked |
 | `user_agent` | internal | Client user agent | at rest | no | shown |
+
+## `auth.enrollment_token`
+
+Single-use, expiring token that allows enrolling a first MFA factor; issued by invitation or MFA reset and delivered out of band. Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Token id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account the token lets enroll | at rest | no | shown |
+| `token_hash` | confidential | SHA-256 of the token | at rest | no | hidden |
+| `purpose` | internal | invite or mfa_reset | at rest | no | shown |
+| `created_at` | internal | When the token was issued | at rest | no | shown |
+| `expires_at` | internal | When it stops working (at most 7 days) | at rest | no | shown |
+| `consumed_at` | internal | When it was used to enroll | at rest | no | shown |
+| `revoked_at` | internal | When it was revoked (superseded or MFA reset) | at rest | no | shown |
+| `issued_by` | internal | user_account that issued it (NULL for the platform) | at rest | no | shown |
 
 ## `auth.session`
 
@@ -256,7 +273,7 @@ A catalog requirement applied to an organization, site, or person. Scope: tenant
 | `site_id` | internal | Site the instance belongs to, if any | at rest | no | shown |
 | `owner_person_id` | internal | Accountable person | at rest | no | shown |
 | `status` | internal | met, due_soon, overdue, missing, not_applicable | at rest | no | shown |
-| `not_applicable_reason` | confidential | Required reason when status is not_applicable | at rest | no | shown |
+| `not_applicable_reason` | PII | Required reason when status is not_applicable (free text) | at rest | no | shown |
 | `next_due_on` | internal | Next due date (site or organization time zone) | at rest | no | shown |
 | `status_computed_at` | internal | When the readiness engine last computed the status | at rest | no | shown |
 | `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
@@ -300,7 +317,7 @@ A human approval or rejection. Insert-only; AI never approves. Scope: tenant. Ow
 | `approver_person_id` | internal | Approving person | at rest | no | shown |
 | `approver_user_account_id` | internal | Approving user account; must be the transaction actor | at rest | no | shown |
 | `decision` | internal | approved or rejected | at rest | no | shown |
-| `comment` | confidential | Approver comment | at rest | no | shown |
+| `comment` | PII | Approver comment (free text) | at rest | no | shown |
 | `requirement_ids` | public | Catalog requirementIds the decision supports | at rest | no | shown |
 | `decided_at` | internal | Decision time (UTC) | at rest | no | shown |
 | `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |

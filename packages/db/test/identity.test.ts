@@ -167,21 +167,103 @@ describeDb('identity tables (ADR-0006)', () => {
     });
   });
 
-  it('stores throttle state only through the definer functions', async () => {
+  it('counts failures atomically in auth.throttle_fail and matches the packages/auth policy', async () => {
+    const key = randomBytes(32);
+    const t0 = new Date('2030-01-01T00:00:00.000Z');
+    // Same numbers as THROTTLE_POLICY.account: 5 free, then 60 s doubling.
+    const locks: (number | null)[] = [];
+    for (let i = 0; i < 8; i++) {
+      const at = new Date(t0.getTime() + i * 1000);
+      const { rows } = await user.query<{
+        failures: number;
+        locked_until: Date | null;
+        locked_now: boolean;
+      }>(`SELECT * FROM auth.throttle_fail($1, 'account', $2)`, [key, at]);
+      locks.push(
+        rows[0]!.locked_now ? (rows[0]!.locked_until!.getTime() - at.getTime()) / 1000 : null,
+      );
+    }
+    expect(locks).toEqual([null, null, null, null, null, 60, 120, 240]);
+    // Only account keys can be cleared, and app_user cannot write arbitrary state.
+    await user.query('SELECT auth.throttle_clear($1)', [key]);
+    const cleared = await user.query<{ failures: number }>(
+      'SELECT * FROM auth.throttle_read(ARRAY[$1::bytea])',
+      [key],
+    );
+    expect(cleared.rows[0]?.failures).toBe(0);
+    await expectPgError(
+      user.query(`SELECT auth.throttle_write($1, 'account', 0, now(), NULL)`, [key]),
+      '42501',
+    );
+  });
+
+  it('counts every one of many concurrent failures (no lost updates)', async () => {
+    const c = need();
+    const key = randomBytes(32);
+    const clients = await Promise.all(Array.from({ length: 8 }, () => connect(c.appUserUrl)));
+    try {
+      const now = new Date();
+      await Promise.all(
+        clients.map((client) =>
+          Promise.all(
+            Array.from({ length: 5 }, () =>
+              client.query(`SELECT * FROM auth.throttle_fail($1, 'ip', $2)`, [key, now]),
+            ),
+          ),
+        ),
+      );
+    } finally {
+      await Promise.all(clients.map((client) => client.end()));
+    }
+    const { rows } = await user.query<{ failures: number }>(
+      'SELECT * FROM auth.throttle_read(ARRAY[$1::bytea])',
+      [key],
+    );
+    expect(rows[0]?.failures).toBe(40);
+  });
+
+  it('keeps TOTP steps strictly increasing and enrollment tokens single use', async () => {
     await inRollback(user, async () => {
-      const key = randomBytes(32);
-      await user.query(`SELECT auth.throttle_write($1, 'account', 3, now(), NULL)`, [key]);
-      const read = await user.query<{ failures: number }>(
-        'SELECT * FROM auth.throttle_read(ARRAY[$1::bytea])',
-        [key],
+      await setTenant(user, xyz);
+      const f = (
+        await user.query<{ id: string }>(
+          `INSERT INTO auth.auth_factor (organization_id, user_account_id, kind, label, totp_secret_enc, verified_at, totp_last_step)
+           VALUES ($1, $2, 'totp', 'test', $3, now(), 100) RETURNING id`,
+          [xyz, ceo, randomBytes(40)],
+        )
+      ).rows[0]!.id;
+      await expectPgError(
+        attempt(user, () =>
+          user.query('UPDATE auth.auth_factor SET totp_last_step = 99 WHERE id = $1', [f]),
+        ),
+        '23514',
       );
-      expect(read.rows[0]?.failures).toBe(3);
-      await user.query('SELECT auth.throttle_clear($1)', [key]);
-      const cleared = await user.query<{ failures: number }>(
-        'SELECT * FROM auth.throttle_read(ARRAY[$1::bytea])',
-        [key],
+      await user.query('UPDATE auth.auth_factor SET totp_last_step = 101 WHERE id = $1', [f]);
+      await user.query('UPDATE auth.auth_factor SET last_used_at = now() WHERE id = $1', [f]);
+      const t = (
+        await user.query<{ id: string }>(
+          `INSERT INTO auth.enrollment_token (organization_id, user_account_id, token_hash, purpose, created_at, expires_at)
+           VALUES ($1, $2, $3, 'invite', now(), now() + interval '1 day') RETURNING id`,
+          [xyz, ceo, randomBytes(32)],
+        )
+      ).rows[0]!.id;
+      await user.query('UPDATE auth.enrollment_token SET consumed_at = now() WHERE id = $1', [t]);
+      await expectPgError(
+        attempt(user, () =>
+          user.query('UPDATE auth.enrollment_token SET consumed_at = NULL WHERE id = $1', [t]),
+        ),
+        '23514',
       );
-      expect(cleared.rows[0]?.failures).toBe(0);
+      await expectPgError(
+        attempt(user, () =>
+          user.query(
+            `INSERT INTO auth.enrollment_token (organization_id, user_account_id, token_hash, purpose, created_at, expires_at)
+             VALUES ($1, $2, $3, 'invite', now(), now() + interval '8 days')`,
+            [xyz, ceo, randomBytes(32)],
+          ),
+        ),
+        '23514',
+      );
     });
   });
 });

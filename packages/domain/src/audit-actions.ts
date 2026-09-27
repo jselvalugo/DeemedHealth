@@ -57,6 +57,10 @@ export const AUDIT_ACTIONS = {
   'mfa.enrolled': { category: 'auth', description: 'MFA factor enrolled' },
   'mfa.challenge': { category: 'auth', description: 'MFA challenge answered' },
   'mfa.reset': { category: 'auth', description: 'MFA reset by an administrator' },
+  'mfa.enrollment_issued': {
+    category: 'auth',
+    description: 'Single-use MFA enrollment token issued',
+  },
   'scim.user_provisioned': { category: 'auth', description: 'User provisioned via SCIM' },
   'scim.user_deprovisioned': { category: 'auth', description: 'User deprovisioned via SCIM' },
   'breakglass.activated': { category: 'auth', description: 'Break-glass account used' },

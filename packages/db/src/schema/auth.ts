@@ -65,6 +65,22 @@ export const loginAttempt = authSchema.table('login_attempt', {
   userAgent: text('user_agent'),
 });
 
+export const ENROLLMENT_PURPOSES = ['invite', 'mfa_reset'] as const;
+
+/** Single-use token that allows enrolling a first MFA factor (migration 0005). */
+export const enrollmentToken = authSchema.table('enrollment_token', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  userAccountId: uuid('user_account_id').notNull(),
+  tokenHash: bytea('token_hash').notNull(),
+  purpose: text('purpose', { enum: ENROLLMENT_PURPOSES }).notNull(),
+  createdAt: timestamptz('created_at').notNull(),
+  expiresAt: timestamptz('expires_at').notNull(),
+  consumedAt: timestamptz('consumed_at'),
+  revokedAt: timestamptz('revoked_at'),
+  issuedBy: uuid('issued_by'),
+});
+
 export const session = authSchema.table('session', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id').notNull(),

@@ -29,6 +29,11 @@ try {
   });
   for (const r of results) {
     console.log(`${r.created ? 'seeded' : 'already present'}: organization ${r.organizationId}`);
+    // Synthetic personas only (the seed refuses production): the single-use codes they
+    // need to enroll a first passkey or authenticator. Reissue with seed:enroll.
+    for (const [persona, token] of Object.entries(r.enrollmentTokens)) {
+      console.log(`  enrollment code for persona "${persona}": ${token}`);
+    }
   }
 } catch (error) {
   console.error(error instanceof SeedRefusedError ? error.message : error);

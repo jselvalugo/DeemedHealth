@@ -159,7 +159,7 @@ export const roleAssignment = pgTable('role_assignment', {
   approvalArea: text('approval_area'),
 });
 
-/** Global reference data: executive approval areas (PROPOSED until confirmed). */
+/** Global reference data: executive approval areas (confirmed, decision D16). */
 export const approvalArea = pgTable('approval_area', {
   key: text('key').primaryKey(),
   modules: text('modules').array().notNull(),
