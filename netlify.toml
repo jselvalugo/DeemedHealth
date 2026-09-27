@@ -6,7 +6,7 @@
   base = "apps/web"
   # The guard fails the build if DH_ENV is "production" or missing.
   # apps/api is built first: netlify/functions/api.mts bundles its dist (ADR-0010 section 1).
-  command = "node ../../scripts/assert-non-production.mjs && pnpm --filter @deemed/api build && pnpm run build"
+  command = "node ../../scripts/assert-non-production.mjs && pnpm --filter @deemed/api build && DH_API_URL=\"${DH_API_URL:-$DEPLOY_PRIME_URL}\" pnpm run build"
   publish = ".next"
   # Next.js is served by Netlify's built-in Next.js runtime (OpenNext adapter),
   # detected automatically; no plugin entry is needed.

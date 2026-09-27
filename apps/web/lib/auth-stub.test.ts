@@ -80,7 +80,7 @@ describe('auth stub in production', () => {
 });
 
 describe('auth stub outside production (synthetic demo)', () => {
-  beforeEach(() => vi.stubEnv('DH_ENV', 'development'));
+  beforeEach(() => vi.stubEnv('DH_ENV', 'local'));
 
   it('validates the email without revealing whether an account exists', async () => {
     expect(await actions.startSignIn(IDLE, form({ email: '' }))).toMatchObject({
