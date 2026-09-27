@@ -15,7 +15,9 @@ export default defineProject({
     include: ['test/**/*.test.ts'],
     globalSetup: ['test/global-setup.ts'],
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    // Vitest 4 replacement for poolOptions.forks.singleFork: one worker, one file at a time.
+    maxWorkers: 1,
+    fileParallelism: false,
     testTimeout: 30_000,
     hookTimeout: 180_000,
   },
