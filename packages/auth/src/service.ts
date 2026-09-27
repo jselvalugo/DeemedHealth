@@ -429,34 +429,76 @@ export class AuthService {
     return { loginToken: issued.token, next: methods.length ? 'mfa' : 'mfa_enroll', methods };
   }
 
-  /** Loads a pending sign-in in its tenant transaction, or throws session_expired. */
+  /**
+   * Reserves one second-factor guess on the account key before the guess is evaluated
+   * (auth.throttle_reserve counts it atomically under a row lock). False while the
+   * account is locked; then nothing was counted. A successful sign-in or step-up clears
+   * the account key, which gives the reservation back.
+   */
+  private async reserveAccountGuess(email: string): Promise<boolean> {
+    const key = accountKey(email);
+    const result = await this.db.withPlatform(SYSTEM, (tx) =>
+      tx.execute<{ allowed: boolean }>(
+        sql`SELECT allowed FROM auth.throttle_reserve(${key.hash}, ${key.scope})`,
+      ),
+    );
+    return result.rows[0]?.allowed === true;
+  }
+
+  /** Gives one reserved guess back to a pending sign-in (the guess was not evaluated). */
+  private async releaseAttemptGuess(
+    organizationId: string,
+    attemptId: string,
+    meta: RequestMeta,
+  ): Promise<void> {
+    await this.db.withTenant(
+      organizationId,
+      SYSTEM,
+      (tx) =>
+        tx
+          .update(schema.loginAttempt)
+          .set({ failedMfaCount: sql`greatest(${schema.loginAttempt.failedMfaCount} - 1, 0)` })
+          .where(eq(schema.loginAttempt.id, attemptId)),
+      { requestId: meta.requestId },
+    );
+  }
+
+  /**
+   * Loads a pending sign-in and runs `fn` in its tenant transaction, or throws
+   * session_expired. With `guess`, one second-factor guess is reserved first, on the
+   * sign-in (a conditional UPDATE: failed_mfa_count < 5) and on the account
+   * (auth.throttle_reserve), each committed before any code is evaluated; so guesses
+   * sent at once cannot all pass a count read before any of them was recorded.
+   */
   private async withAttempt<T>(
     loginToken: string | undefined,
     meta: RequestMeta,
     fn: (tx: Tx, ctx: TransactionContext, attempt: AttemptRow, account: Account) => Promise<T>,
+    options: { guess?: boolean } = {},
   ): Promise<T> {
     const parsed = parseToken(loginToken);
     if (!parsed) throw new AuthError('session_expired');
     const now = this.clock.now();
+    const pending = and(
+      eq(schema.loginAttempt.tokenHash, parsed.hash),
+      isNull(schema.loginAttempt.consumedAt),
+      gt(schema.loginAttempt.expiresAt, now),
+      lt(schema.loginAttempt.failedMfaCount, SESSION_POLICY.maxMfaFailuresPerAttempt),
+    );
     const found = await this.db.withTenant(
       parsed.organizationId,
       SYSTEM,
       async (tx) => {
-        const attempt = (
-          await tx
-            .select()
-            .from(schema.loginAttempt)
-            .where(eq(schema.loginAttempt.tokenHash, parsed.hash))
-            .limit(1)
-        )[0];
-        if (
-          !attempt ||
-          attempt.consumedAt !== null ||
-          attempt.expiresAt.getTime() <= now.getTime() ||
-          attempt.failedMfaCount >= SESSION_POLICY.maxMfaFailuresPerAttempt
-        ) {
-          return null;
-        }
+        const attempt = options.guess
+          ? (
+              await tx
+                .update(schema.loginAttempt)
+                .set({ failedMfaCount: sql`${schema.loginAttempt.failedMfaCount} + 1` })
+                .where(pending)
+                .returning()
+            )[0]
+          : (await tx.select().from(schema.loginAttempt).where(pending).limit(1))[0];
+        if (!attempt) return null;
         const account = await loadAccount(tx, attempt.userAccountId);
         return account?.active ? { attempt, account } : null;
       },
@@ -465,7 +507,14 @@ export class AuthService {
     if (!found) throw new AuthError('session_expired');
     // Second-factor failures count per user (the account key), across every pending
     // sign-in; while the account is locked no attempt may answer.
-    if (await this.accountLocked(found.account.email)) throw new AuthError('too_many_attempts');
+    if (options.guess) {
+      if (!(await this.reserveAccountGuess(found.account.email))) {
+        await this.releaseAttemptGuess(parsed.organizationId, found.attempt.id, meta);
+        throw new AuthError('too_many_attempts');
+      }
+    } else if (await this.accountLocked(found.account.email)) {
+      throw new AuthError('too_many_attempts');
+    }
     return this.db.withTenant(
       parsed.organizationId,
       userActor(found.account),
@@ -474,31 +523,45 @@ export class AuthService {
     );
   }
 
-  /** A wrong second factor: count it on the attempt and the account, audit it. */
-  private async mfaFailed(
+  /**
+   * One second-factor guess at sign-in: reserved before `verify` runs (withAttempt with
+   * `guess`). `verify` returns the session, or null for a wrong answer, which is audited
+   * in the same transaction and answered with invalid_code; the reservation stays spent.
+   */
+  private async signInGuess(
     loginToken: string | undefined,
     meta: RequestMeta,
     method: MfaMethod,
-  ): Promise<never> {
-    const email = await this.withAttempt(loginToken, meta, async (tx, ctx, attempt, account) => {
-      await tx
-        .update(schema.loginAttempt)
-        .set({ failedMfaCount: attempt.failedMfaCount + 1 })
-        .where(eq(schema.loginAttempt.id, attempt.id));
-      await appendAuditEvent(
-        tx,
-        ctx,
-        authEvent(meta, 'mfa.challenge', {
-          outcome: 'failure',
-          targetTable: 'user_account',
-          targetId: account.id,
-          metadata: { method },
-        }),
-      );
-      return account.email;
-    }).catch(() => null);
-    if (email) await this.fail([accountKey(email)]);
-    throw new AuthError('invalid_code');
+    verify: (
+      tx: Tx,
+      ctx: TransactionContext,
+      attempt: AttemptRow,
+      account: Account,
+    ) => Promise<IssuedSession | null>,
+  ): Promise<IssuedSession> {
+    const result = await this.withAttempt(
+      loginToken,
+      meta,
+      async (tx, ctx, attempt, account) => {
+        const session = await verify(tx, ctx, attempt, account);
+        if (session) return { session, email: account.email };
+        await appendAuditEvent(
+          tx,
+          ctx,
+          authEvent(meta, 'mfa.challenge', {
+            outcome: 'failure',
+            targetTable: 'user_account',
+            targetId: account.id,
+            metadata: { method },
+          }),
+        );
+        return null;
+      },
+      { guess: true },
+    );
+    if (!result) throw new AuthError('invalid_code');
+    await this.afterSignIn(result.email);
+    return result.session;
   }
 
   // -------------------------------------------------------------------------
@@ -515,9 +578,13 @@ export class AuthService {
   ): Promise<IssuedSession> {
     if (factor[verifiedBrand] !== true) throw new Error('issueSession needs a verified factor');
     const now = this.clock.now();
+    // Consume the sign-in, giving back the guess reserved for this (right) answer.
     const consumed = await tx
       .update(schema.loginAttempt)
-      .set({ consumedAt: now })
+      .set({
+        consumedAt: now,
+        failedMfaCount: sql`greatest(${schema.loginAttempt.failedMfaCount} - 1, 0)`,
+      })
       .where(and(eq(schema.loginAttempt.id, attempt.id), isNull(schema.loginAttempt.consumedAt)))
       .returning({ id: schema.loginAttempt.id });
     if (consumed.length !== 1) throw new AuthError('session_expired');
@@ -676,6 +743,7 @@ export class AuthService {
     return { token: issued.token, expiresAt };
   }
 
+  /** After a right second factor (sign-in or step-up): the account key starts over. */
   private async afterSignIn(email: string): Promise<void> {
     await this.clearThrottle(accountKey(email));
   }
@@ -714,7 +782,7 @@ export class AuthService {
     meta: RequestMeta,
   ): Promise<IssuedSession> {
     const now = this.clock.now();
-    const result = await this.withAttempt(loginToken, meta, async (tx, ctx, attempt, account) => {
+    return this.signInGuess(loginToken, meta, 'totp', async (tx, ctx, attempt, account) => {
       if ((await activeFactors(tx, account.id)).length > 0) {
         throw new AuthError('mfa_required', 'user already has a factor; enrollment refused');
       }
@@ -753,19 +821,8 @@ export class AuthService {
           metadata: { method: 'totp', factor_id: pending.id },
         }),
       );
-      const session = await this.issueSession(
-        tx,
-        ctx,
-        attempt,
-        account,
-        verified(pending.id, 'totp'),
-        meta,
-      );
-      return { session, email: account.email };
+      return this.issueSession(tx, ctx, attempt, account, verified(pending.id, 'totp'), meta);
     });
-    if (!result) return this.mfaFailed(loginToken, meta, 'totp');
-    await this.afterSignIn(result.email);
-    return result.session;
   }
 
   async verifyTotpLogin(
@@ -774,7 +831,7 @@ export class AuthService {
     meta: RequestMeta,
   ): Promise<IssuedSession> {
     const now = this.clock.now();
-    const result = await this.withAttempt(loginToken, meta, async (tx, ctx, attempt, account) => {
+    return this.signInGuess(loginToken, meta, 'totp', async (tx, ctx, attempt, account) => {
       for (const f of await activeFactors(tx, account.id)) {
         if (f.kind !== 'totp' || !f.totpSecretEnc) continue;
         const secret = this.totpSecret(attempt.organizationId, f.totpSecretEnc);
@@ -789,21 +846,10 @@ export class AuthService {
             metadata: { method: 'totp' },
           }),
         );
-        const session = await this.issueSession(
-          tx,
-          ctx,
-          attempt,
-          account,
-          verified(f.id, 'totp'),
-          meta,
-        );
-        return { session, email: account.email };
+        return this.issueSession(tx, ctx, attempt, account, verified(f.id, 'totp'), meta);
       }
       return null;
     });
-    if (!result) return this.mfaFailed(loginToken, meta, 'totp');
-    await this.afterSignIn(result.email);
-    return result.session;
   }
 
   // -------------------------------------------------------------------------
@@ -840,7 +886,7 @@ export class AuthService {
     meta: RequestMeta,
   ): Promise<IssuedSession> {
     const now = this.clock.now();
-    const result = await this.withAttempt(loginToken, meta, async (tx, ctx, attempt, account) => {
+    return this.signInGuess(loginToken, meta, 'passkey', async (tx, ctx, attempt, account) => {
       if ((await activeFactors(tx, account.id)).length > 0) {
         throw new AuthError('mfa_required', 'user already has a factor; enrollment refused');
       }
@@ -879,19 +925,8 @@ export class AuthService {
           metadata: { method: 'passkey', factor_id: factorId },
         }),
       );
-      const session = await this.issueSession(
-        tx,
-        ctx,
-        attempt,
-        account,
-        verified(factorId, 'passkey'),
-        meta,
-      );
-      return { session, email: account.email };
+      return this.issueSession(tx, ctx, attempt, account, verified(factorId, 'passkey'), meta);
     });
-    if (!result) return this.mfaFailed(loginToken, meta, 'passkey');
-    await this.afterSignIn(result.email);
-    return result.session;
   }
 
   async passkeyLoginOptions(loginToken: string | undefined, meta: RequestMeta) {
@@ -913,7 +948,7 @@ export class AuthService {
     meta: RequestMeta,
   ): Promise<IssuedSession> {
     const now = this.clock.now();
-    const result = await this.withAttempt(loginToken, meta, async (tx, ctx, attempt, account) => {
+    return this.signInGuess(loginToken, meta, 'passkey', async (tx, ctx, attempt, account) => {
       const challenge = attempt.webauthnChallenge;
       const credentialId = responseCredentialId(response);
       if (!challenge || !credentialId) return null;
@@ -945,19 +980,8 @@ export class AuthService {
           metadata: { method: 'passkey' },
         }),
       );
-      const session = await this.issueSession(
-        tx,
-        ctx,
-        attempt,
-        account,
-        verified(factor.id, 'passkey'),
-        meta,
-      );
-      return { session, email: account.email };
+      return this.issueSession(tx, ctx, attempt, account, verified(factor.id, 'passkey'), meta);
     });
-    if (!result) return this.mfaFailed(loginToken, meta, 'passkey');
-    await this.afterSignIn(result.email);
-    return result.session;
   }
 
   // -------------------------------------------------------------------------
@@ -1139,6 +1163,19 @@ export class AuthService {
     return now;
   }
 
+  /**
+   * Before a step-up answer is evaluated: refused while the address is locked, and one
+   * guess reserved on the account key (auth.throttle_reserve), exactly as at sign-in.
+   */
+  private async reserveStepUpGuess(session: ActiveSession, meta: RequestMeta): Promise<void> {
+    const ip = ipKey(meta.ip);
+    if ((await this.readThrottle([ip])).get(ip.hash.toString('hex'))?.locked) {
+      throw new AuthError('too_many_attempts');
+    }
+    if (!(await this.reserveAccountGuess(session.email))) throw new AuthError('too_many_attempts');
+  }
+
+  /** A wrong step-up answer: audited; the reserved guess stays spent. */
   private async stepUpFailed(
     session: ActiveSession,
     meta: RequestMeta,
@@ -1157,13 +1194,12 @@ export class AuthService {
         }),
       ),
     );
-    await this.fail([accountKey(session.email)]);
     throw new AuthError('invalid_code');
   }
 
   /** Step-up with an authenticator code. */
   async reauthWithTotp(session: ActiveSession, code: string, meta: RequestMeta): Promise<Date> {
-    if (await this.isThrottled(session.email, meta.ip)) throw new AuthError('too_many_attempts');
+    await this.reserveStepUpGuess(session, meta);
     const now = this.clock.now();
     const done = await this.withSessionUser(session, meta, async (tx, ctx, account) => {
       for (const f of await activeFactors(tx, account.id)) {
@@ -1175,7 +1211,9 @@ export class AuthService {
       }
       return null;
     });
-    return done ?? this.stepUpFailed(session, meta, 'totp');
+    if (!done) return this.stepUpFailed(session, meta, 'totp');
+    await this.afterSignIn(session.email);
+    return done;
   }
 
   async reauthPasskeyOptions(session: ActiveSession, meta: RequestMeta) {
@@ -1196,6 +1234,7 @@ export class AuthService {
     response: unknown,
     meta: RequestMeta,
   ): Promise<Date> {
+    await this.reserveStepUpGuess(session, meta);
     const now = this.clock.now();
     const done = await this.withSessionUser(session, meta, async (tx, ctx, account) => {
       const row = (
@@ -1227,7 +1266,9 @@ export class AuthService {
         .where(eq(schema.authFactor.id, factor.id));
       return this.stepUpDone(tx, ctx, session, meta, 'passkey');
     });
-    return done ?? this.stepUpFailed(session, meta, 'passkey');
+    if (!done) return this.stepUpFailed(session, meta, 'passkey');
+    await this.afterSignIn(session.email);
+    return done;
   }
 
   async logout(session: ActiveSession, meta: RequestMeta): Promise<void> {

@@ -704,6 +704,16 @@ describeDb('error model and request checks', () => {
 // Second-factor brute force and races (security review findings 2 and 3)
 // ---------------------------------------------------------------------------
 
+/** Wrong second-factor answers that were evaluated (each is audited as a failed challenge). */
+async function failedGuesses(user: TestUser): Promise<number> {
+  const { rows } = await api.admin.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM audit.audit_event
+     WHERE target_id = $1 AND outcome = 'failure' AND action IN ('mfa.challenge', 'session.reauth')`,
+    [user.userAccountId],
+  );
+  return rows[0]!.n;
+}
+
 describeDb('second factor across pending sign-ins', () => {
   it('counts wrong codes per user, across attempts, and locks every open attempt', async () => {
     const user = await staff();
@@ -718,6 +728,75 @@ describeDb('second factor across pending sign-ins', () => {
     expect(res.statusCode).toBe(429);
     expect(res.json().error.code).toBe('too_many_attempts');
     expect(a.client.sessionToken).toBeUndefined();
+  });
+
+  it('evaluates at most five guesses on one pending sign-in, however many arrive at once', async () => {
+    const user = await staff();
+    await signIn(api, user);
+    const { client } = await passwordStep(user);
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        client.post('/api/auth/mfa/totp/verify', { code: '000000' }),
+      ),
+    );
+    const codes = results.map((r) => r.json().error.code as string);
+    // Five wrong codes are evaluated (the account allows six); the rest find the
+    // sign-in used up without their code being checked.
+    expect(codes.filter((c) => c === 'invalid_code')).toHaveLength(5);
+    expect(codes.filter((c) => c === 'session_expired')).toHaveLength(15);
+    expect(await failedGuesses(user)).toBe(5);
+    const { rows } = await api.admin.query(
+      'SELECT failed_mfa_count FROM auth.login_attempt WHERE user_account_id = $1',
+      [user.userAccountId],
+    );
+    expect(rows.map((r) => r.failed_mfa_count)).toContain(5);
+    const right = await client.post('/api/auth/mfa/totp/verify', { code: nextCode(api, user) });
+    expect(right.json().error.code).toBe('session_expired');
+  });
+
+  it('evaluates at most six guesses per account lock window across parallel sign-ins', async () => {
+    const user = await staff();
+    await signIn(api, user);
+    const attempts = [await passwordStep(user), await passwordStep(user), await passwordStep(user)];
+    const guess = () =>
+      Promise.all(
+        attempts.flatMap(({ client }) =>
+          Array.from({ length: 10 }, () =>
+            client.post('/api/auth/mfa/totp/verify', { code: '000000' }),
+          ),
+        ),
+      );
+    const first = (await guess()).map((r) => r.json().error.code as string);
+    // THROTTLE_POLICY.account: five free failures and the one that locks.
+    expect(first.filter((c) => c === 'invalid_code')).toHaveLength(6);
+    expect(first.filter((c) => c === 'too_many_attempts').length).toBeGreaterThan(0);
+    expect(await failedGuesses(user)).toBe(6);
+    // Refused guesses gave their reservation back to the pending sign-ins.
+    const { rows } = await api.admin.query(
+      `SELECT sum(failed_mfa_count)::int AS n FROM auth.login_attempt
+       WHERE user_account_id = $1 AND consumed_at IS NULL`,
+      [user.userAccountId],
+    );
+    expect(rows[0]).toEqual({ n: 6 });
+
+    // The next lock window (after the 60 s lock): one more guess, then locked again.
+    await ageThrottle(api, [accountKey(user.email).hash], 61);
+    const fresh = [await passwordStep(user)];
+    attempts.splice(0, attempts.length, ...fresh);
+    const second = (await guess()).map((r) => r.json().error.code as string);
+    expect(second.filter((c) => c === 'invalid_code')).toHaveLength(1);
+    expect(await failedGuesses(user)).toBe(7);
+  });
+
+  it('reserves step-up guesses the same way', async () => {
+    const user = await staff();
+    const client = await signIn(api, user);
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () => client.post('/api/auth/reauth/totp', { code: '000000' })),
+    );
+    const codes = results.map((r) => r.json().error.code as string);
+    expect(codes.filter((c) => c === 'invalid_code')).toHaveLength(6);
+    expect(codes.filter((c) => c === 'too_many_attempts')).toHaveLength(14);
   });
 
   it('keeps at most three pending sign-ins per user, closing the oldest', async () => {

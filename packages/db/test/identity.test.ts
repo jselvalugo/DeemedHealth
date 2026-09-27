@@ -257,6 +257,37 @@ describeDb('identity tables (ADR-0006)', () => {
     expect(rows[0]?.failures).toBe(40);
   });
 
+  it('reserves guesses under a row lock: at most the free failures plus one per lock window', async () => {
+    const c = need();
+    const key = randomBytes(32);
+    const clients = await Promise.all(Array.from({ length: 8 }, () => connect(c.appUserUrl)));
+    let allowed: boolean[];
+    try {
+      const results = await Promise.all(
+        clients.map((client) =>
+          Promise.all(
+            Array.from({ length: 5 }, () =>
+              client.query<{ allowed: boolean }>(
+                `SELECT allowed FROM auth.throttle_reserve($1, 'account')`,
+                [key],
+              ),
+            ),
+          ),
+        ),
+      );
+      allowed = results.flat().map((r) => r.rows[0]!.allowed);
+    } finally {
+      await Promise.all(clients.map((client) => client.end()));
+    }
+    // THROTTLE_POLICY.account: 5 free failures, and the sixth locks the key.
+    expect(allowed.filter(Boolean)).toHaveLength(6);
+    const { rows } = await user.query<{ failures: number; locked: boolean }>(
+      'SELECT failures, locked FROM auth.throttle_read(ARRAY[$1::bytea])',
+      [key],
+    );
+    expect(rows[0]).toEqual({ failures: 6, locked: true });
+  });
+
   it('keeps TOTP steps strictly increasing and enrollment tokens single use', async () => {
     await inRollback(user, async () => {
       await setTenant(user, xyz);
