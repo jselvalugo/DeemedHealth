@@ -19,5 +19,6 @@ Planned first records:
 - `0011-tenancy-naming.md` (Accepted; `organization_id`, `app.organization_id`, and the database roles; supersedes 0002 and 0008 in part)
 - `0012-platform-operator-console.md` (Proposed; Loogo Labs operator console and customer-approved support access)
 - `0013-environment-management.md` (Proposed; environment matrix, typed config, flags, migrations, promotion)
+- `0014-record-management-pattern.md` (Proposed; typed record-type registry, generic record API and UI, per-record permissions)
 
 All eight must be Accepted before gate G0 in `docs/product/implementation-roadmap.md`.
