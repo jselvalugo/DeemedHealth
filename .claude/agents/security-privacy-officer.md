@@ -32,6 +32,9 @@ Health centers trust the suite with their most sensitive operational records.
   and pinned container images.
 - **Backups and DR:** encrypted backups, tested restores, and documented RPO/RTO.
 
+`platform-devops-engineer` implements the environment, supply chain, backup,
+and hosting controls above. You define them and review the result.
+
 ## HIPAA posture
 - Deemed Health acts as a **business associate** when customers store PHI in it.
   Sign a BAA with customers, and hold BAAs with every subprocessor that may touch

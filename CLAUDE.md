@@ -65,6 +65,7 @@ Use the agent whose scope matches the work. Cross-cutting work starts with
 | `security-privacy-officer` | HIPAA safeguards, RBAC, encryption, audit, retention, BAAs, threat review |
 | `qa-test-engineer` | Test strategy, regulatory fixtures, date/cadence math, accessibility, E2E |
 | `ux-content-writer` | UI copy, EN/ES strings, in-app wiki, empty states, error messages |
+| `platform-devops-engineer` | Toolchain, CI/CD, environments and PREVIEW guarantee, hosting, backups/DR, observability, job operations, releases |
 
 The shared modules (Command Center, Tasks & Workflows, Self-Service, Learning,
 Administration) are built by `frontend-engineer` and `backend-engineer` under
@@ -73,6 +74,20 @@ Administration) are built by `frontend-engineer` and `backend-engineer` under
 Every agent that builds a compliance feature must get a sign-off pass from
 `hrsa-regulatory-analyst`; every feature that touches personal data must get a
 pass from `security-privacy-officer`.
+
+### Feature handoff order
+
+1. `suite-architect` plans: scope, affected modules and entities, task table.
+2. `hrsa-regulatory-analyst` adds or confirms the catalog `requirementId`s and citations.
+3. The domain specialist writes the rules, evidence list, and workflow for its module.
+4. `data-architect` designs the schema and migration; `backend-engineer` builds the
+   services, jobs, and API; `integrations-engineer` adds any external source.
+5. `ux-content-writer` supplies EN/ES copy; `frontend-engineer` builds the pages on
+   the shell and components from `design-system-engineer`.
+6. `ai-assistant-engineer` adds assistant actions or briefs, if any.
+7. `qa-test-engineer` covers tests; `platform-devops-engineer` covers jobs, alerts, and rollout.
+8. Sign-offs: `hrsa-regulatory-analyst` (always) and `security-privacy-officer`
+   (personal data), recorded in the PR.
 
 ## Proposed default stack (confirm in ADR-0001)
 
