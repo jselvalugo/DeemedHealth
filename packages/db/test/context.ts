@@ -9,6 +9,8 @@ export interface DbTestContext {
   appUserUrl?: string;
   platformUrl?: string;
   ownerUrl?: string;
+  /** Password of every seeded persona account (test-only, random per run). */
+  personaPassword?: string;
   tenants?: {
     xyz: {
       organizationId: string;

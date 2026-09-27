@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { t } from '@deemed/i18n';
 import { canViewPage, findRoute, homeRoute } from '@deemed/ui';
-import { getCurrentUser, getLocale } from '../../../lib/session';
+import { modulesFromNavigation } from '../../../lib/navigation';
+import { getCurrentUser, getLocale, getNavigation } from '../../../lib/session';
 import { ModulePlaceholder, NoPermissionView } from '../views';
 
 type Params = { params: Promise<{ slug?: string[] }> };
@@ -29,9 +30,16 @@ export default async function RegistryPage({ params }: Params) {
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in');
   const locale = await getLocale();
-  const home = homeRoute(user.permissions);
+  // With the real API, the page list is the one /api/me/navigation allowed (roles can
+  // exclude pages their module permission would cover, e.g. D15's administrator).
+  const nav = await getNavigation();
+  const allowedModules = nav ? modulesFromNavigation(nav) : null;
+  const home = allowedModules ? allowedModules[0]?.pages[0]?.route : homeRoute(user.permissions);
+  const canView = allowedModules
+    ? allowedModules.some((m) => m.pages.some((p) => p.route === found.page.route))
+    : canViewPage(found.page, user.permissions);
 
-  if (!canViewPage(found.page, user.permissions)) {
+  if (!canView) {
     // Home ("/") falls through to the first page this user can open.
     if (found.page.route === '/' && home && home !== '/') redirect(home);
     return (

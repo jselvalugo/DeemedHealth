@@ -7,8 +7,10 @@
  * provisioning function, RLS policies, triggers, and audit writer as the application.
  * It is idempotent: a tenant that already exists is left alone.
  */
+import { createHash, randomBytes } from 'node:crypto';
 import { isProduction, parseDhEnv, type JsonValue } from '@deemed/domain';
 import { makeTestNpi } from '@deemed/test-fixtures/npi';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { appendAuditEvent } from '../src/audit/index.js';
@@ -46,12 +48,76 @@ export function assertSeedAllowed(dhEnv: string | undefined): void {
 
 const SEED_ACTOR: Actor = { type: 'system', label: 'synthetic seed' };
 
+export interface SeedTenantOptions {
+  /**
+   * Argon2id PHC hash of the shared synthetic persona password (non-production only).
+   * When set, every fixture account gets a local credential; the persona still has to
+   * enroll a passkey or TOTP at first sign-in (ADR-0006 rule 3, ADR-0010 section 2).
+   */
+  personaPasswordHash?: string;
+}
+
 export interface SeedResult {
   organizationId: string;
   created: boolean;
   userIds: Record<string, string>;
   personIds: Record<string, string>;
   siteIds: Record<string, string>;
+  /**
+   * Person key -> single-use MFA enrollment token (same format as packages/auth tokens).
+   * NON-PRODUCTION ONLY, and only when the tenant is created: personas need one to
+   * enroll their first passkey or authenticator. Reissue with `pnpm --filter @deemed/db
+   * seed:enroll <email>`.
+   */
+  enrollmentTokens: Record<string, string>;
+}
+
+/** Seven days, the longest an enrollment token may live (migration 0005). */
+const ENROLLMENT_TOKEN_MS = 7 * 86_400_000;
+
+/**
+ * Inserts a single-use enrollment token for a user (revoking open ones) and audits it.
+ * Token format and digest match packages/auth (`v1.<organizationId>.<base64url>`,
+ * SHA-256 at rest). Seed tooling only; the API issues its own through AuthService.
+ */
+async function insertEnrollmentToken(
+  tx: Tx,
+  ctx: TransactionContext,
+  organizationId: string,
+  userAccountId: string,
+  now: Date,
+): Promise<string> {
+  await tx
+    .update(schema.enrollmentToken)
+    .set({ revokedAt: now })
+    .where(
+      and(
+        eq(schema.enrollmentToken.userAccountId, userAccountId),
+        isNull(schema.enrollmentToken.consumedAt),
+        isNull(schema.enrollmentToken.revokedAt),
+      ),
+    );
+  const token = `v1.${organizationId}.${randomBytes(32).toString('base64url')}`;
+  const expiresAt = new Date(now.getTime() + ENROLLMENT_TOKEN_MS);
+  await tx.insert(schema.enrollmentToken).values({
+    organizationId,
+    userAccountId,
+    tokenHash: createHash('sha256').update(token).digest(),
+    purpose: 'invite',
+    createdAt: now,
+    expiresAt,
+  });
+  await appendAuditEvent(tx, ctx, {
+    category: 'auth',
+    action: 'mfa.enrollment_issued',
+    targetTable: 'user_account',
+    targetId: userAccountId,
+    // Auth events record a client; seed tooling has none of its own.
+    ipAddress: '127.0.0.1',
+    userAgent: 'synthetic seed',
+    metadata: { purpose: 'invite', expires_at: expiresAt.toISOString(), test: true },
+  });
+  return token;
 }
 
 function lookup(
@@ -79,6 +145,7 @@ export async function seedTenant(
   db: Db,
   fixture: TenantFixture,
   now: Date = new Date(),
+  options: SeedTenantOptions = {},
 ): Promise<SeedResult> {
   const id = (kind: number, n: number) => fixtureId(fixture.idPrefix, kind, n);
   const organizationId = id(KIND.organization, 1);
@@ -89,7 +156,14 @@ export async function seedTenant(
   const userIds = Object.fromEntries(
     fixture.people.filter((p) => p.account).map((p, i) => [p.key, id(KIND.userAccount, i + 1)]),
   );
-  const result: SeedResult = { organizationId, created: false, userIds, personIds, siteIds };
+  const result: SeedResult = {
+    organizationId,
+    created: false,
+    userIds,
+    personIds,
+    siteIds,
+    enrollmentTokens: {},
+  };
   const platform = { assumeRole: 'app_platform' } as const;
   const runtime = { assumeRole: 'app_user' } as const;
 
@@ -178,13 +252,28 @@ export async function seedTenant(
           status: 'active',
           isTestRecord: true,
         });
+        if (options.personaPasswordHash !== undefined) {
+          await tx.insert(schema.localCredential).values({
+            organizationId,
+            userAccountId: userId,
+            passwordHash: options.personaPasswordHash,
+            passwordSetAt: now,
+          });
+          result.enrollmentTokens[p.key] = await insertEnrollmentToken(
+            tx,
+            ctx,
+            organizationId,
+            userId,
+            now,
+          );
+        }
         await audit(
           tx,
           ctx,
           'user_account.create',
           'user_account',
           userId,
-          created({ status: 'active' }),
+          created({ status: 'active', local_password: options.personaPasswordHash !== undefined }),
         );
         for (const r of p.account.roles) {
           grant += 1;
@@ -350,6 +439,8 @@ export interface RunSeedOptions {
   dhEnv: string | undefined;
   fixtures: readonly TenantFixture[];
   now?: Date;
+  /** See SeedTenantOptions.personaPasswordHash. */
+  personaPasswordHash?: string;
 }
 
 export async function runSeed(options: RunSeedOptions): Promise<SeedResult[]> {
@@ -359,8 +450,66 @@ export async function runSeed(options: RunSeedOptions): Promise<SeedResult[]> {
     const db = drizzle(pool, { schema });
     const results: SeedResult[] = [];
     for (const fixture of options.fixtures)
-      results.push(await seedTenant(db, fixture, options.now));
+      results.push(
+        await seedTenant(
+          db,
+          fixture,
+          options.now,
+          options.personaPasswordHash === undefined
+            ? {}
+            : { personaPasswordHash: options.personaPasswordHash },
+        ),
+      );
     return results;
+  } finally {
+    await pool.end();
+  }
+}
+
+export interface IssueEnrollmentOptions {
+  /** Migration (admin) connection string. */
+  connectionString: string;
+  dhEnv: string | undefined;
+  email: string;
+  now?: Date;
+}
+
+/**
+ * Non-production tooling: a fresh enrollment token for a synthetic persona, found by
+ * login email through the same auth.resolve_login the API uses. Refuses production.
+ */
+export async function issuePersonaEnrollmentToken(
+  options: IssueEnrollmentOptions,
+): Promise<string> {
+  assertSeedAllowed(options.dhEnv);
+  const pool = new pg.Pool({ connectionString: options.connectionString, max: 1 });
+  try {
+    const db = drizzle(pool, { schema });
+    const runtime = { assumeRole: 'app_user' } as const;
+    const found = await withPlatform(
+      db,
+      SEED_ACTOR,
+      async (tx) =>
+        (
+          await tx.execute<{ organization_id: string; user_account_id: string }>(
+            sql`SELECT organization_id::text, user_account_id::text FROM auth.resolve_login(${options.email})`,
+          )
+        ).rows,
+      runtime,
+    );
+    if (found.length !== 1) throw new Error('no single active account has that login email');
+    const { organization_id: organizationId, user_account_id: userAccountId } = found[0] as {
+      organization_id: string;
+      user_account_id: string;
+    };
+    return withTenant(
+      db,
+      organizationId,
+      SEED_ACTOR,
+      (tx, ctx) =>
+        insertEnrollmentToken(tx, ctx, organizationId, userAccountId, options.now ?? new Date()),
+      runtime,
+    );
   } finally {
     await pool.end();
   }

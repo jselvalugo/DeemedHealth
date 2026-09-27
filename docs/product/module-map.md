@@ -87,6 +87,7 @@ opened from any page, plus a "Deemed briefs" card on the Command Center. See
 | Finance | Finance & Grants, Contracts, Scope (read), Tasks |
 | Staff / provider | Self-Service, Learning, My tasks |
 | Auditor (time-boxed) | Read-only, the evidence library, and exports. Every view is logged |
+| Health center administrator | Administration: users & roles, organization & sites, integrations, support access. No compliance module data (decision D15) |
 
 All roles can be limited to specific sites.
 

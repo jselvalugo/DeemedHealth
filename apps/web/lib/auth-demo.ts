@@ -9,6 +9,7 @@
  */
 import { isProduction, type RoleId } from '@deemed/domain';
 import type { AuthErrorCode } from './auth-types';
+import { normalizeRecoveryCode } from './auth-validate';
 
 export const DEMO_TENANT = { id: 'tenant-xyz-chc', name: 'XYZ Community Health Center' } as const;
 
@@ -102,22 +103,4 @@ export function checkDemoRecoveryCode(code: string): boolean {
 
 // ---- Validation (pure; used in every environment) ----
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export function validateEmail(value: string): AuthErrorCode | undefined {
-  const v = value.trim();
-  if (!v) return 'email_required';
-  if (v.length > 254 || !EMAIL.test(v)) return 'email_invalid';
-  return undefined;
-}
-
-export function validateTotp(value: string): AuthErrorCode | undefined {
-  const v = value.replace(/\s/g, '');
-  if (!v) return 'code_required';
-  if (!/^\d{6}$/.test(v)) return 'code_format';
-  return undefined;
-}
-
-export function normalizeRecoveryCode(value: string): string {
-  return value.replace(/\s/g, '').toUpperCase();
-}
+export { normalizeRecoveryCode, validateEmail, validateTotp } from './auth-validate';

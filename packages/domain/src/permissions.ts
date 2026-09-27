@@ -51,6 +51,11 @@ export type RoleDefinition = {
   maxAccessDays: number | null;
   /** Auditor: every read is written to the audit log, not only mutations. */
   auditsEveryView: boolean;
+  /**
+   * Registry routes this role never opens even though its module permission covers
+   * them (the module map names only some pages of the module).
+   */
+  excludedRoutes?: readonly string[];
 };
 
 const ALL = MODULE_IDS;
@@ -159,6 +164,19 @@ export const ROLES = [
     requiresEndDate: true,
     maxAccessDays: 30,
     auditsEveryView: true,
+  },
+  {
+    id: 'org_admin',
+    moduleMapLabel: 'Health center administrator',
+    nameKey: 'role.org_admin.name',
+    // Decision D15: "Administration (users & roles, organization & sites, integrations,
+    // support access), with no compliance module data". The requirements catalog and
+    // the audit log are compliance data, so those two Administration pages are out.
+    permissions: grant(['admin'], ['read', 'write']),
+    requiresEndDate: false,
+    maxAccessDays: null,
+    auditsEveryView: false,
+    excludedRoutes: ['/admin/catalog', '/admin/audit'],
   },
 ] as const satisfies readonly RoleDefinition[];
 

@@ -141,11 +141,19 @@ async function startLocalCluster(log: (m: string) => void): Promise<PgAcquisitio
   const port = await freePort();
   const cleanup = () => rm(dir, { recursive: true, force: true });
 
-  const init = await run(
+  // Match CI (postgres:16 image, en_US.utf8 collation) so text ordering behaves the
+  // same locally: an ICU en-US default collation needs no OS locale. Fall back to C
+  // when this build of PostgreSQL has no ICU.
+  const base = ['-D', data, '-U', 'postgres', '--auth=trust', '-E', 'UTF8', '--no-sync'];
+  let init = await run(
     join(bin, 'initdb'),
-    ['-D', data, '-U', 'postgres', '--auth=trust', '-E', 'UTF8', '--locale=C', '--no-sync'],
+    [...base, '--locale=C', '--locale-provider=icu', '--icu-locale=en-US'],
     ids,
   );
+  if (init.code !== 0) {
+    await rm(data, { recursive: true, force: true });
+    init = await run(join(bin, 'initdb'), [...base, '--locale=C'], ids);
+  }
   if (init.code !== 0) {
     await cleanup();
     return { skipReason: `initdb failed: ${init.output.trim().split('\n').slice(-3).join(' | ')}` };

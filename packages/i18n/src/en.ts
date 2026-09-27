@@ -73,6 +73,7 @@ export const en = {
   'release.planned': 'Planned',
 
   // Roles (module map "Default roles"; keys match RoleDefinition.nameKey in @deemed/domain)
+  'role.org_admin.name': 'Health center administrator',
   'role.executive.name': 'Executive',
   'role.compliance_officer.name': 'Compliance officer',
   'role.credentialing_coordinator.name': 'Credentialing coordinator',
@@ -187,4 +188,56 @@ export const en = {
   'recovery.password.body':
     'If your health center uses single sign-on, reset it with your IT team. Otherwise, your administrator can send you a reset link.',
   'recovery.back': 'Back to sign in',
+  // Two-step setup at first sign-in (ADR-0006 rule 3: passkey first, authenticator second)
+  'mfa.setup.title': 'Set up two-step verification',
+  'mfa.setup.body':
+    'Your health center requires a second step every time you sign in. Choose one now; you can’t skip this step.',
+  'mfa.setup.passkey': 'Create a passkey',
+  'mfa.setup.passkeyHint': 'Recommended. Uses Touch ID, Windows Hello, or a security key.',
+  'mfa.setup.totp': 'Use an authenticator app instead',
+  'mfa.setup.secret.label': 'Setup key for your authenticator app',
+  'mfa.setup.secret.hint':
+    'In your authenticator app, add an account and enter this key. Then type the 6-digit code it shows.',
+  'mfa.setup.token.label': 'Setup code from your administrator',
+  'mfa.setup.token.hint':
+    'Your administrator sends it to you when your account is created or your sign-in methods are reset.',
+  'mfa.setup.submit': 'Finish setup',
+
+  // Re-authentication dialog (ADR-0006 rule 5)
+  'reauth.title': 'Confirm it’s you',
+  'reauth.body':
+    'This action needs a fresh check. Confirm with your passkey or a code from your authenticator app.',
+  'reauth.passkey': 'Confirm with a passkey',
+  'reauth.code.label': 'Code from your authenticator app',
+  'reauth.submit': 'Confirm',
+  'reauth.cancel': 'Cancel',
+
+  'recovery.unavailable':
+    'Recovery codes aren’t available yet. Ask your health center administrator to reset your sign-in methods.',
+
+  // API errors (stable codes from apps/api; never shows technical detail)
+  'apiError.bad_request':
+    'Some information is missing or not in the right format. Check the form and try again.',
+  'apiError.unauthenticated': 'You’re signed out. Sign in to continue.',
+  'apiError.session_expired': 'Your session ended. Sign in again to continue.',
+  'apiError.reauth_required': 'Confirm it’s you to continue.',
+  'apiError.mfa_required': 'Finish the second sign-in step to continue.',
+  'apiError.mfa_enrollment_required': 'Set up two-step verification to continue.',
+  'apiError.invalid_credentials': 'That email and password don’t match our records.',
+  'apiError.invalid_code': 'That code didn’t work. Enter the newest code from your app.',
+  'apiError.too_many_attempts': 'Too many attempts. Wait a few minutes and try again.',
+  'apiError.organization_required': 'Choose which health center you want to sign in to.',
+  'apiError.forbidden': 'Your role doesn’t allow this action.',
+  'apiError.not_found': 'We couldn’t find that record.',
+  'apiError.conflict': 'This record changed or was already updated. Reload and try again.',
+  'apiError.csrf_failed':
+    'We couldn’t confirm this request came from Deemed Health. Reload the page and try again.',
+  'apiError.payload_too_large': 'That is too large to send. Try a smaller file or less text.',
+  'apiError.unsupported': 'This option isn’t available for your account.',
+  'apiError.not_configured':
+    'This environment isn’t connected to its database yet. Try again later.',
+  'apiError.enrollment_token_invalid':
+    'That setup code didn’t work. It may have expired or been used already. Ask your health center administrator for a new one.',
+  'apiError.internal':
+    'Something went wrong on our side. Try again. If it keeps happening, contact support with the reference number.',
 } as const;

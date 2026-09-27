@@ -7,6 +7,8 @@ export * from './tenancy.js';
 export * from './modules.js';
 export * from './permissions.js';
 export * from './audit-actions.js';
+export * from './policy/index.js';
+export * from './api/contracts.js';
 
 export * from './entities/organization.js';
 export * from './entities/person.js';

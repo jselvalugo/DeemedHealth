@@ -6,9 +6,25 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b && node scripts/bundle-serverless.mjs",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "start": "node dist/server.js"
   },
   "dependencies": {
-    "@deemed/domain": "workspace:*"
+    "@deemed/auth": "workspace:*",
+    "@deemed/db": "workspace:*",
+    "@deemed/domain": "workspace:*",
+    "@deemed/ui": "workspace:*",
+    "@fastify/rate-limit": "^10.3.0",
+    "@node-rs/argon2": "^2.2.1",
+    "drizzle-orm": "^0.45.3",
+    "fastify": "^5.12.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@simplewebauthn/server": "^13.3.3",
+    "@types/pg": "^8.23.1",
+    "esbuild": "^0.28.2",
+    "pg": "^8.23.0"
   }
 }
