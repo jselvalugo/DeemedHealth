@@ -242,6 +242,21 @@ export async function createUser(
   return { organizationId, userAccountId, personId, email, enrollmentToken: enrollment.token };
 }
 
+/**
+ * Throttling runs on the database clock (migration 0006), so the fake clock cannot end
+ * a lock. This ages the given keys' rows instead, as if `seconds` had passed on the
+ * server; other tests' keys are left alone.
+ */
+export async function ageThrottle(api: TestApi, keys: Buffer[], seconds: number): Promise<void> {
+  await api.admin.query(
+    `UPDATE platform.auth_throttle
+     SET window_started_at = window_started_at - make_interval(secs => $2),
+         locked_until = locked_until - make_interval(secs => $2)
+     WHERE key_hash = ANY ($1::bytea[])`,
+    [keys, seconds],
+  );
+}
+
 /** The next valid code, moving the fake clock one TOTP step so codes never replay. */
 export function nextCode(api: TestApi, user: TestUser): string {
   api.clock.advance({ seconds: 30 });

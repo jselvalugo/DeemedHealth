@@ -169,32 +169,68 @@ describeDb('identity tables (ADR-0006)', () => {
 
   it('counts failures atomically in auth.throttle_fail and matches the packages/auth policy', async () => {
     const key = randomBytes(32);
-    const t0 = new Date('2030-01-01T00:00:00.000Z');
-    // Same numbers as THROTTLE_POLICY.account: 5 free, then 60 s doubling.
+    // Same numbers as THROTTLE_POLICY.account: 5 free, then 60 s doubling. now() is the
+    // statement's transaction time, the same one the function uses.
     const locks: (number | null)[] = [];
     for (let i = 0; i < 8; i++) {
-      const at = new Date(t0.getTime() + i * 1000);
-      const { rows } = await user.query<{
-        failures: number;
-        locked_until: Date | null;
-        locked_now: boolean;
-      }>(`SELECT * FROM auth.throttle_fail($1, 'account', $2)`, [key, at]);
-      locks.push(
-        rows[0]!.locked_now ? (rows[0]!.locked_until!.getTime() - at.getTime()) / 1000 : null,
+      const { rows } = await user.query<{ locked_now: boolean; lock_s: number | null }>(
+        `SELECT f.locked_now, extract(epoch FROM f.locked_until - now())::float8 AS lock_s
+         FROM auth.throttle_fail($1, 'account') f`,
+        [key],
       );
+      locks.push(rows[0]!.locked_now ? rows[0]!.lock_s : null);
     }
     expect(locks).toEqual([null, null, null, null, null, 60, 120, 240]);
     // Only account keys can be cleared, and app_user cannot write arbitrary state.
     await user.query('SELECT auth.throttle_clear($1)', [key]);
-    const cleared = await user.query<{ failures: number }>(
+    const cleared = await user.query<{ failures: number; locked: boolean }>(
       'SELECT * FROM auth.throttle_read(ARRAY[$1::bytea])',
       [key],
     );
-    expect(cleared.rows[0]?.failures).toBe(0);
+    expect(cleared.rows[0]).toMatchObject({ failures: 0, locked: false });
     await expectPgError(
       user.query(`SELECT auth.throttle_write($1, 'account', 0, now(), NULL)`, [key]),
       '42501',
     );
+  });
+
+  it('runs the window and the lock on the database clock, never a caller-supplied time', async () => {
+    const c = need();
+    const key = randomBytes(32);
+    // The old signature that took the caller's time is gone.
+    await expectPgError(
+      user.query(`SELECT * FROM auth.throttle_fail($1, 'account', now() - interval '1 day')`, [
+        key,
+      ]),
+      '42883',
+    );
+    for (let i = 0; i < 6; i++) await user.query(`SELECT auth.throttle_fail($1, 'account')`, [key]);
+    const read = () =>
+      user.query<{ failures: number; locked: boolean }>(
+        'SELECT failures, locked FROM auth.throttle_read(ARRAY[$1::bytea])',
+        [key],
+      );
+    expect((await read()).rows[0]).toEqual({ failures: 6, locked: true });
+    // Only time passing on the server (here: the rows aged by the owner) unlocks it.
+    const admin = await connect(c.adminUrl);
+    try {
+      await admin.query(
+        `UPDATE platform.auth_throttle
+         SET window_started_at = window_started_at - interval '16 minutes',
+             locked_until = locked_until - interval '16 minutes'
+         WHERE key_hash = $1`,
+        [key],
+      );
+    } finally {
+      await admin.end();
+    }
+    expect((await read()).rows[0]).toEqual({ failures: 6, locked: false });
+    // A failure after the window closed starts a new window.
+    const { rows } = await user.query<{ failures: number; locked_now: boolean }>(
+      `SELECT failures, locked_now FROM auth.throttle_fail($1, 'account')`,
+      [key],
+    );
+    expect(rows[0]).toEqual({ failures: 1, locked_now: false });
   });
 
   it('counts every one of many concurrent failures (no lost updates)', async () => {
@@ -202,12 +238,11 @@ describeDb('identity tables (ADR-0006)', () => {
     const key = randomBytes(32);
     const clients = await Promise.all(Array.from({ length: 8 }, () => connect(c.appUserUrl)));
     try {
-      const now = new Date();
       await Promise.all(
         clients.map((client) =>
           Promise.all(
             Array.from({ length: 5 }, () =>
-              client.query(`SELECT * FROM auth.throttle_fail($1, 'ip', $2)`, [key, now]),
+              client.query(`SELECT * FROM auth.throttle_fail($1, 'ip')`, [key]),
             ),
           ),
         ),

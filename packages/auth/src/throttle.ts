@@ -1,7 +1,9 @@
 /**
- * Sign-in throttling and progressive lockout (ADR-0006 rule 11). The decision logic
- * is pure and takes `now`; the state lives in platform.auth_throttle behind the
- * auth.throttle_* SECURITY DEFINER functions.
+ * Sign-in throttling and progressive lockout (ADR-0006 rule 11). The state lives in
+ * platform.auth_throttle behind the auth.throttle_* SECURITY DEFINER functions, which
+ * apply the policy atomically on the database clock (migrations 0005-0006).
+ * `recordFailure` and `isLocked` below are the reference model of that policy: pure,
+ * taking `now`, and kept in step with the SQL by a database test.
  *
  * Keys are SHA-256 digests of `account:<lower-case email>` and `ip:<prefix>`, so an
  * unknown email is throttled exactly like a known one (no user enumeration) and no

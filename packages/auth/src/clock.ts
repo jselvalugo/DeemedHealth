@@ -1,6 +1,8 @@
 /**
- * Time source for every auth rule (idle and absolute timeouts, step-up window, TOTP,
- * lockout). Services receive a Clock; tests pass a FakeClock and move it forward.
+ * Time source for the auth rules (idle and absolute timeouts, step-up window, TOTP,
+ * token expiry). Services receive a Clock; tests pass a FakeClock and move it forward.
+ * Sign-in throttling is the exception: it runs on the database clock (migration 0006),
+ * so a caller cannot move its own lock.
  */
 export interface Clock {
   now(): Date;

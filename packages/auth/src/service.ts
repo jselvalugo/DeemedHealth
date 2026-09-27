@@ -31,7 +31,7 @@ import { AuthError } from './errors.js';
 import { verifyPassword } from './password.js';
 import { SESSION_POLICY } from './policy.js';
 import { open, seal, type SecretBoxKey } from './secret-box.js';
-import { accountKey, ipKey, isLocked, type ThrottleKey, type ThrottleState } from './throttle.js';
+import { accountKey, ipKey, type ThrottleKey } from './throttle.js';
 import { csrfTokenFor, issueToken, parseToken, sha256 } from './tokens.js';
 import { newTotpSecret, totpUri, verifyTotp } from './totp.js';
 import {
@@ -240,24 +240,23 @@ export class AuthService {
   // Throttling (no tenant: platform functions, as app_user)
   // -------------------------------------------------------------------------
 
-  private async readThrottle(keys: ThrottleKey[]): Promise<Map<string, ThrottleState>> {
+  /** Throttle state by key (hex), with `locked` decided on the database clock. */
+  private async readThrottle(
+    keys: ThrottleKey[],
+  ): Promise<Map<string, { failures: number; locked: boolean }>> {
     return this.db.withPlatform(SYSTEM, async (tx) => {
       const hashes = sql.join(
         keys.map((k) => sql`${k.hash}::bytea`),
         sql`, `,
       );
-      const result = await tx.execute<{
-        key_hash: Buffer;
-        failures: number;
-        window_started_at: Date;
-        locked_until: Date | null;
-      }>(sql`SELECT * FROM auth.throttle_read(ARRAY[${hashes}])`);
-      const out = new Map<string, ThrottleState>();
+      const result = await tx.execute<{ key_hash: Buffer; failures: number; locked: boolean }>(
+        sql`SELECT key_hash, failures, locked FROM auth.throttle_read(ARRAY[${hashes}])`,
+      );
+      const out = new Map<string, { failures: number; locked: boolean }>();
       for (const r of result.rows) {
         out.set(Buffer.from(r.key_hash).toString('hex'), {
           failures: r.failures,
-          windowStartedAt: new Date(r.window_started_at),
-          lockedUntil: r.locked_until ? new Date(r.locked_until) : null,
+          locked: r.locked === true,
         });
       }
       return out;
@@ -266,16 +265,16 @@ export class AuthService {
 
   /**
    * Records one failure per key, each with one atomic statement in the database
-   * (auth.throttle_fail), so concurrent failures are all counted. Returns whether the
-   * account key just locked.
+   * (auth.throttle_fail), so concurrent failures are all counted. The window and the
+   * lock run on the database clock, never the caller's. Returns whether the account key
+   * just locked.
    */
   private async fail(keys: ThrottleKey[]): Promise<boolean> {
-    const now = this.clock.now();
     let accountLocked = false;
     for (const key of keys) {
       const result = await this.db.withPlatform(SYSTEM, (tx) =>
         tx.execute<{ locked_now: boolean }>(
-          sql`SELECT locked_now FROM auth.throttle_fail(${key.hash}, ${key.scope}, ${now.toISOString()}::timestamptz)`,
+          sql`SELECT locked_now FROM auth.throttle_fail(${key.hash}, ${key.scope})`,
         ),
       );
       if (key.scope === 'account' && result.rows[0]?.locked_now) accountLocked = true;
@@ -285,8 +284,7 @@ export class AuthService {
 
   private async accountLocked(email: string): Promise<boolean> {
     const key = accountKey(email);
-    const state = (await this.readThrottle([key])).get(key.hash.toString('hex'));
-    return isLocked(state, this.clock.now());
+    return (await this.readThrottle([key])).get(key.hash.toString('hex'))?.locked === true;
   }
 
   private async clearThrottle(key: ThrottleKey): Promise<void> {
@@ -297,9 +295,8 @@ export class AuthService {
 
   /** Whether sign-in for this email or from this address is currently locked. */
   async isThrottled(email: string, ip: string): Promise<boolean> {
-    const now = this.clock.now();
     const states = await this.readThrottle([accountKey(email), ipKey(ip)]);
-    return [...states.values()].some((s) => isLocked(s, now));
+    return [...states.values()].some((s) => s.locked);
   }
 
   // -------------------------------------------------------------------------

@@ -4,6 +4,7 @@
  * step-up, throttling and lockout, and the error model. Every auth endpoint's required
  * cases are here (defineRouteTests).
  */
+import { accountKey } from '@deemed/auth';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ROUTES } from '../src/manifest.js';
 import { ctx, describeDb } from '../../../packages/db/test/helpers.js';
@@ -13,6 +14,7 @@ import {
   ORIGIN,
   RP_ID,
   TEST_PASSWORD,
+  ageThrottle,
   auditFor,
   createUser,
   nextCode,
@@ -578,7 +580,7 @@ describeDb('sessions (fake clock)', () => {
 // Throttling and lockout (ADR-0006 rule 11)
 // ---------------------------------------------------------------------------
 
-describeDb('throttling (fake clock)', () => {
+describeDb('throttling (database clock)', () => {
   it('locks an account after repeated failures, with the same answer for unknown emails', async () => {
     const user = await staff();
     const client = new Client(api);
@@ -604,7 +606,7 @@ describeDb('throttling (fake clock)', () => {
         .statusCode,
     ).toBe(429);
 
-    api.clock.advance({ minutes: 1, seconds: 1 });
+    await ageThrottle(api, [accountKey(user.email).hash], 61);
     const fresh = await new Client(api).post('/api/auth/login', {
       email: user.email,
       password: TEST_PASSWORD,
