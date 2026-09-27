@@ -49,6 +49,8 @@ one.
 | `FL-456` | Fla. Stat. ch. 456 and the practice acts (for example ch. 458, 459, 464, 466) | License types, renewal cycles, and practitioner requirements | draft |
 | `FL-435` | Fla. Stat. ch. 435 and §408.809 (Level 2 background screening, AHCA Clearinghouse) | Whether any health center staff need Level 2 screening. Likely out of scope for the MVP (§4) | draft |
 | `FL-SUNSHINE` | Fla. Stat. ch. 119 (public records) and ch. 286 (open meetings) | Governance, for health centers that are public agencies or public-agency co-applicants | draft |
+| `FL-617` | Florida Not For Profit Corporation Act, Fla. Stat. ch. 617 (§617.0801 board powers, §617.0821 action without a meeting, §617.0825 committees, §617.0832 director conflicts, §617.0840–.0841 officers) | Approvals: who may act for the corporation, committee limits, disinterested-director votes. See `approval-authority.md` §2.3 and §3.1 | draft |
+| `FL-MEDICAID-SIGN` | Fla. Stat. §409.907 and r. 59G-1.060 (Medicaid provider agreement, authorized signer) | Approvals: who signs the Florida Medicaid provider agreement (outside the product) | draft |
 | `FL-MEDICAID-PPS` | AHCA Florida Medicaid FQHC coverage and reimbursement policy (PPS encounter rate, encounter definition, same-day visits, SMMC wraparound or supplemental payments) | Finance & Grants tracking of rates, deadlines, and reconciliation. See `market-requirements.md` MR-5 | draft |
 | `FL-RECORDS` | Fla. Stat. §456.057 and the practice board record rules (for example Fla. Admin. Code 64B8-10.002) | Retention periods. See MR-7 | draft |
 | `FL-TELEHEALTH` | Fla. Stat. §456.47 | Telehealth provider registration and credentialing. See MR-7 | draft |
@@ -81,6 +83,15 @@ agent deadline.
 - **Sunshine Law:** for public-agency health centers, board meeting notice and
   public minutes rules sit on top of Compliance Manual Ch. 19. Model them as
   applicability on the organization.
+- **Approvals (2026-09-27, see `docs/compliance/approval-authority.md`):**
+
+  | Approval | Florida rule | Product effect | Status |
+  | --- | --- | --- | --- |
+  | Director conflict-of-interest transaction | Approved by a majority of disinterested directors after disclosure (§617.0832) | Recusals recorded; vote counted without interested directors | draft (secondary source only) |
+  | Committee action | Committees are created by a majority of the full board and may not fill vacancies (§617.0825). HRSA board-required approvals still need full-board ratification | Committee action on a board-required item stays At risk until ratified | draft |
+  | Action without a meeting | Unanimous written consent unless articles or bylaws say otherwise (§617.0821) | Off by default; never available to public-agency tenants; HRSA effect is an open counsel item | draft |
+  | Board action at a public agency | Formal action binds only at a noticed public meeting (§286.011); no delegation around it | Board and committee approvals need a meeting with a public notice date; written consent and board-member comment threads turned off | draft |
+  | Medicaid provider agreement | Signed by an authorized official of the provider (§409.907, r. 59G-1.060) | Recorded as a human attestation with evidence; never signed by the product | draft |
 
 ## 5. Decisions (2026-09-27, owner @jselvalugo)
 

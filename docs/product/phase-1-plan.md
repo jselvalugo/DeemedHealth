@@ -4,6 +4,7 @@ Owner: `suite-architect`. Status: plan, 2026-09-27.
 Source of scope and gate: `docs/product/implementation-roadmap.md` §4 (Phase 1,
 G1) and §13 (D1–D11). Runtime: ADR-0010 (Proposed) on top of ADR-0001 to ADR-0009.
 Operator console: ADR-0012 (Proposed). Environments: ADR-0013 (Proposed).
+Records framework: ADR-0014 (Proposed, roadmap D14).
 
 ## 1. What is being built and why
 
@@ -40,7 +41,7 @@ except S4 and S5, which cite catalog `requirementId`s through their fixtures.
 - No real person, organization, or credential enters any environment
   (roadmap §2 rule 1). Dev accounts are synthetic personas (ADR-0010 §2).
 - Landing and marketing pages are out of scope. Unauthenticated visitors to any
-  route are sent to `/login`.
+  route are sent to `/sign-in`.
 
 ## 2. Affected modules, entities, and pages
 
@@ -63,11 +64,12 @@ identity: `UserAccount`, `AuthFactor`, `Session`, `IdpConnection`, `ScimToken`,
 
 | Area | Pages (route) | Slice |
 | --- | --- | --- |
-| Auth (outside the shell) | Sign in `/login` · Set up MFA `/login/mfa/setup` · Verify MFA `/login/mfa` · Sign in with your organization `/login/sso` · Signed out `/logout` · Session expired `/login?reason=expired` · Re-authentication dialog (modal on any page) | S1 (UI), S3 (wired) |
+| Auth (outside the shell) | Sign in `/sign-in` · Set up MFA `/sign-in/mfa/setup` · Verify MFA `/sign-in/mfa` · Recovery `/sign-in/recovery` · Sign in with your organization `/sign-in/sso` · Signed out `/sign-in?reason=signed-out` · Session expired `/sign-in?reason=expired` · Re-authentication dialog (modal on any page) | S1 (UI), S3 (wired) |
 | Shell | Header, module bar, launcher / command palette, PREVIEW banner, language toggle, user menu, no-permission page, not-found, error | S1 |
 | Command Center | Overview `/` as the signed-in landing: designed empty state until Phase 2 | S1 |
 | Administration | Users & roles `/admin/users` · Organization & sites `/admin/org` · Requirements catalog `/admin/catalog` · Audit log `/admin/audit` · Integrations `/admin/integrations` (empty state until Phase 2) | S7 |
 | Administration | Support access `/admin/support-access` (approve, deny, revoke, history) | S7b |
+| Records (every module) | Record list `/<module>/<slug>` and record page `/<module>/<slug>/<id>` for each registered record type (ADR-0014 §3); first types: sites, users and role assignments, requirements (read-only), audit events (read-only) | S4b |
 | Operator console (internal, `apps/console`) | Tenants · Support access · Catalog releases · Feature flags · Platform health · Operators (module map, "Operator console (internal)") | S7b |
 
 The auth routes are not navigation, but routes are registry data: S1 adds an
@@ -80,7 +82,8 @@ same entries to `packages/ui/module-registry.ts` in one change, reviewed by
 ```
 S0 contracts + spike ──┬─> S2 db ──> S3 api, auth, RBAC ──┬─> S5 tasks, approvals, notifications ─┐
 S0b config, env matrix ┤              │                    ├─> S6 evidence, field encryption ──────┤
-S1 shell+login, day 1 ─┤              │                    ├─> S7 Administration pages <───────────┤
+S1 shell+login, day 1 ─┤              │                    ├─> S4b records framework ──> S7 ───────┤
+                       │              │                    ├─> S7 Administration pages <───────────┤
                        │              │                    └─> S7b operator console (after S5, S7) ┤
                        │              └─> S8 observability, log hygiene (closes after S6) ─────────┤
                        ├─> S4 dates (day 1) ─> catalog loader, readiness engine (after S2) ────────┤
@@ -88,7 +91,10 @@ S1 shell+login, day 1 ─┤              │                    ├─> S7 Admi
 ```
 
 S0b runs beside S0 and must land before S2's migration job and S3's `buildApp()`
-read configuration. S1 starts on day 1 against mocks. S7b starts once S7's Administration shell and S5's approval
+read configuration. S4b (records framework, ADR-0014) starts when S3's policy engine,
+audit middleware, and route manifest exist, uses S1's components, and lands before S7,
+whose Administration pages are its first adopters; its evidence, tasks, and approvals
+tabs light up as S5 and S6 land. S1 starts on day 1 against mocks. S7b starts once S7's Administration shell and S5's approval
 service exist.
 
 The login page is the first thing a reviewer can use: S1 builds it on a mocked
@@ -172,7 +178,7 @@ G1-15 internal security review.
 | `design-system-engineer` | Tokens, Tailwind preset, header, module bar, launcher / command palette (Ctrl K), PREVIEW banner that cannot be dismissed, four page states | `docs/brand/design-system.md` §1–§8, module map | Stories render; axe clean; no hex values in components (lint) |
 | `suite-architect` | `packages/ui/module-registry.ts` from the module map, including the auth routes section; permission key per page | Module map, S0 `Permission` | Registry test: every module-map row and route present; module map and registry updated in one PR |
 | `ux-content-writer` | EN/ES strings for shell, auth, MFA enrollment, re-auth, errors (generic, no user enumeration), empty states | ADR-0006 rules 3, 5, 11; design system | Key parity check passes; no determination wording |
-| `frontend-engineer` | `/login`, `/login/mfa/setup` (passkey first, TOTP second), `/login/mfa`, `/login/sso`, `/logout`, expired state, re-auth dialog; shell layout; Overview empty state | S1 components, strings, mocked auth client | Playwright: flows pass in EN and ES against the mock; axe clean |
+| `frontend-engineer` | `/sign-in`, `/sign-in/mfa/setup` (passkey first, TOTP second), `/sign-in/mfa`, `/sign-in/sso`, sign-out, expired state, re-auth dialog; shell layout; Overview empty state | S1 components, strings, mocked auth client | Playwright: flows pass in EN and ES against the mock; axe clean |
 | `qa-test-engineer` | Playwright + axe harness; visual snapshots for shell and launcher; PREVIEW banner E2E | Test strategy §1 | Tests run in CI on every PR and against the Netlify preview |
 
 ### S2 · Database package
@@ -244,6 +250,46 @@ G1-15 internal security review.
 | `backend-engineer` + `qa-test-engineer` | Readiness engine and recompute job; snapshots keep `catalogVersion` | ADR-0003 rule 4, test strategy G1 readiness row | Property-based determinism tests; snapshot tests; recompute enqueued transactionally and drained by `drain()` |
 | `hrsa-regulatory-analyst` | Regulatory review of engine semantics and draft entries | S4 outputs | Verdict recorded in the PR |
 
+### S4b · Records framework
+
+- **Outputs:** ADR-0014 Accepted (roadmap D14). `packages/domain/src/records`
+  (`defineRecordType`, registry, generated column classes from the data dictionary,
+  registry test); `apps/api` generic record routes (list with filters, sort, search,
+  keyset cursor, saved views; get; create; update with `If-Match` row version;
+  transitions; archive and restore; bulk; history from `audit_event`; field reveal;
+  CSV/XLSX export as a job; import with dry run and commit behind a flag that is off in
+  every deployed environment); record rules compiled to SQL (`site_scope`, `own`,
+  `assigned`, `not_self`, `state_lock`, `executive_area` fail-closed until D13 is
+  accepted, `auditor_scope`); route manifest entries and generated four-case tests per
+  record type; migrations for `row_version`, archive fields, `owner_person_id`,
+  `saved_view`, `record_comment`, `record_evidence_link`, `task` subject columns,
+  `record_import`, `record_export`, and the `audit_event` target index;
+  `packages/ui/src/records` (`RecordTable`, `RecordPage`, `RecordForm`) with Storybook
+  stories for every state; the module map "Record types" section and `RECORD_TYPES` in
+  the module registry, launcher, and command palette; first record types `site`,
+  `user_account`, `role_assignment`, `requirement` (read-only), `audit_event`
+  (read-only).
+- **G1:** G1-1 (generated other-tenant tests per record type), G1-2 (generated four-case
+  route tests), G1-3 (every record mutation, reveal, export, import, and denial
+  audited), G1-6 (export and import in the log-hygiene canary run), G1-7 (import runs the
+  SSN guard; registry rejects SSN-like fields), G1-11 (site scope and record rules), G1-14
+  (record components axe clean, keyboard bulk selection).
+- **Depends on:** S1 (components), S2 (tables, `withTenant`, audit), S3 (policy engine,
+  audit middleware, route manifest). Blocks S7. Tabs for evidence, tasks, and approvals
+  need S5 and S6.
+
+| Agent | Task | Inputs | Done when |
+| --- | --- | --- | --- |
+| `suite-architect` | Take ADR-0014 to acceptance; `RecordType` types and registry in `packages/domain`; module map "Record types" section and `RECORD_TYPES` in `packages/ui/module-registry.ts` in one PR; add definition-of-done item 7 to `CLAUDE.md` | ADR-0014 §1, §3; module map | Accepted by @jselvalugo; registry test fails a type with no site scope, no fixture factory, an unclassified field, or a masked field marked filterable |
+| `data-architect` | Migrations for row version (via `set_row_meta()`), archive fields, owner, `saved_view`, `record_comment`, `record_evidence_link`, task subject, import and export tables, `audit_event (organization_id, target_table, target_id, occurred_at)` index; column-classes generator; index check for sortable and filterable fields | ADR-0014 §2, §6; ERD; data dictionary | Migrations apply on PG 16 and Neon; every new table in the RLS matrix; stale generated classes fail CI; a sortable column without an index fails CI |
+| `backend-engineer` | Generic record routes, record rules compiled to SQL and in memory, keyset cursor (HMAC), optimistic version with `409`, bulk, history, reveal, export job with formula-injection guard, import dry run and commit (flagged off), module hook points, generated audit actions | ADR-0014 §2, §4, §5; S3 policy engine; ADR-0008 §5 | Paging never returns an out-of-scope row (property test); out-of-scope `get` is `404`; stale `If-Match` is `409`; no `DELETE` route exists; bulk writes one event per row; import writes nothing on dry run |
+| `design-system-engineer` | `RecordTable`, `RecordPage`, `RecordForm` and their parts (filter bar, column chooser, saved views menu, bulk bar, drawer, tabs, timeline, reveal dialog) on the tokens | ADR-0014 §3; design system §4.5, §5 | Stories for empty, loading, error, no-permission, archived, masked, and conflict states; axe clean; no hex values |
+| `frontend-engineer` | Generic list and record routes in `apps/web` from the registry; UUID route matcher; command palette record actions and search | S4b components and API | Playwright EN and ES on `site` and `audit_event`: filter, sort, saved view, create in drawer, edit with a version conflict, archive and restore, history tab |
+| `ux-content-writer` | EN/ES strings for the framework (filters, operators, bulk results, conflict, archive reason, reveal reason, import report, export notice) and label keys for the first record types | ADR-0014 §3; design system | Key parity check passes, including every `record.<type>.field.<field>` key in the registry |
+| `qa-test-engineer` | Generated four-case suite per record type and action; fixture factories for the first types; scope-before-paging property test; export and import added to the S8 canary run; performance check at 10x seed volume | ADR-0014 §2.9; test strategy G1 rows | A new record type without a fixture factory or with a failing case fails CI; suites listed in the G1 evidence index |
+| `security-privacy-officer` | Review masking, reveal, export, import, saved-view sharing, comment classification, and the auditor scope rule | ADR-0014 §2.7–§2.8, §4.5, §5 | Verdict recorded in the S4b PR; open questions in ADR-0014 answered |
+| `hrsa-regulatory-analyst` | Review lifecycle and approval hooks, archive rules for regulatory records, and Sunshine flags | ADR-0014 §4.3, §4.6 | Verdict recorded |
+
 ### S5 · Tasks and approvals service, notifications, jobs
 
 - **Outputs:** `packages/jobs` pg-boss adapter with transactional `send`;
@@ -291,8 +337,9 @@ G1-15 internal security review.
   chain verification status), Integrations (empty state).
 - **G1:** G1-12, G1-2 (admin endpoints), G1-3 (permission changes, export events),
   G1-11 (auditor expiry visible and enforced), G1-14.
-- **Depends on:** S1, S3, S4 (catalog read), S2 (audit), S5 (notifications for
-  MFA reset).
+- **Depends on:** S1, S3, S4 (catalog read), S4b (records framework: the pages
+  are record types where they are lists), S2 (audit), S5 (notifications for MFA
+  reset).
 
 | Agent | Task | Inputs | Done when |
 | --- | --- | --- | --- |
@@ -384,7 +431,7 @@ G1-15 internal security review.
   signed document), manual keyboard and screen-reader scripts run, threat model
   updated with what was built, internal security review, sign-offs.
 - **G1:** G1-14 (manual part), G1-15, and the evidence for all others.
-- **Depends on:** S0b, S1–S9, S7b, and **G0 closed** (decision D9).
+- **Depends on:** S0b, S1–S9, S4b, S7b, and **G0 closed** (decision D9).
 
 | Agent | Task | Inputs | Done when |
 | --- | --- | --- | --- |
@@ -397,20 +444,20 @@ G1-15 internal security review.
 
 | G1 checkbox | Proven in | Where the proof runs |
 | --- | --- | --- |
-| G1-1 Tenant isolation | S2 (DB), S3 (API), S7b (support functions), S0b (parity) | CI Testcontainers; nightly Neon branch |
-| G1-2 Authorization | S3, S5, S6, S7, S7b | CI (route manifest) |
-| G1-3 Audit | S2, S3, S5, S6, S7, S7b | CI |
+| G1-1 Tenant isolation | S2 (DB), S3 (API), S4b (per record type), S7b (support functions), S0b (parity) | CI Testcontainers; nightly Neon branch |
+| G1-2 Authorization | S3, S4b, S5, S6, S7, S7b | CI (route manifest) |
+| G1-3 Audit | S2, S3, S4b, S5, S6, S7, S7b | CI |
 | G1-4 Identity | S3, S7b (operators) | CI (fake clock, test IdP); E2E on preview |
 | G1-5 Uploads | S6 | CI (MinIO, ClamAV) |
-| G1-6 Logging hygiene | S8 | CI |
-| G1-7 No SSN | S2 (schema lint, import column guard), S0 (contracts), S0b (seed jobs) | CI (`check:no-ssn`, schema lint, guard tests) |
+| G1-6 Logging hygiene | S8 (incl. S4b export and import) | CI |
+| G1-7 No SSN | S2 (schema lint, import column guard), S4b (import dry run, registry), S0 (contracts), S0b (seed jobs) | CI (`check:no-ssn`, schema lint, guard tests) |
 | G1-8 Readiness engine | S4 | CI |
 | G1-9 Encryption (KMS) | S9 (config), S6 (library), S0b (production config schema) | Policy-as-code in CI; nightly on `dh-nonprod` |
 | G1-10 Storage | S6 (behavior), S9 (config) | CI (MinIO); `dh-nonprod` |
-| G1-11 Roles | S3, S7, S7b (grant expiry) | CI (fake clock) |
+| G1-11 Roles | S3, S4b (record rules), S7, S7b (grant expiry) | CI (fake clock) |
 | G1-12 Customer audit access | S7, S7b (support events) | CI + E2E |
 | G1-13 PREVIEW banner | S1, S0b (every environment), S7b (console) | E2E on every non-production deploy |
-| G1-14 Accessibility | S1, S7, S7b, S10 | CI axe; manual scripts |
+| G1-14 Accessibility | S1, S4b, S7, S7b, S10 | CI axe; manual scripts |
 | G1-15 Security review | S10 | Signed review |
 
 Nothing in G1 is proven only on Netlify. The Netlify site is where reviewers see
@@ -432,6 +479,8 @@ the platform; CI and the AWS configuration tests are where G1 is proven
 | Customers do not answer support requests, so support stalls | Requests notify all administrators; break-glass for emergencies only; tenant opt-out is explicit | `suite-architect`, `ux-content-writer` |
 | Neon branch per preview cannot be wired (ADR-0010 §2) | Fallback in ADR-0013 alternatives: shared development database with migration ordering | `platform-devops-engineer` |
 | The synthetic-only rule is broken by a reviewer typing real data | PREVIEW banner, synthetic personas only, no importer, sign-up off; `security-privacy-officer` spot checks | `security-privacy-officer` |
+| The records framework grows into a low-code engine, or a generic export leaks a field | Closed lists of field options, hooks, and record rules; export columns from the data dictionary display rule; canaries through export and import (ADR-0014) | `suite-architect`, `security-privacy-officer` |
+| Import lets a reviewer load real data | Import flag off in every deployed environment until G4; CI uses synthetic fixtures only (ADR-0014 §2.8) | `backend-engineer`, `security-privacy-officer` |
 | Readiness shown from draft entries is read as real | Draft badge everywhere; production bundle excludes drafts; "internal readiness" wording | `hrsa-regulatory-analyst`, `ux-content-writer` |
 
 **For `hrsa-regulatory-analyst`**
@@ -443,6 +492,8 @@ the platform; CI and the AWS configuration tests are where G1 is proven
   with a "Draft, not verified" badge meets roadmap §2 rule 6.
 - Catalog source verification is a G0 blocker; which sources are verified first so
   S4 fixtures cite real locators?
+- Records framework (ADR-0014): which lifecycle transitions are approvals that need a
+  catalog `approvalType`, and may board-approved records be archived or only superseded?
 
 **For `security-privacy-officer`**
 
@@ -457,6 +508,9 @@ the platform; CI and the AWS configuration tests are where G1 is proven
   support read (not only writes) the right level (ADR-0012 §6)?
 - May support grants cover the tenant audit log (amending ADR-0008 §6), or should that
   remain break-glass only?
+- Records framework (ADR-0014): may exports include list-visible PII (names, work
+  email, NPI) with re-authentication alone? Should site-scoped roles see history events
+  written at other sites? Default class of comments on non-PHI records?
 
 ## 7. ADRs
 
@@ -465,4 +519,5 @@ the platform; CI and the AWS configuration tests are where G1 is proven
 - **ADR-0012** Platform operator console and customer-approved support access
   (Proposed; roadmap D10; slice S7b).
 - **ADR-0013** Environment management (Proposed; roadmap D11; slice S0b).
+- **ADR-0014** Record management pattern (Proposed; roadmap D14; slice S4b).
 - Revisit ADR-0010 when `dh-nonprod` exists or before G4.

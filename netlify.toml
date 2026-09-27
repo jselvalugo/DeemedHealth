@@ -12,8 +12,12 @@
   # when any of them, the lockfile, this file, or the build scripts change.
   # Exit 0 = skip, 1 = build. Paths are relative to apps/web.
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ../../packages ../../pnpm-lock.yaml ../../package.json ../../netlify.toml ../../scripts"
-  # Next.js is served by Netlify's built-in Next.js runtime (OpenNext adapter),
-  # detected automatically; no plugin entry is needed.
+
+# Declare the Next.js runtime explicitly. Auto-detection did not attach it in
+# this monorepo (base = apps/web): deploys reported "No functions deployed", so
+# every server-rendered page failed. The plugin creates the server handler.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 [build.environment]
   NODE_VERSION = "22"
