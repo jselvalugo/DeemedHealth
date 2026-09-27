@@ -36,7 +36,11 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@26.6.3)(lightningcss@1.32.0)
 
-  apps/api: {}
+  apps/api:
+    dependencies:
+      '@deemed/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
 
   apps/web:
     dependencies:
@@ -84,7 +88,11 @@ importers:
 
   packages/db: {}
 
-  packages/domain: {}
+  packages/domain:
+    dependencies:
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
 
   packages/i18n: {}
 
