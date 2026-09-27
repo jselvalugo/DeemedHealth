@@ -25,7 +25,8 @@ Logo: `assets/brand/deemed-health-logo.png`. Tagline: "FQHC Compliance Software"
    never attests, approves, signs, submits to HRSA, or closes a finding.
 3. **Cite the source.** Every requirement, finding, and AI answer points to the
    regulatory source it depends on (Compliance Manual chapter/element, CFR
-   section, PAL/PIN number) and the date that source was last verified.
+   section, PAL/PIN number, CMS change request or MLN article, public law
+   section) and the date that source was last verified.
 4. **Requirements are data, not code.** Regulatory rules live in a versioned
    requirements catalog with effective dates, so an HRSA policy update is a
    catalog change plus migration, not a rewrite.
@@ -95,6 +96,48 @@ pass from `security-privacy-officer`.
 7. `qa-test-engineer` covers tests; `platform-devops-engineer` covers jobs, alerts, and rollout.
 8. Sign-offs: `hrsa-regulatory-analyst` (always) and `security-privacy-officer`
    (personal data), recorded in the PR.
+
+## Medicare and Medicaid rules in effect (as of 2026-09-27)
+
+Deemed Health does not bill claims. It tracks what these rules change in the
+things a health center must keep compliant: billing and collections policies
+and the fee schedule (CM Ch. 16), the sliding fee program (Ch. 9), the budget
+(Ch. 17), payer enrollment, UDS payer mix, and the board approvals behind each
+(Ch. 19). CMS and Medicaid rules are catalog entries with their own source keys
+(`CMS-*`, `MCD-*`, `FL-*`). They are labeled as CMS or Medicaid rules, never as
+HRSA requirements. Rates and percentages are catalog parameters with effective
+dates, never hard-coded. Owners: `hrsa-regulatory-analyst` (catalog),
+`finance-grants-specialist` (billing, SFDP, budget), `enrollment-screening-specialist`
+(Medicare and Medicaid enrollment).
+
+> **Status: unverified.** Every item below comes from search-result summaries.
+> The session proxy blocked cms.gov, medicaid.gov, and the secondary sites, so
+> no official text was read. Verify each item against the named source and
+> record the URL and date before it becomes a `verified` catalog entry.
+
+| # | Rule | Effective | What changes | What the suite does | Source to verify |
+| --- | --- | --- | --- | --- | --- |
+| R1 | Medicare distant-site telehealth billing for FQHCs and RHCs | **Oct 1, 2026** (CMS claims systems reported to switch Oct 5, 2026) | Bill the individual CPT/HCPCS code for the service, with modifier **95** (audio-video) or **93** (audio-only) and the revenue code, instead of the single code **G2025**. Lines with behavioral health revenue code 0900 are reported as excluded. CY 2026 distant-site payment rate reported as $97.53 | Flags billing and collections policies and telehealth procedures that still reference G2025 or the FQ modifier. Opens a policy-update task and, where the policy changes, a board approval task. Rate stored as a catalog parameter | CMS CR 14468 / MLN MM14468 |
+| R2 | Medicaid eligibility for non-citizens (H.R. 1, Pub. L. 119-21, §71109) | **Oct 1, 2026** | Full federally funded Medicaid/CHIP limited to lawful permanent residents, Cuban/Haitian entrants, and COFA migrants. Refugees, asylees, and humanitarian parolees who are not in a kept category lose full Medicaid; emergency Medicaid remains. Florida DCF reports lawfully residing children 18 and under stay eligible | Readiness prompts for the expected rise in uninsured and self-pay patients: sliding fee program capacity and evaluation, budget re-forecast and board approval, UDS payer-mix notes, and patient-facing notices in the languages the health center configures. **Aggregate counts only.** The suite never stores a patient's immigration or eligibility status (principle 6) | CMS SHO #26-001; Florida DCF implementation notice |
+| R3 | Medicare FQHC PPS rate, CY 2026 | Jan 1 – Dec 31, 2026 (**not** an Oct 1 change) | National base rate **$207.72** (2.5% over $202.65 in 2025). Multiplied by **1.3416** (the 34.16% adjustment) for a new patient, IPPE, or AWV (G0438/G0439), and by the GAF for the site's Medicare locality. Medicare pays 80% of the lesser of the charge or the PPS rate | Stores the base rate, the adjustment, and each Florida site's locality GAF as catalog parameters, so the CY 2027 update (expected in the CY 2027 Physician Fee Schedule final rule) is a catalog change. Used only for budget and fee-schedule context, never to price a claim | CMS transmittal for the CY 2026 FQHC PPS rate update; CY 2026 PFS final rule (CMS-1832-F) |
+
+Rules for this section:
+
+- **Effective dates follow the source, not January 1.** CMS payment rules
+  usually take effect on January 1 or October 1. Florida's state fiscal year
+  starts July 1. HRSA budget periods follow the award. Every entry stores its
+  own `effective.from`, and past readiness snapshots keep the catalog version
+  they were computed under.
+- **Rounding is part of the rule.** Use decimal math, keep full precision
+  through each multiplier, and round to the cent once, at the end. With an
+  example GAF of 1.05, $207.72 × 1.3416 × 1.05 = $292.61 and 80% of it is
+  $234.09. Cutting the middle step to $278.67 first gives $292.60 and $234.08,
+  which is wrong by a cent. CMS's own rounding rule is to be confirmed when R3
+  is verified. `qa-test-engineer` covers this with fixtures.
+- **Check this table on every CMS PFS final rule, CMS FQHC/RHC MLN article, and
+  CMS Medicaid guidance letter**, the same way as a PAL/PIN
+  (`docs/compliance/hrsa-requirements-framework.md` §5). Remove a row once its
+  catalog entry is `verified`, and link the entry here instead.
 
 ## Proposed default stack (confirm in ADR-0001)
 
