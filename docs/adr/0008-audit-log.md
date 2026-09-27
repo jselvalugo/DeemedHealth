@@ -1,5 +1,9 @@
 # ADR-0008: Audit log
 
+> **Superseded in part by ADR-0011** (tenancy naming): `app_rw` below means the
+> runtime role `app_user`. `audit_writer` (no login) and `audit_retention` are
+> confirmed in the ADR-0002 role list.
+
 Owner: `data-architect`. Reviewers: `security-privacy-officer`, `backend-engineer`,
 `suite-architect`. Related: ADR-0002 (tenancy and RLS), ADR-0005 (hosting and
 regions), ADR-0006 (identity), ADR-0007 (encryption and key management).
@@ -373,4 +377,5 @@ Follow-ups:
 
 ## Status
 
-Accepted by the product owner (@jselvalugo) on 2026-09-27.
+Accepted by the product owner (@jselvalugo) on 2026-09-27. Superseded in part
+(names only) by ADR-0011.

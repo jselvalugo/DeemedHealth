@@ -1,6 +1,10 @@
 # ADR-0002: Tenancy and row-level security
 
 - Status: **Accepted** (@jselvalugo, 2026-09-27; roadmap D5)
+- **Superseded in part by ADR-0011** (tenancy naming): the tenant column is
+  `organization_id`, the setting is `app.organization_id`, object keys use
+  `organizations/{organizationId}/`, and the role list adds `audit_writer` and
+  `audit_retention`. Read `tenant_id` below as `organization_id`.
 - Date: 2026-09-27
 - Owner: `suite-architect`; reviewers `data-architect`, `security-privacy-officer`
 - Related: ADR-0001, ADR-0005, ADR-0007, ADR-0008; `docs/compliance/florida.md` §1
@@ -96,4 +100,5 @@ reference data, not tenant data.
 
 ## Status
 
-Accepted by the product owner (@jselvalugo) on 2026-09-27.
+Accepted by the product owner (@jselvalugo) on 2026-09-27. Superseded in part
+(names only) by ADR-0011.
