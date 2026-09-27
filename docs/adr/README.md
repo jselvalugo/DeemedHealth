@@ -15,5 +15,6 @@ Planned first records:
 - `0007-encryption-and-key-management.md`
 - `0008-audit-log.md`
 - `0009-netlify-for-development-environments.md` (Accepted; amends 0005 for non-production)
+- `0010-development-runtime-on-netlify.md` (Proposed; API, database, jobs, storage, and auth for the Netlify development environment)
 
 All eight must be Accepted before gate G0 in `docs/product/implementation-roadmap.md`.
