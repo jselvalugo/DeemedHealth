@@ -12,7 +12,7 @@
   "scripts": {
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -b --pretty && pnpm -r --if-present typecheck",
-    "test": "vitest run",
+    "test": "vitest run && pnpm -r --if-present test:coverage",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:no-ssn": "node scripts/check-no-ssn.mjs",
