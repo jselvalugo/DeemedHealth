@@ -64,13 +64,13 @@ describe('sign-in against apps/api', () => {
     fetchMock.mockResolvedValueOnce(json(200, { next: 'mfa', methods: ['totp'] }));
     await passwordStep();
     expect(fetchMock.mock.calls[0]![0]).toBe('/api/auth/login');
-    expect(go).toHaveBeenCalledWith('/sign-in/mfa');
+    await vi.waitFor(() => expect(go).toHaveBeenCalledWith('/sign-in/mfa'));
   });
 
   it('sends people without a factor to setup', async () => {
     fetchMock.mockResolvedValueOnce(json(200, { next: 'mfa_enroll', methods: [] }));
     await passwordStep();
-    expect(go).toHaveBeenCalledWith('/sign-in/mfa?setup=1');
+    await vi.waitFor(() => expect(go).toHaveBeenCalledWith('/sign-in/mfa?setup=1'));
   });
 
   it('shows generic errors for wrong passwords and lockouts', async () => {
