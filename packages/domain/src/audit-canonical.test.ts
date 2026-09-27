@@ -28,6 +28,14 @@ describe('jcs', () => {
   });
 });
 
+describe('jcs numbers', () => {
+  it('counts significant digits ignoring sign, point, and padding zeros', () => {
+    expect(jcs(-0.00012345678901234)).toBe('-0.00012345678901234');
+    expect(jcs(123456789012345000)).toBe('123456789012345000');
+    expect(() => jcs(1234567890.1234567)).toThrow(CanonicalFormError);
+  });
+});
+
 describe('canonicalAuditRow', () => {
   it('matches the golden bytes', () => {
     expect(canonicalAuditRow(GOLDEN_ROW)).toBe(GOLDEN_CANONICAL);

@@ -27,6 +27,17 @@ export class CanonicalFormError extends Error {
   override name = 'CanonicalFormError';
 }
 
+/** Count significant digits in a plain decimal string, without regex backtracking. */
+function significantDigits(text: string): number {
+  let digits = '';
+  for (const ch of text) if (ch >= '0' && ch <= '9') digits += ch;
+  let start = 0;
+  let end = digits.length;
+  while (start < end && digits[start] === '0') start++;
+  while (end > start && digits[end - 1] === '0') end--;
+  return end - start;
+}
+
 function canonicalNumber(n: number): string {
   if (!Number.isFinite(n)) throw new CanonicalFormError('non-finite number');
   if (n === 0) return '0';
@@ -34,8 +45,7 @@ function canonicalNumber(n: number): string {
   if (abs >= 1e21 || abs < 1e-6)
     throw new CanonicalFormError(`number ${n} is outside the supported range`);
   const text = String(n);
-  const digits = text.replace('-', '').replace('.', '').replace(/^0+/, '').replace(/0+$/, '');
-  if (digits.length > 15)
+  if (significantDigits(text) > 15)
     throw new CanonicalFormError(`number ${text} has more than 15 significant digits`);
   return text;
 }
