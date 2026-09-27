@@ -21,6 +21,9 @@ Logo: `assets/brand/deemed-health-logo.png`. Tagline: "FQHC Compliance Software"
 > (MR-1 to MR-7). If any of them cannot be met under the current scope,
 > principles, or ADRs, stop that part of the work and notify the product owner
 > as its §4 describes. Never work around it silently.
+> Decided 2026-09-27 (MR-D0): Deemed Health stays compliance software. No ONC
+> certification, no UDS computed from patient-level data, and no Medicaid PPS
+> billing. Build the compliance side of each requirement only.
 
 ## Product principles
 

@@ -477,6 +477,7 @@ Where each baseline control is first built and where it is proven.
 | D9 | **Phase 1 starts before G0 closes (AWS BAA, training record, source verification), synthetic data only; G0 must close before G1.** | Phase 1 runs on Netlify (ADR-0009, ADR-0010) with synthetic data only, in parallel with the open G0 items. No G1 checkbox is signed until G0 is closed. Plan: `docs/product/phase-1-plan.md` |
 | D10 | **Operator console with customer-approved support access.** Status: **Proposed**, pending acceptance by @jselvalugo. | Loogo Labs operators use a separate `apps/console` (own origin, workforce SSO, passkeys, short sessions, own RBAC) that shows metadata and aggregate counts only. Tenant data is reachable only through a support grant requested with a reason, approved by the customer in Administration › Support access, time-boxed (max 4 h), read-only by default, and audited in the platform and tenant chains; break-glass is the only exception (two-person, immediate customer notice). No `BYPASSRLS`. ADR-0012; Phase 1 slice S7b |
 | D11 | **Environment matrix.** Status: **Proposed**, pending acceptance by @jselvalugo. | One matrix for local, preview (per PR, own Neon branch, `DH_ENV=preview`), development (Netlify main), staging (AWS `dh-nonprod`), and production (AWS `dh-prod`); typed fail-closed config in `packages/config`; feature flags per environment and per tenant; migrations promoted in order through CI with owner credentials never on Netlify; synthetic seed refused in production; release by tag plus human approval; nightly parity checks; PREVIEW banner in every non-production environment. ADR-0013; Phase 1 slice S0b |
+| D12 | **Stay compliance software (MR-D0).** No ONC certification, no UDS computed from patient-level data, no encounter-level Medicaid PPS billing (MR-D1 to MR-D3 decided "no"). | Standing rule 7 is unchanged. The compliance side of each market requirement is built as `docs/compliance/market-requirements.md` describes. Reopening any of them needs a new decision and an ADR |
 
 ### Open questions
 
@@ -492,11 +493,6 @@ For `hrsa-regulatory-analyst`:
 
 For `security-privacy-officer`:
 - Florida privacy items FL-PRIV-1 to FL-PRIV-4 in `docs/compliance/florida.md`.
-
-For @jselvalugo (market requirements, `docs/compliance/market-requirements.md` §3):
-- MR-D1 ONC certification, MR-D2 UDS from patient-level data, and MR-D3
-  encounter-level Medicaid PPS billing. Each would replace standing rule 7 and
-  needs an ADR. Until decided, the defaults there hold.
 
 For legal counsel (engaged per D3):
 - Customer BAA and terms of service language, including the "internal readiness,

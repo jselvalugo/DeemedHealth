@@ -11,6 +11,13 @@ under the current scope, decisions, or ADRs, the agent stops and tells the
 product owner (§4).** It never works around the conflict silently, and it never
 widens the scope on its own.
 
+> **Decision MR-D0 (2026-09-27, @jselvalugo): Deemed Health stays compliance
+> software.** It is not an EHR, a certified health IT product, a UDS
+> calculation engine over patient-level data, or a billing system. MR-D1 to
+> MR-D3 (§3) are decided "no". Agents build the compliance side of every
+> requirement below and do not raise those three again. The notice rule (§4)
+> still applies to anything new.
+
 > These requirements are market input, not verified law. Each one gets a
 > catalog source key and is verified against the current source before it drives
 > a rule, a gate, or contract language, the same as
@@ -23,6 +30,7 @@ widens the scope on its own.
 | --- | --- |
 | **On plan** | Fits the current scope and roadmap. Build it. |
 | **On plan, limited** | The compliance side fits the current scope. The full expectation (clinical, billing, or patient-level data) does not. Build the compliance side, and keep the limit visible to customers. |
+| **Out of scope (decided)** | The product owner decided not to build it (MR-D0). Do not build it or raise it again unless the product owner reopens the decision. |
 | **Blocked: decision needed** | Cannot be met without changing a standing rule, a product principle, or an ADR. Needs a product owner decision before any work. |
 | **Unverified** | The requirement itself is not confirmed. Verify before building. |
 
@@ -43,13 +51,13 @@ assumption, to verify: an FQHC does not need a certified product to run its
 compliance program, but it does need one for its EHR, and some federal programs
 tie payment or reporting to certified EHR technology.
 
-**Status:** **Blocked: decision needed** for certification itself;
+**Status:** **Out of scope (decided)** for certification itself (MR-D1);
 **on plan** for the security and interoperability practices it tests.
 
-- Certification only becomes reachable if Deemed Health adds clinical or
-  patient-level functions (an EHR module, or UDS+ patient-level FHIR data). That
-  breaks standing rule 7 and principle 6, and needs an ADR plus decision MR-D1.
-- Until then, build to the same bar so the path stays open: FHIR R4 / US Core
+- Certification would only be reachable if Deemed Health added clinical or
+  patient-level functions (an EHR module, or UDS+ patient-level FHIR data). The
+  product owner decided not to (MR-D1).
+- Build to the same bar so the path stays open: FHIR R4 / US Core
   data shapes at integration boundaries, standards-based auth (OIDC, SMART-style
   scopes where an API is exposed), audit logging (ADR-0008), encryption
   (ADR-0007), and the HIPAA controls below.
@@ -102,7 +110,7 @@ roadmap allows only aggregate measure results in Quality & UDS (§10).
 Submission to EHBs is always done by a person (principle 2).
 
 **Status:** **On plan, limited.** Full automatic aggregation from patient-level
-data is **blocked: decision needed** (MR-D2).
+data is **out of scope (decided)** (MR-D2).
 
 What is on plan:
 - UDS readiness: calendar and due dates per reporting year (`UDS-YYYY`
@@ -115,7 +123,7 @@ What is on plan:
   credentialing, budget, sliding fee), with the differences listed for a human.
 - An export the health center reviews and then enters or uploads in EHBs itself.
 
-What needs MR-D2: computing the patient and clinical tables (for example
+Out of scope (MR-D2): computing the patient and clinical tables (for example
 Tables 3A, 3B, 4, 6A, 6B, 7) or UDS+ FHIR files from patient-level data.
 
 ### MR-5 · Florida Medicaid PPS billing and wraparound
@@ -130,8 +138,8 @@ calculation are revenue-cycle functions of the practice-management or billing
 system, and use patient-level claims data (PHI, and HIPAA transaction
 standards such as 837/835). All of that is outside the current scope.
 
-**Status:** **On plan, limited.** Encounter-level billing is **blocked:
-decision needed** (MR-D3).
+**Status:** **On plan, limited.** Encounter-level billing is **out of
+scope (decided)** (MR-D3).
 
 What is on plan (Finance & Grants, Enrollment, Scope & Sites):
 - Catalog entries (`FL-MEDICAID-PPS`) for the AHCA FQHC coverage and
@@ -178,19 +186,23 @@ enforcement on top of HIPAA.
   telehealth provider registration, license verification) and on scope of
   project, and it goes to `credentialing-privileging-specialist`.
 
-## 3. Decisions needed from the product owner
+## 3. Product owner decisions (2026-09-27, @jselvalugo)
 
-| # | Question | Default until decided |
+MR-D0: Deemed Health stays compliance software. Each item below is decided "no".
+Reopening one needs a new decision from the product owner and an ADR.
+
+| # | Question | Decision |
 | --- | --- | --- |
-| MR-D1 | Pursue ONC Health IT Certification? This means adding clinical or patient-level functions, an ADR that replaces standing rule 7, and an ONC-ATL/ACB engagement | No. Build to the same security and interoperability bar; never claim certification |
-| MR-D2 | Compute UDS patient and clinical tables (or UDS+ FHIR) from patient-level EHR data? This needs an EHR integration ADR, a BAA review, a risk analysis update, and a `security-privacy-officer` Approve | No. Import EHR-generated tables or aggregates, validate them, and cross-check them against suite data |
-| MR-D3 | Handle encounter-level Medicaid PPS billing and wraparound? This makes Deemed Health a revenue-cycle system with claims PHI | No. Track PPS policy, rates, deadlines, and aggregate reconciliation only |
+| MR-D1 | Pursue ONC Health IT Certification? This means adding clinical or patient-level functions, an ADR that replaces standing rule 7, and an ONC-ATL/ACB engagement | **No (decided).** Build to the same security and interoperability bar; never claim certification |
+| MR-D2 | Compute UDS patient and clinical tables (or UDS+ FHIR) from patient-level EHR data? This needs an EHR integration ADR, a BAA review, a risk analysis update, and a `security-privacy-officer` Approve | **No (decided).** Import EHR-generated tables or aggregates, validate them, and cross-check them against suite data |
+| MR-D3 | Handle encounter-level Medicaid PPS billing and wraparound? This makes Deemed Health a revenue-cycle system with claims PHI | **No (decided).** Track PPS policy, rates, deadlines, and aggregate reconciliation only |
 
 ## 4. Rule for every agent: when a requirement cannot be met
 
 Tell the product owner (@jselvalugo) when any of these happens:
 
-1. A task needs work that this file marks **blocked: decision needed**.
+1. A task needs work that this file marks **blocked: decision needed** or
+   **out of scope (decided)**.
 2. A standing rule, product principle, ADR, or gate would have to be broken or
    bent to meet one of MR-1 to MR-7.
 3. Verification shows a requirement is wrong, has changed, or does not apply,
