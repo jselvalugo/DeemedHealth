@@ -19,6 +19,21 @@ jobs:
     name: lint-typecheck-test
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # Throwaway PostgreSQL 16 for the @deemed/db integration tests (tenant isolation,
+    # RLS, audit hash chain). Trust auth inside the job's private network only; no
+    # credentials to store. The tests create a scratch database and drop it afterwards.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,7 +51,11 @@ jobs:
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
-      - name: Test
+      - name: Test (unit + PostgreSQL integration)
+        env:
+          DATABASE_URL: postgres://postgres@localhost:5432/postgres
+          # Never skip the database suite in CI (CI=true already implies this).
+          DH_REQUIRE_DB: '1'
         run: pnpm test
       - name: No SSN-shaped values (decision D1)
         run: pnpm check:no-ssn

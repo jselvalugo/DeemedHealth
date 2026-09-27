@@ -2,11 +2,30 @@
   "name": "@deemed/db",
   "version": "0.0.0",
   "private": true,
-  "description": "Drizzle schema, SQL migrations with RLS policies, withTenant() helper (ADR-0001, ADR-0002).",
+  "description": "Drizzle schema, SQL migrations with RLS policies, audit hash chain, withTenant() helper (ADR-0001, ADR-0002, ADR-0008).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "migrations"
+  ],
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run",
+    "migrate": "tsx --tsconfig tsconfig.test.json scripts/migrate.ts",
+    "seed": "tsx --tsconfig tsconfig.test.json seed/run.ts",
+    "dictionary": "tsx --tsconfig tsconfig.test.json scripts/data-dictionary.ts"
+  },
+  "dependencies": {
+    "@deemed/domain": "workspace:*",
+    "drizzle-orm": "^0.45.3",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@deemed/test-fixtures": "workspace:*",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15"
   }
 }
