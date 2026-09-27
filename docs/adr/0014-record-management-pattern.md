@@ -1,6 +1,6 @@
 # ADR-0014: Record management pattern
 
-- Status: **Proposed**
+- Status: **Accepted** (@jselvalugo, 2026-09-27; roadmap D14)
 - Date: 2026-09-27
 - Owner: `suite-architect`
 - Reviewers required: `security-privacy-officer` (per-record access, masking, reveal,
@@ -491,8 +491,4 @@ types by module, in roadmap order:
 
 ## Status
 
-Proposed by `suite-architect` on 2026-09-27. Needs review by `security-privacy-officer`,
-`data-architect`, `backend-engineer`, `design-system-engineer`, `hrsa-regulatory-analyst`,
-and `qa-test-engineer`, and acceptance by the product owner (@jselvalugo) as roadmap
-decision D14. The module map, ERD, design system, and `CLAUDE.md` changes listed above
-are made on acceptance, in the S4b PRs.
+Accepted by the product owner (@jselvalugo) on 2026-09-27 as roadmap decision D14.
