@@ -288,3 +288,12 @@ export async function auditFor(api: TestApi, res: LightMyRequestResponse): Promi
   );
   return rows;
 }
+
+/** A session token re-pointed at another tenant (split/join, every occurrence). */
+export function retarget(
+  token: string,
+  fromOrganizationId: string,
+  toOrganizationId: string,
+): string {
+  return token.split(fromOrganizationId).join(toOrganizationId);
+}

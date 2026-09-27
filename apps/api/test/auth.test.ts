@@ -20,6 +20,7 @@ import {
   startApi,
   type TestApi,
   type TestUser,
+  retarget,
 } from './harness.js';
 import { defineRouteTests } from './route-tests.js';
 
@@ -321,7 +322,7 @@ defineRouteTests('auth.reauth.totp', {
     const user = await staff();
     const client = await signIn(api, user);
     const gulf = api.tenants.gulf.organizationId;
-    const forged = (client.sessionToken as string).replace(user.organizationId, gulf);
+    const forged = retarget(client.sessionToken as string, user.organizationId, gulf);
     const res = await new Client(api).post(
       '/api/auth/reauth/totp',
       { code: '123456' },
@@ -347,7 +348,8 @@ defineRouteTests('auth.reauth.passkey.options', {
   otherTenant: async () => {
     const user = await staff();
     const client = await enrollPasskey(user);
-    const forged = (client.sessionToken as string).replace(
+    const forged = retarget(
+      client.sessionToken as string,
       user.organizationId,
       api.tenants.gulf.organizationId,
     );
@@ -380,7 +382,8 @@ defineRouteTests('auth.reauth.passkey.verify', {
   otherTenant: async () => {
     const user = await staff();
     const client = await enrollPasskey(user);
-    const forged = (client.sessionToken as string).replace(
+    const forged = retarget(
+      client.sessionToken as string,
       user.organizationId,
       api.tenants.gulf.organizationId,
     );
@@ -413,7 +416,8 @@ defineRouteTests('auth.logout', {
   otherTenant: async () => {
     const user = await staff();
     const client = await signIn(api, user);
-    const forged = (client.sessionToken as string).replace(
+    const forged = retarget(
+      client.sessionToken as string,
       user.organizationId,
       api.tenants.gulf.organizationId,
     );

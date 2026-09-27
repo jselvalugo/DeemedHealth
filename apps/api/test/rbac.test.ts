@@ -16,6 +16,7 @@ import {
   stepUp,
   type TestApi,
   type TestUser,
+  retarget,
 } from './harness.js';
 import { defineRouteTests } from './route-tests.js';
 
@@ -102,7 +103,7 @@ defineRouteTests('me', {
   otherTenant: async () => {
     // Sessions are bound to one tenant: re-pointing a token at another tenant fails.
     const token = clients.co.sessionToken as string;
-    const forged = token.replace(users.co.organizationId, users.gco.organizationId);
+    const forged = retarget(token, users.co.organizationId, users.gco.organizationId);
     const res = await new Client(api).get('/api/me', { cookie: `__Host-dh_session=${forged}` });
     expect(res.statusCode).toBe(401);
     const gulf = (await clients.gco.get('/api/me')).json();
@@ -128,7 +129,7 @@ defineRouteTests('me.navigation', {
   },
   otherTenant: async () => {
     const token = clients.staff.sessionToken as string;
-    const forged = token.replace(users.staff.organizationId, users.gco.organizationId);
+    const forged = retarget(token, users.staff.organizationId, users.gco.organizationId);
     const res = await new Client(api).get('/api/me/navigation', {
       cookie: `__Host-dh_session=${forged}`,
     });
