@@ -108,6 +108,8 @@ export default async function RegistryPage({ params, searchParams }: Params) {
     const query = await searchParams;
     return (
       <RecordListScreen
+        // A new type (or a new "?new=1" from the launcher) starts a fresh table.
+        key={`${entry.recordType}:${query.new === '1' ? 'new' : 'list'}`}
         typeId={entry.recordType}
         actions={listActionsFor(def, user.permissions)}
         initialCreate={query.new === '1'}
