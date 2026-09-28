@@ -1,10 +1,12 @@
 'use client';
 
 /**
- * Re-authentication (ADR-0006 rule 5). Pages call the API through `useApi().post()`.
+ * Re-authentication (ADR-0006 rule 5). Pages call the API through `useApi()`.
  * When the API answers 401 `reauth_required`, a dialog asks for a passkey or an
  * authenticator code, calls /api/auth/reauth/*, and then retries the original request
- * once. Cancelling returns the original error.
+ * once. Cancelling returns the original error. `withStepUp` wraps any call that can
+ * answer `reauth_required` (the records demo adapter uses it too, with its own
+ * step-up adapter; see `stepUp`).
  */
 import { startAuthentication } from '@simplewebauthn/browser';
 import { KeyRound } from 'lucide-react';
@@ -13,16 +15,40 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { t, type Locale } from '@deemed/i18n';
 import { Alert, Button, Card, Input } from '@deemed/ui';
-import { apiPost, type BrowserResult } from '../../lib/api-browser';
+import {
+  apiPost,
+  apiRequest,
+  type BrowserResult,
+  type RequestOptions,
+} from '../../lib/api-browser';
 import { compactCode, validateTotp } from '../../lib/auth-validate';
 
-type Api = { post<T = unknown>(path: string, body?: unknown): Promise<BrowserResult<T>> };
+export type Api = {
+  post<T = unknown>(path: string, body?: unknown): Promise<BrowserResult<T>>;
+  request<T = unknown>(
+    method: 'GET' | 'POST' | 'PATCH',
+    path: string,
+    options?: RequestOptions,
+  ): Promise<BrowserResult<T>>;
+  /** Runs a call; on `reauth_required` asks for step-up once and retries once. */
+  withStepUp<T>(call: () => Promise<BrowserResult<T>>): Promise<BrowserResult<T>>;
+};
+
+/**
+ * How the dialog confirms it's you. Defaults to apps/api (`/api/auth/reauth/*`); the
+ * non-production demo passes its own (a server action that accepts the demo code).
+ */
+export type StepUpAdapter = {
+  totp(code: string): Promise<BrowserResult<unknown>>;
+  passkey(): Promise<BrowserResult<unknown>>;
+};
 
 const ApiContext = createContext<Api | null>(null);
 
@@ -37,12 +63,14 @@ export function ApiProvider({
   csrfToken,
   children,
   fetchImpl,
+  stepUp,
 }: {
   locale: Locale;
   csrfToken: string | undefined;
   children: ReactNode;
   /** Tests inject a fake fetch. */
   fetchImpl?: typeof fetch;
+  stepUp?: StepUpAdapter | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const pending = useRef<((ok: boolean) => void) | null>(null);
@@ -62,14 +90,21 @@ export function ApiProvider({
     pending.current = null;
   }, []);
 
-  const api: Api = {
-    async post<T>(path: string, body?: unknown) {
-      const first = await apiPost<T>(path, body, csrfToken, fetchImpl);
+  const api = useMemo<Api>(() => {
+    async function withStepUp<T>(call: () => Promise<BrowserResult<T>>) {
+      const first = await call();
       if (first.ok || first.code !== 'reauth_required') return first;
       if (!(await askForReauth())) return first;
-      return apiPost<T>(path, body, csrfToken, fetchImpl);
-    },
-  };
+      return call();
+    }
+    return {
+      withStepUp,
+      post: <T,>(path: string, body?: unknown) =>
+        withStepUp(() => apiPost<T>(path, body, csrfToken, fetchImpl)),
+      request: <T,>(method: 'GET' | 'POST' | 'PATCH', path: string, options?: RequestOptions) =>
+        withStepUp(() => apiRequest<T>(method, path, options, csrfToken, fetchImpl)),
+    };
+  }, [askForReauth, csrfToken, fetchImpl]);
 
   return (
     <ApiContext.Provider value={api}>
@@ -79,6 +114,7 @@ export function ApiProvider({
           locale={locale}
           csrfToken={csrfToken}
           fetchImpl={fetchImpl}
+          stepUp={stepUp}
           onDone={() => finish(true)}
           onCancel={() => finish(false)}
         />
@@ -93,12 +129,14 @@ export function ReauthDialog({
   onDone,
   onCancel,
   fetchImpl,
+  stepUp,
 }: {
   locale: Locale;
   csrfToken: string | undefined;
   onDone: () => void;
   onCancel: () => void;
   fetchImpl?: typeof fetch | undefined;
+  stepUp?: StepUpAdapter | undefined;
 }) {
   const tr = (k: Parameters<typeof t>[1]) => t(locale, k);
   const [code, setCode] = useState('');
@@ -122,7 +160,9 @@ export function ReauthDialog({
       return;
     }
     setBusy(true);
-    const res = await apiPost('/api/auth/reauth/totp', { code: value }, csrfToken, fetchImpl);
+    const res = stepUp
+      ? await stepUp.totp(value)
+      : await apiPost('/api/auth/reauth/totp', { code: value }, csrfToken, fetchImpl);
     setBusy(false);
     if (res.ok) onDone();
     else setError(tr(res.code === 'invalid_code' ? 'mfa.code.invalid' : 'apiError.internal'));
@@ -130,6 +170,13 @@ export function ReauthDialog({
 
   async function withPasskey() {
     setBusy(true);
+    if (stepUp) {
+      const res = await stepUp.passkey();
+      setBusy(false);
+      if (res.ok) onDone();
+      else setError(tr('apiError.invalid_code'));
+      return;
+    }
     const options = await apiPost<Parameters<typeof startAuthentication>[0]['optionsJSON']>(
       '/api/auth/reauth/passkey/options',
       {},

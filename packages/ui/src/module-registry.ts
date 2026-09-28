@@ -5,7 +5,7 @@
  * Change docs/product/module-map.md first, then this file. A test
  * (module-registry.test.ts) parses the module map and fails when they disagree.
  */
-import type { ModuleId, Permission } from '@deemed/domain';
+import { recordTypes, type ModuleId, type Permission, type RecordTypeDef } from '@deemed/domain';
 import type { I18nKey } from '@deemed/i18n';
 
 /** Lucide icon names (kebab-case, as written in the module map). See icons.tsx. */
@@ -78,7 +78,10 @@ export type LucideIconName =
   | 'building'
   | 'plug'
   | 'book-marked'
-  | 'scroll-text';
+  | 'scroll-text'
+  // Record type navigation (ADR-0014 section 3): lists without their own page, and "New …"
+  | 'key-round'
+  | 'circle-plus';
 
 export type ReleaseStatus = 'mvp' | 'next' | 'planned';
 
@@ -93,6 +96,16 @@ export type PageEntry = {
    * profile, board packets). `read` implies `read_own` for navigation.
    */
   permission: Permission;
+  /**
+   * The record type this page lists (ADR-0014 section 3, module map "Record types"). The
+   * page's route is the type's list route and `<route>/<uuid>` opens one record.
+   */
+  recordType?: string;
+  /**
+   * Launcher and command palette only (record lists without a module-map page, and
+   * "New …" actions); never a module bar tab. Added by `withRecordEntries`.
+   */
+  launcherOnly?: boolean;
 };
 
 export type ModuleEntry = {
@@ -162,6 +175,7 @@ export const MODULES: readonly ModuleEntry[] = [
         route: '/readiness',
         icon: 'clipboard-check',
         permission: 'readiness:read',
+        recordType: 'requirement_instance',
       },
       {
         id: 'evidence',
@@ -716,6 +730,15 @@ export const MODULES: readonly ModuleEntry[] = [
         route: '/admin/users',
         icon: 'users',
         permission: 'admin:read',
+        recordType: 'user_account',
+      },
+      {
+        id: 'people',
+        name: 'page.admin.people',
+        route: '/admin/people',
+        icon: 'users-round',
+        permission: 'admin:read',
+        recordType: 'person',
       },
       {
         id: 'org',
@@ -723,6 +746,7 @@ export const MODULES: readonly ModuleEntry[] = [
         route: '/admin/org',
         icon: 'building',
         permission: 'admin:read',
+        recordType: 'site',
       },
       {
         id: 'integrations',
@@ -835,8 +859,16 @@ export function matchModule(
   pathname: string,
   modules: readonly ModuleEntry[] = MODULES,
 ): RouteMatch | undefined {
+  // A record list or record route belongs to the module-map page that hosts the list
+  // (role assignments under Users & roles), even when the list is a launcher-only entry.
+  const record = matchRecordRoute(pathname);
+  if (record) {
+    const module = modules.find((m) => m.id === record.entry.module);
+    const page = module?.pages.find((p) => p.id === record.entry.pageId && !p.launcherOnly);
+    if (module && page) return { module, page };
+  }
   const exact = findRoute(pathname, modules);
-  if (exact) return exact;
+  if (exact && !exact.page.launcherOnly) return exact;
   const route = normalizeRoute(pathname);
   let best: RouteMatch | undefined;
   for (const module of modules) {
@@ -857,4 +889,154 @@ export function homeRoute(perms: PermissionSet): string | undefined {
 
 export function allPages(modules: readonly ModuleEntry[] = MODULES): RouteMatch[] {
   return modules.flatMap((module) => module.pages.map((page) => ({ module, page })));
+}
+
+// ---------------------------------------------------------------------------
+// Record types (ADR-0014 section 3, module map "Record types")
+// ---------------------------------------------------------------------------
+
+/** A record type's place in navigation, generated from the domain registry. */
+export type RecordNavEntry = {
+  recordType: string;
+  module: ModuleId;
+  /** The module-map page that hosts the list (module bar tab, no-permission check). */
+  pageId: string;
+  /** `/<module>/<slug>`, or the module root for a module's primary type. */
+  listRoute: string;
+  /** Documentation form of the record route: `<listRoute>/:id` (id is a UUID). */
+  recordRoute: string;
+  readPermission: Permission;
+  /** Null when the type has no generic create (managed elsewhere, or read-only). */
+  createPermission: Permission | null;
+  /** Plural list name, e.g. "Sites". */
+  plural: I18nKey;
+  /** "New site"; null when the type has no create. */
+  newLabel: I18nKey | null;
+  icon: LucideIconName;
+};
+
+/**
+ * Record lists that live inside another module-map page instead of having their own:
+ * role assignments are shown with user accounts under Users & roles.
+ */
+const HOSTED_LISTS: Readonly<Record<string, { pageId: string; icon: LucideIconName }>> = {
+  role_assignment: { pageId: 'users', icon: 'key-round' },
+};
+
+/** The route prefix of a module: the first segment its pages share (`/admin`). */
+function moduleBase(module: ModuleEntry): string {
+  const first = module.pages[0]?.route ?? '/';
+  const end = first.indexOf('/', 1);
+  return end < 0 ? first : first.slice(0, end);
+}
+
+function navEntry(def: RecordTypeDef, modules: readonly ModuleEntry[]): RecordNavEntry {
+  const module = modules.find((m) => m.id === def.module);
+  if (!module) throw new Error(`Record type ${def.id}: unknown module ${def.module}`);
+  const base = moduleBase(module);
+  const listRoute = def.slug ? `${base === '/' ? '' : base}/${def.slug}` : base;
+  const page = module.pages.find((p) => p.recordType === def.id);
+  const hosted = HOSTED_LISTS[def.id];
+  const pageId = page?.id ?? hosted?.pageId;
+  if (!pageId) throw new Error(`Record type ${def.id} has no module-map page`);
+  const canCreate = def.actions.includes('create') && !def.readOnly;
+  return {
+    recordType: def.id,
+    module: def.module,
+    pageId,
+    listRoute,
+    recordRoute: `${listRoute === '/' ? '' : listRoute}/:id`,
+    readPermission: def.access.read,
+    createPermission: canCreate ? def.access.create : null,
+    plural: `recordType.${def.id}.plural` as I18nKey,
+    newLabel: canCreate ? (`recordType.${def.id}.new` as I18nKey) : null,
+    icon: page?.icon ?? hosted?.icon ?? module.icon,
+  };
+}
+
+/** One entry per registered record type, in registry order. */
+export const RECORD_NAV: readonly RecordNavEntry[] = recordTypes().map((def) =>
+  navEntry(def, MODULES),
+);
+
+export function recordNav(recordType: string): RecordNavEntry | undefined {
+  return RECORD_NAV.find((e) => e.recordType === recordType);
+}
+
+/** Canonical 8-4-4-4-12 hexadecimal UUID, checked with a loop (no regex on input). */
+export function isUuid(value: string): boolean {
+  if (value.length !== 36) return false;
+  for (let i = 0; i < 36; i++) {
+    const c = value.charCodeAt(i);
+    if (i === 8 || i === 13 || i === 18 || i === 23) {
+      if (c !== 45) return false;
+      continue;
+    }
+    const hex = (c >= 48 && c <= 57) || (c >= 97 && c <= 102) || (c >= 65 && c <= 70);
+    if (!hex) return false;
+  }
+  return true;
+}
+
+export type RecordRouteMatch = { entry: RecordNavEntry; id: string | null };
+
+/**
+ * A record list route (`/admin/org`) or record route (`/admin/org/<uuid>`). Only UUIDs
+ * match as ids, so record ids never collide with page routes (ADR-0014 section 3).
+ */
+export function matchRecordRoute(
+  pathname: string,
+  entries: readonly RecordNavEntry[] = RECORD_NAV,
+): RecordRouteMatch | undefined {
+  const route = normalizeRoute(pathname);
+  for (const entry of entries) {
+    if (route === entry.listRoute) return { entry, id: null };
+    const prefix = entry.listRoute === '/' ? '/' : `${entry.listRoute}/`;
+    if (route.startsWith(prefix)) {
+      const rest = route.slice(prefix.length);
+      if (isUuid(rest)) return { entry, id: rest.toLowerCase() };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Adds record navigation to the launcher and command palette (ADR-0014 section 3): lists
+ * that have no module-map page of their own ("Role assignments" under Administration),
+ * and "New <record>" for types the user may create. Only modules and hosting pages the
+ * user can already open get entries; the API still checks every request.
+ */
+export function withRecordEntries(
+  modules: readonly ModuleEntry[],
+  perms: PermissionSet,
+  entries: readonly RecordNavEntry[] = RECORD_NAV,
+): ModuleEntry[] {
+  return modules.map((module) => {
+    const extra: PageEntry[] = [];
+    for (const e of entries) {
+      if (e.module !== module.id) continue;
+      if (!module.pages.some((p) => p.id === e.pageId)) continue;
+      if (!module.pages.some((p) => p.route === e.listRoute) && has(perms, e.readPermission)) {
+        extra.push({
+          id: `records-${e.recordType}`,
+          name: e.plural,
+          route: e.listRoute,
+          icon: e.icon,
+          permission: e.readPermission,
+          launcherOnly: true,
+        });
+      }
+      if (e.createPermission && e.newLabel && has(perms, e.createPermission)) {
+        extra.push({
+          id: `new-${e.recordType}`,
+          name: e.newLabel,
+          route: `${e.listRoute}?new=1`,
+          icon: 'circle-plus',
+          permission: e.createPermission,
+          launcherOnly: true,
+        });
+      }
+    }
+    return extra.length ? { ...module, pages: [...module.pages, ...extra] } : module;
+  });
 }

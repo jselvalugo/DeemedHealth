@@ -281,6 +281,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@deemed/dates':
+        specifier: workspace:*
+        version: link:../dates
       '@deemed/domain':
         specifier: workspace:*
         version: link:../domain

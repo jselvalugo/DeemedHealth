@@ -1,5 +1,5 @@
 import { LoaderCircle } from 'lucide-react';
-import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, MouseEvent, ReactNode, Ref } from 'react';
 import { cn } from '../cn.js';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -51,6 +51,7 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   /** Replaces the label while loading (e.g. "Checking…"). */
   loadingLabel?: string;
   icon?: ReactNode;
+  ref?: Ref<HTMLButtonElement>;
 };
 
 export function Button({

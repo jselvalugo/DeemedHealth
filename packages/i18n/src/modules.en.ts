@@ -127,6 +127,7 @@ export const modulesEn = {
   'module.admin.description':
     'Users, roles, sites, integrations, audit log, and health center settings.',
   'page.admin.users': 'Users & roles',
+  'page.admin.people': 'People',
   'page.admin.org': 'Organization & sites',
   'page.admin.integrations': 'Integrations',
   'page.admin.catalog': 'Requirements catalog',
