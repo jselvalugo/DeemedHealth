@@ -315,7 +315,7 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
   const failed = !loading && answer && !answer.ok ? answer.error : null;
   const data = failed ? undefined : (lastData ?? undefined);
   const items = data?.items ?? [];
-  const selectable = actions.update && def.actions.includes('bulk');
+  const selectable = actions.bulk && def.actions.includes('bulk');
   const bulkable = bulkFields(def).filter((f) => isListable(def, f));
   const canBulkArchive = selectable && actions.archive && def.archivable;
   const showSelection = selectable && (bulkable.length > 0 || canBulkArchive);
@@ -868,23 +868,26 @@ function FilterInput({
   const error = invalid ? t(locale, 'records.filters.invalid') : undefined;
   if (f.kind === 'date' || f.kind === 'timestamp') {
     return (
-      <fieldset className="grid grid-cols-2 gap-2 sm:col-span-2 xl:col-span-2">
-        <legend className="sr-only">{label}</legend>
-        <Input
-          id={`${id}-from`}
-          type="date"
-          label={t(locale, 'records.filters.from', { field: label })}
-          value={draft.from}
-          error={error}
-          onChange={(e) => onChange({ ...draft, from: e.target.value })}
-        />
-        <Input
-          id={`${id}-to`}
-          type="date"
-          label={t(locale, 'records.filters.to', { field: label })}
-          value={draft.to}
-          onChange={(e) => onChange({ ...draft, to: e.target.value })}
-        />
+      <fieldset className="sm:col-span-2 xl:col-span-2">
+        {/* One visible group label ("In scope from"), then "From" and "To". */}
+        <legend className="text-sm font-semibold text-gray-900">{label}</legend>
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            id={`${id}-from`}
+            type="date"
+            label={t(locale, 'records.filters.from')}
+            value={draft.from}
+            error={error}
+            onChange={(e) => onChange({ ...draft, from: e.target.value })}
+          />
+          <Input
+            id={`${id}-to`}
+            type="date"
+            label={t(locale, 'records.filters.to')}
+            value={draft.to}
+            onChange={(e) => onChange({ ...draft, to: e.target.value })}
+          />
+        </div>
       </fieldset>
     );
   }

@@ -23,8 +23,8 @@ import {
 
 const siteDef = getRecordType('site');
 const personDef = getRecordType('person');
-const ALL = { create: true, update: true, archive: true };
-const NONE = { create: false, update: false, archive: false };
+const ALL = { create: true, update: true, archive: true, bulk: true };
+const NONE = { create: false, update: false, archive: false, bulk: false };
 
 function A({ href, children, ...rest }: { href: string; children?: ReactNode }) {
   return (
@@ -85,7 +85,8 @@ describe('RecordTable', () => {
       expect(client.list.mock.lastCall?.[1].sort).toEqual([{ field: 'name', dir: 'desc' }]),
     );
     await user.selectOptions(screen.getByLabelText('Time zone'), 'America/Chicago');
-    await user.type(screen.getByLabelText('In scope from from'), '2021-01-01');
+    const group = screen.getByRole('group', { name: 'In scope from' });
+    await user.type(within(group).getByLabelText('From'), '2021-01-01');
     await user.click(screen.getByRole('button', { name: 'Apply filters' }));
     await waitFor(() =>
       expect(client.list.mock.lastCall?.[1].filters).toEqual([
@@ -172,6 +173,31 @@ describe('RecordTable', () => {
     expect(screen.queryByRole('button', { name: 'New site' })).toBeNull();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByLabelText('Show')).toBeNull();
+  });
+
+  it('offers bulk actions only for types that serve bulk (finding L7)', async () => {
+    const noBulk = { ...siteDef, actions: siteDef.actions.filter((a) => a !== 'bulk') };
+    const perms = new Set(['admin:read', 'admin:write'] as const);
+    expect(listActionsFor(noBulk, perms)).toEqual({
+      create: true,
+      update: true,
+      archive: true,
+      bulk: false,
+    });
+    wrap(
+      fakeClient({ list: (t) => Promise.resolve({ ok: true, data: listOf(t, [site()]) }) }),
+      <RecordTable def={noBulk} actions={listActionsFor(noBulk, perms)} />,
+    );
+    await screen.findByRole('table');
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+
+  it('labels a date range once, with From and To inside the group', async () => {
+    wrap(fakeClient(), <RecordTable def={siteDef} actions={ALL} />);
+    const group = screen.getByRole('group', { name: 'In scope from' });
+    expect(within(group).getByLabelText('From')).toBeTruthy();
+    expect(within(group).getByLabelText('To')).toBeTruthy();
+    expect(screen.queryByText(/from from|until to/)).toBeNull();
   });
 
   it('derives list actions from the session permissions', () => {

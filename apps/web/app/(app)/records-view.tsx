@@ -67,7 +67,6 @@ export function RecordListScreen({
   initialCreate,
   eyebrow,
   title,
-  description,
   siblings,
   locale,
 }: {
@@ -76,14 +75,14 @@ export function RecordListScreen({
   initialCreate: boolean;
   eyebrow: string;
   title: string;
-  description: string;
   siblings: SiblingList[];
   locale: Locale;
 }) {
   const def = getRecordType(typeId);
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader eyebrow={eyebrow} title={title} description={description} />
+      {/* Pages have no description of their own yet; the module's does not describe the list. */}
+      <PageHeader eyebrow={eyebrow} title={title} />
       {siblings.length > 1 && (
         <nav aria-label={t(locale, 'records.tabs.label')} className="border-b border-gray-200">
           <ul className="flex flex-wrap gap-1">

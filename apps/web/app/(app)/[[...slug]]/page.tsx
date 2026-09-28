@@ -115,7 +115,6 @@ export default async function RegistryPage({ params, searchParams }: Params) {
         initialCreate={query.new === '1'}
         eyebrow={t(locale, 'records.eyebrow', { module: moduleName, tenant: user.tenant.name })}
         title={t(locale, found.page.name)}
-        description={t(locale, found.module.description)}
         siblings={siblings}
         locale={locale}
       />
