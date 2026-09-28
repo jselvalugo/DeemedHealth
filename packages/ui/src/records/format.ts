@@ -214,17 +214,21 @@ function holds(perms: PermissionSet, p: Permission): boolean {
 }
 
 /**
- * List-level actions to offer (New, bulk change, bulk archive, archived filter). They
- * follow the role permissions the API reported for this session; the API still checks
- * every request, per record, and a denied action never appears.
+ * List-level actions to offer: New, bulk change and archive, the archived filter, and
+ * sharing a saved view. They are HINTS scoped to the session (the role permissions the
+ * API reported at sign-in), not decisions: the API checks every request again, per
+ * record, and the record page uses the API's own `allowedActions`. An action the type
+ * does not serve is never offered.
  */
-export type ListActions = { create: boolean; update: boolean; archive: boolean };
+export type ListActions = { create: boolean; update: boolean; archive: boolean; bulk: boolean };
 
 export function listActionsFor(def: RecordTypeDef, perms: PermissionSet): ListActions {
   const has = (a: RecordTypeDef['actions'][number]) => def.actions.includes(a) && !def.readOnly;
   return {
     create: has('create') && holds(perms, def.access.create),
-    update: (has('update') || has('bulk')) && holds(perms, def.access.update),
+    update: has('update') && holds(perms, def.access.update),
     archive: has('archive') && holds(perms, def.access.archive),
+    // Bulk change and bulk archive are the `bulk` route, which needs `update`.
+    bulk: has('bulk') && holds(perms, def.access.update),
   };
 }
