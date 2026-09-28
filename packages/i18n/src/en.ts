@@ -230,6 +230,10 @@ export const en = {
   'apiError.forbidden': 'Your role doesn’t allow this action.',
   'apiError.not_found': 'We couldn’t find that record.',
   'apiError.conflict': 'This record changed or was already updated. Reload and try again.',
+  'apiError.version_conflict':
+    'Someone else changed this record while you were editing. Review their changes, then apply yours again.',
+  'apiError.precondition_required':
+    'We couldn’t tell which version of this record you edited. Reload it and try again.',
   'apiError.csrf_failed':
     'We couldn’t confirm this request came from Deemed Health. Reload the page and try again.',
   'apiError.payload_too_large': 'That is too large to send. Try a smaller file or less text.',

@@ -231,6 +231,10 @@ export const es: Record<keyof typeof en, string> = {
   'apiError.not_found': 'No encontramos ese registro.',
   'apiError.conflict':
     'Este registro cambió o ya se actualizó. Vuelva a cargar e intente de nuevo.',
+  'apiError.version_conflict':
+    'Otra persona cambió este registro mientras usted lo editaba. Revise sus cambios y vuelva a aplicar los suyos.',
+  'apiError.precondition_required':
+    'No pudimos saber qué versión de este registro editó. Vuelva a cargarlo e intente de nuevo.',
   'apiError.csrf_failed':
     'No pudimos confirmar que esta solicitud viene de Deemed Health. Vuelva a cargar la página e intente de nuevo.',
   'apiError.payload_too_large':

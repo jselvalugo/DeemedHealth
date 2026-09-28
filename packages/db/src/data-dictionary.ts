@@ -47,8 +47,17 @@ const rowMeta = {
   updated_at: c('internal', 'When the row last changed (UTC), set by the database'),
   updated_by: c('internal', 'user_account that last changed the row'),
 };
+const rowVersion = {
+  row_version: c(
+    'internal',
+    'Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta)',
+  ),
+};
 const archived = {
   archived_at: c('internal', 'Soft-delete time; archived rows are hidden, never hard-deleted'),
+  ...rowVersion,
+  archived_by: c('internal', 'user_account that archived the row (NULL for a service actor)'),
+  archive_reason: c('PII', 'Why the row was archived (free text)', { freeText: true }),
 };
 const tenantKey = {
   organization_id: c('internal', 'Tenant (organization) that owns the row; RLS key'),
@@ -193,6 +202,7 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       revoke_reason: c('PII', 'Why the grant was revoked (free text)', { freeText: true }),
       ...rowMeta,
       approval_area: c('internal', 'Executive grants only: approval area (public.approval_area)'),
+      ...rowVersion,
     },
   },
   'public.approval_area': {
@@ -378,6 +388,26 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       requirement_ids: c('public', 'Catalog requirementIds the decision supports'),
       decided_at: c('internal', 'Decision time (UTC)'),
       ...rowMeta,
+    },
+  },
+  'public.saved_view': {
+    description:
+      'A saved list view (filters, sort, columns) for one record type; private or shared with roles. Never widens access.',
+    scope: 'tenant',
+    owner: 'data-architect',
+    columns: {
+      id: c('internal', 'Saved view id'),
+      ...tenantKey,
+      record_type: c('internal', 'Record type id from the registry'),
+      owner_user_account_id: c('internal', 'user_account that owns the view'),
+      name: c('internal', 'View name; no personal data (ADR-0014 section 4.5)'),
+      visibility: c('internal', 'private or roles'),
+      shared_roles: c('internal', 'Role keys the view is shared with (visibility roles)'),
+      query: c('confidential', 'Filters, sort, and search of the view'),
+      columns: c('internal', 'Visible columns'),
+      row_version: rowVersion.row_version,
+      ...rowMeta,
+      archived_at: c('internal', 'When the view was removed'),
     },
   },
   'audit.action_registry': {

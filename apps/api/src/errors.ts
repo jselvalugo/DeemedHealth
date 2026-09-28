@@ -26,6 +26,8 @@ export const STATUS: Record<ApiErrorCode, number> = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  version_conflict: 409,
+  precondition_required: 428,
   csrf_failed: 403,
   payload_too_large: 413,
   unsupported: 400,

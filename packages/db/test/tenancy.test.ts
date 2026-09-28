@@ -38,6 +38,7 @@ const EXPECTED_TENANT_TABLES = [
   'public.person',
   'public.requirement_instance',
   'public.role_assignment',
+  'public.saved_view',
   'public.site',
   'public.task',
   'public.user_account',

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RECORD_AUDIT_ACTIONS } from './generated/record-audit-actions.js';
 
 /**
  * Audit action registry (ADR-0008 §4). `category` is a closed enum; `action` is a
@@ -46,8 +47,12 @@ export const DENIABLE_CATEGORIES: readonly AuditCategory[] = [
 
 type Entry = { category: AuditCategory; description: string };
 
-/** Skeleton: shared-entity and platform actions. Module actions are added as modules ship. */
-export const AUDIT_ACTIONS = {
+/**
+ * Hand-written actions: shared-entity and platform actions. Module actions are added as
+ * modules ship. Record-type actions not listed here are generated from the record type
+ * registry (`generated/record-audit-actions.ts`, ADR-0014 section 2.9).
+ */
+export const BASE_AUDIT_ACTIONS = {
   // auth
   'session.login': { category: 'auth', description: 'Signed in' },
   'session.login_failed': { category: 'auth', description: 'Sign-in failed' },
@@ -117,6 +122,8 @@ export const AUDIT_ACTIONS = {
   'task.complete': { category: 'mutation', description: 'Task completed' },
   'workflow_run.start': { category: 'mutation', description: 'Workflow started' },
   'import.commit': { category: 'mutation', description: 'Import run committed (summary event)' },
+  'saved_view.create': { category: 'mutation', description: 'Saved list view created' },
+  'saved_view.update': { category: 'mutation', description: 'Saved list view changed' },
 
   // reveal
   'person.reveal_dob': { category: 'reveal', description: 'Date of birth shown in clear text' },
@@ -149,6 +156,10 @@ export const AUDIT_ACTIONS = {
     description: 'Time-boxed auditor access granted',
   },
   'auditor_access.expired': { category: 'permission', description: 'Auditor access expired' },
+  'saved_view.share': {
+    category: 'permission',
+    description: 'Saved list view shared with roles',
+  },
 
   // integration
   'screening_run.complete': {
@@ -181,6 +192,12 @@ export const AUDIT_ACTIONS = {
     category: 'system',
     description: 'Synthetic seed data loaded (non-production only)',
   },
+} as const satisfies Record<string, Entry>;
+
+/** Every registered action: the base list plus the generated record-type actions. */
+export const AUDIT_ACTIONS = {
+  ...BASE_AUDIT_ACTIONS,
+  ...RECORD_AUDIT_ACTIONS,
 } as const satisfies Record<string, Entry>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

@@ -33,6 +33,8 @@ export const API_ERROR_CODES = [
   'forbidden',
   'not_found',
   'conflict',
+  'version_conflict',
+  'precondition_required',
   'csrf_failed',
   'payload_too_large',
   'unsupported',
@@ -50,6 +52,8 @@ export const ApiErrorBody = z.object({
     correlationId: z.string(),
     /** Validation only: the paths of the invalid fields (never their values). */
     fields: z.array(z.string()).optional(),
+    /** version_conflict only: the record's current row version (send it as If-Match). */
+    currentVersion: z.number().int().optional(),
   }),
 });
 export type ApiErrorBody = z.infer<typeof ApiErrorBody>;
