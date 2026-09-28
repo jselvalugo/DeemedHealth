@@ -53,6 +53,11 @@ export type ListParams = {
   limit: number;
   cursor: string | null;
   archived: ArchivedMode;
+  /**
+   * A saved view the API applies (its filters are added to these). Used for views shared
+   * by someone else, whose filter values the API does not disclose.
+   */
+  view?: string | null | undefined;
 };
 
 export type RecordMutation = { recordType: string; record: RecordView };
@@ -73,7 +78,12 @@ export interface RecordsClient {
     rowVersion: number,
     reason: string,
   ): Promise<RecordsResult<RecordMutation>>;
-  restore(type: string, id: string, rowVersion: number): Promise<RecordsResult<RecordMutation>>;
+  restore(
+    type: string,
+    id: string,
+    rowVersion: number,
+    reason?: string,
+  ): Promise<RecordsResult<RecordMutation>>;
   bulk(type: string, body: BulkRequest): Promise<RecordsResult<BulkResponse>>;
   history(type: string, id: string, cursor: string | null): Promise<RecordsResult<HistoryResponse>>;
   /** Step-up (re-authentication) is the client's job: it retries once after the dialog. */
@@ -111,6 +121,7 @@ export function listQuery(p: ListParams): Record<string, string> {
   out.limit = String(p.limit);
   if (p.cursor) out.cursor = p.cursor;
   if (p.archived !== 'exclude') out.archived = p.archived;
+  if (p.view) out.view = p.view;
   return out;
 }
 

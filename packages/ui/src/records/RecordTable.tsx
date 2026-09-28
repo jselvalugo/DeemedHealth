@@ -203,13 +203,15 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
   const [announce, setAnnounce] = useState('');
 
   const cursor = cursors[cursors.length - 1] ?? null;
+  // A view shared by someone else is applied by the API (its filter values stay private).
+  const sharedViewId = views.find((v) => v.id === viewId && !v.owned)?.id ?? null;
   const pageIndex = cursors.length - 1;
 
   useEffect(() => {
     let live = true;
     setLoad((prev) => ({ state: 'loading', ...(prev.state === 'ok' ? { data: prev.data } : {}) }));
     void client
-      .list(def.id, { filters, sort, q, limit: PAGE_SIZE, cursor, archived })
+      .list(def.id, { filters, sort, q, limit: PAGE_SIZE, cursor, archived, view: sharedViewId })
       .then((res) => {
         if (!live) return;
         if (res.ok) {
@@ -221,7 +223,7 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
     return () => {
       live = false;
     };
-  }, [client, def.id, filters, sort, q, cursor, archived, reload, locale]);
+  }, [client, def.id, filters, sort, q, cursor, archived, reload, locale, sharedViewId]);
 
   const loadViews = useCallback(async () => {
     if (!def.actions.includes('views')) return;
@@ -271,11 +273,19 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
       setSort(defaultSort);
       return;
     }
-    setDrafts(filtersToDrafts(def, view.query.filters, timeZone));
-    setFilters(view.query.filters.map((f) => ({ field: f.field, op: f.op, value: f.value })));
+    if (view.owned) {
+      const own = view.query.filters.flatMap((f) =>
+        f.value === undefined ? [] : [{ field: f.field, op: f.op, value: f.value }],
+      );
+      setDrafts(filtersToDrafts(def, own, timeZone));
+      setFilters(own);
+    } else {
+      setDrafts({});
+      setFilters([]);
+    }
     setSort(view.query.sort.length > 0 ? view.query.sort.map((s) => ({ ...s })) : defaultSort);
-    setQ(view.query.q ?? '');
-    setQDraft(view.query.q ?? '');
+    setQ(view.owned ? (view.query.q ?? '') : '');
+    setQDraft(view.owned ? (view.query.q ?? '') : '');
     const cols = view.columns.filter((c) => listable.includes(c));
     setColumns(cols.length > 0 ? cols : defaultColumns);
     setInvalid([]);

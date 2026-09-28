@@ -240,6 +240,7 @@ export const recordsUiEn = {
   'records.restore.title': 'Restore {name}?',
   'records.restore.body':
     'The record returns to lists and can be changed again. The restore is recorded in its history.',
+  'records.restore.reason': 'Reason for restoring (optional)',
   'records.restore.submit': 'Restore',
   'records.restore.done': 'Record restored.',
 

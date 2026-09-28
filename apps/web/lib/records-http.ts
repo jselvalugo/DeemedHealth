@@ -64,10 +64,10 @@ export function httpRecordsClient(api: Api): RecordsClient {
         }),
         Mutation,
       ),
-    restore: (type, id, rowVersion) =>
+    restore: (type, id, rowVersion, reason) =>
       parsed(
         api.request('POST', `${base(type)}/${enc(id)}/restore`, {
-          body: {},
+          body: reason ? { reason } : {},
           headers: ifMatch(rowVersion),
         }),
         Mutation,

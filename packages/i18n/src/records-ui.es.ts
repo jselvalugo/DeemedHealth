@@ -230,6 +230,7 @@ export const recordsUiEs: Record<keyof typeof recordsUiEn, string> = {
   'records.restore.title': '¿Restaurar {name}?',
   'records.restore.body':
     'El registro vuelve a aparecer en las listas y se puede cambiar de nuevo. La restauración queda anotada en su historial.',
+  'records.restore.reason': 'Motivo para restaurar (opcional)',
   'records.restore.submit': 'Restaurar',
   'records.restore.done': 'Registro restaurado.',
 

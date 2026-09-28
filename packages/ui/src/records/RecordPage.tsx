@@ -746,16 +746,25 @@ function RestoreDialog({
   onDone: (next: RecordView) => void;
 }) {
   const { client, locale } = useRecords();
+  const base = useId();
+  const [reason, setReason] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function confirm() {
     setBusy(true);
     setFailure(null);
-    const res = await client.restore(def.id, record.id, record.rowVersion ?? 1);
+    const res = await client.restore(
+      def.id,
+      record.id,
+      record.rowVersion ?? 1,
+      reason.trim() || undefined,
+    );
     setBusy(false);
-    if (res.ok) onDone(res.data.record);
-    else setFailure(mutationFailure(locale, res));
+    if (res.ok) {
+      setReason('');
+      onDone(res.data.record);
+    } else setFailure(mutationFailure(locale, res));
   }
 
   return (
@@ -781,6 +790,14 @@ function RestoreDialog({
           {failure}
         </Alert>
       )}
+      <Textarea
+        id={`${base}-reason`}
+        label={t(locale, 'records.restore.reason')}
+        hint={t(locale, 'records.archive.reasonHint')}
+        value={reason}
+        maxLength={500}
+        onChange={(e) => setReason(e.target.value)}
+      />
     </Modal>
   );
 }
