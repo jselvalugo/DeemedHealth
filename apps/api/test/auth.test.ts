@@ -803,7 +803,12 @@ describeDb('second factor across pending sign-ins', () => {
     const user = await staff();
     await signIn(api, user);
     const attempts = [];
-    for (let i = 0; i < 4; i++) attempts.push(await passwordStep(user));
+    for (let i = 0; i < 4; i++) {
+      // Distinct creation times, so "oldest" is well defined (the fake clock
+      // otherwise stamps all four attempts with the same instant).
+      if (i > 0) api.clock.advance({ seconds: 1 });
+      attempts.push(await passwordStep(user));
+    }
     const oldest = await attempts[0]!.client.post('/api/auth/mfa/totp/verify', {
       code: nextCode(api, user),
     });
