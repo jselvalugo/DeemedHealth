@@ -137,10 +137,26 @@ describe('auth stub outside production (synthetic demo)', () => {
     });
   });
 
-  it('signs out', async () => {
+  it('signs out, clearing the records demo journal and step-up (finding M3)', async () => {
     jar.set('dh_demo_session', 'demo-compliance');
+    jar.set('dh_demo_records', 'journal');
+    jar.set('dh_demo_stepup', 'step-up');
     expect(await redirectOf(actions.signOut())).toBe('/sign-in?reason=signed-out');
     expect(jar.size).toBe(0);
+  });
+
+  it('starts a new session without the previous user’s demo journal or step-up', async () => {
+    jar.set('dh_demo_records', 'journal');
+    jar.set('dh_demo_stepup', 'step-up');
+    await redirectOf(
+      actions.signInWithPassword(
+        IDLE,
+        form({ email: 'coordinator@xyz-chc.test', password: 'correct-horse-battery' }),
+      ),
+    );
+    expect(await redirectOf(actions.verifyMfaCode(IDLE, form({ code: '000000' })))).toBe('/');
+    expect(jar.has('dh_demo_records')).toBe(false);
+    expect(jar.has('dh_demo_stepup')).toBe(false);
   });
 });
 

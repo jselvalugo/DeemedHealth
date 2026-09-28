@@ -28,7 +28,12 @@ import {
 } from './auth-demo';
 import { authMode } from './auth-mode';
 import type { AuthFormState } from './auth-types';
-import { PENDING_COOKIE, SESSION_COOKIE, cookieOptions } from './session-cookies';
+import {
+  DEMO_SESSION_SCOPED_COOKIES,
+  PENDING_COOKIE,
+  SESSION_COOKIE,
+  cookieOptions,
+} from './session-cookies';
 
 const NOT_IMPLEMENTED: AuthFormState = { status: 'not_implemented' };
 
@@ -49,6 +54,8 @@ async function setPending(userId: string) {
 async function startSession(userId: string) {
   const jar = await cookies();
   jar.delete(PENDING_COOKIE);
+  // A new session starts clean: no records journal or step-up from a previous user.
+  for (const name of DEMO_SESSION_SCOPED_COOKIES) jar.delete(name);
   jar.set(SESSION_COOKIE, userId, cookieOptions(12 * 60 * 60)); // ADR-0006 §4 absolute 12h
 }
 
@@ -138,5 +145,6 @@ export async function signOut(): Promise<void> {
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
   jar.delete(PENDING_COOKIE);
+  for (const name of DEMO_SESSION_SCOPED_COOKIES) jar.delete(name);
   redirect('/sign-in?reason=signed-out');
 }

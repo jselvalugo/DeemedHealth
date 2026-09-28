@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { RecordGetResponse, RecordListResponse } from '@deemed/domain';
-import { runOp, seedStore, type DemoViewer, type RunContext } from './engine';
+import {
+  runOp,
+  seedStore,
+  stepUpFresh,
+  STEP_UP_MS,
+  type DemoViewer,
+  type RunContext,
+} from './engine';
 import {
   buildStore,
   decodeJournal,
   encodeJournal,
   JOURNAL_MAX_BYTES,
+  toJournalOp,
   type JournalEntry,
 } from './journal';
 import { PERSON_IDS, SITE_IDS } from './seed';
@@ -201,6 +209,33 @@ describe('demo records engine', () => {
     });
   });
 
+  it('fails step-up closed on missing, non-finite, stale, or future times (finding M2)', () => {
+    const at = Date.parse(NOW);
+    expect(stepUpFresh(at - 1000, at)).toBe(true);
+    for (const bad of [null, undefined, NaN, Infinity, -Infinity]) {
+      expect(stepUpFresh(bad as number | null, at), String(bad)).toBe(false);
+    }
+    expect(stepUpFresh(at - 1000, NaN)).toBe(false);
+    expect(stepUpFresh(at - STEP_UP_MS - 1, at)).toBe(false);
+    expect(stepUpFresh(at + 61_000, at)).toBe(false);
+    const store = seedStore();
+    const body = { reasonCode: 'data_correction' };
+    expect(
+      runOp(
+        store,
+        { op: 'reveal', type: 'person', id: RAMAN, field: 'dob', body },
+        ctx({ stepUpAt: NaN }),
+      ),
+    ).toMatchObject({ code: 'reauth_required' });
+    expect(
+      runOp(
+        store,
+        { op: 'reveal', type: 'person', id: RAMAN, field: 'dob', body },
+        ctx({ now: 'not a time', stepUpAt: at }),
+      ),
+    ).toMatchObject({ code: 'reauth_required' });
+  });
+
   it('shows someone else’s shared view without its filter values', () => {
     const store = seedStore();
     const views = runOp(store, { op: 'views.list', type: 'site' }, ctx());
@@ -210,29 +245,93 @@ describe('demo records engine', () => {
     expect(view?.query.filters).toEqual([{ field: 'timeZone', op: 'eq' }]);
   });
 
-  it('replays the journal from the cookie, and drops the oldest changes past the size cap', () => {
-    const entries: JournalEntry[] = [
-      {
-        o: {
-          op: 'update',
-          type: 'site',
-          id: S4,
-          version: 1,
-          fields: { city: 'Kissimmee', postalCode: '34741' },
-        },
-        a: NOW,
-        u: officer.id,
-        i: [ID, ID2],
-      },
-    ];
-    const text = encodeJournal(entries);
-    const store = buildStore(decodeJournal(text), (id) =>
-      id === officer.id ? officer : undefined,
-    );
+  const update = (a = NOW, i = [ID, ID2]): JournalEntry => ({
+    o: {
+      op: 'update',
+      type: 'site',
+      id: S4,
+      version: 1,
+      fields: { city: 'Kissimmee', postalCode: '34741' },
+    },
+    a,
+    i,
+  });
+  const cityAfter = (entries: JournalEntry[]) => {
+    const store = buildStore(entries, officer, Date.parse(NOW));
     const got = runOp(store, { op: 'get', type: 'site', id: S4 }, ctx());
-    expect((got as { data: RecordGetResponse }).data.record.fields.city).toBe('Kissimmee');
-    expect(decodeJournal('not-json')).toEqual([]);
-    const many = Array.from({ length: 60 }, () => entries[0] as JournalEntry);
-    expect(encodeJournal(many).length).toBeLessThanOrEqual(JOURNAL_MAX_BYTES);
+    return (got as { data: RecordGetResponse }).data.record.fields.city;
+  };
+
+  it('replays the signed journal as the viewer, and drops the oldest changes past the cap', () => {
+    const text = encodeJournal([update()], officer.id);
+    const decoded = decodeJournal(text, officer.id);
+    expect(decoded.tampered).toBe(false);
+    expect(cityAfter(decoded.entries)).toBe('Kissimmee');
+    const many = Array.from({ length: 60 }, (_, n) =>
+      update(NOW, [`${n.toString(16).padStart(8, '0')}-2b3d-4e5f-8a9b-0c1d2e3f4a5b`]),
+    );
+    expect(encodeJournal(many, officer.id).length).toBeLessThanOrEqual(JOURNAL_MAX_BYTES);
+  });
+
+  it('refuses a tampered journal cookie: edited, foreign user, or unsigned (finding M1)', () => {
+    const text = encodeJournal([update()], officer.id);
+    // Signed for another user: a copied cookie does not verify.
+    expect(decodeJournal(text, coordinator.id)).toEqual({ entries: [], tampered: true });
+    // Payload edited, signature kept.
+    const [payload, mac] = text.split('.') as [string, string];
+    const forged = Buffer.from(
+      Buffer.from(payload, 'base64url').toString('utf8').replace('Kissimmee', 'Tampa'),
+    ).toString('base64url');
+    expect(decodeJournal(`${forged}.${mac}`, officer.id).tampered).toBe(true);
+    // The old unsigned format, and junk.
+    expect(decodeJournal(payload, officer.id).tampered).toBe(true);
+    expect(decodeJournal('not-json', officer.id).tampered).toBe(true);
+    // A validly signed payload that is not a journal (an entry with a user id `u`, or a
+    // time that is not an ISO datetime) is also refused as a whole.
+    const withUser = encodeJournal([{ ...update(), u: 'demo-board' } as JournalEntry], officer.id);
+    expect(decodeJournal(withUser, officer.id).tampered).toBe(true);
+    const badTime = encodeJournal([update('yesterday')], officer.id);
+    expect(decodeJournal(badTime, officer.id).tampered).toBe(true);
+  });
+
+  it('skips entries with future times, reused ids, or seed ids (finding M1)', () => {
+    const future = update(new Date(Date.parse(NOW) + 3_600_000).toISOString());
+    expect(cityAfter([future])).toBe('Orlando');
+    const seedId = update(NOW, ['d0000001-0002-4000-8000-000000000009']);
+    expect(cityAfter([seedId])).toBe('Orlando');
+    const first = update(NOW, [ID]);
+    const reused = {
+      ...update(NOW, [ID]),
+      o: {
+        op: 'update',
+        type: 'site',
+        id: S4,
+        version: 2,
+        fields: { city: 'Tampa', postalCode: '33602' },
+      },
+    } as JournalEntry;
+    expect(cityAfter([first, reused])).toBe('Kissimmee');
+  });
+
+  it('journals reason codes and reason lengths, never the free text (finding L4)', () => {
+    const reveal = toJournalOp({
+      op: 'reveal',
+      type: 'person',
+      id: RAMAN,
+      field: 'dob',
+      body: { reasonCode: 'other', note: 'Checking the file for Dr. Raman' },
+    });
+    expect(reveal).toMatchObject({ body: { reasonCode: 'other' } });
+    expect(JSON.stringify(reveal)).not.toContain('Dr. Raman');
+    const archive = toJournalOp({
+      op: 'archive',
+      type: 'site',
+      id: S4,
+      version: 1,
+      body: { reason: 'Closed after the flood' },
+    });
+    expect(archive).toMatchObject({ body: { reason: '#'.repeat(22) } });
+    const restore = toJournalOp({ op: 'restore', type: 'site', id: S4, version: 2, body: {} });
+    expect(restore).toMatchObject({ body: {} });
   });
 });

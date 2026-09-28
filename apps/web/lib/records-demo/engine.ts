@@ -117,6 +117,18 @@ export type RunContext = {
 };
 
 export const STEP_UP_MS = 5 * 60 * 1000;
+
+/**
+ * Whether a step-up at `stepUpAt` still counts at `at` (both epoch ms). Written as the
+ * failure conditions, so a missing or non-finite value (NaN compares false) fails closed.
+ */
+export function stepUpFresh(stepUpAt: number | null | undefined, at: number): boolean {
+  if (stepUpAt === null || stepUpAt === undefined) return false;
+  if (!Number.isFinite(stepUpAt) || !Number.isFinite(at)) return false;
+  if (at - stepUpAt > STEP_UP_MS) return false;
+  if (stepUpAt > at + 60_000) return false;
+  return true;
+}
 const HISTORY_PAGE = 50;
 
 type Result<T> = RecordsResult<T>;
@@ -696,10 +708,7 @@ function reveal(
   if (!row) return fail(404, 'not_found');
   if (!revealable(def, ctx).includes(field)) return fail(403, 'forbidden');
   // Step-up (ADR-0006 rule 5): a confirmation within the last five minutes.
-  const at = Date.parse(ctx.now);
-  if (ctx.stepUpAt === null || at - ctx.stepUpAt > STEP_UP_MS || ctx.stepUpAt > at + 60_000) {
-    return fail(401, 'reauth_required');
-  }
+  if (!stepUpFresh(ctx.stepUpAt, Date.parse(ctx.now))) return fail(401, 'reauth_required');
   const value = row.secrets[field] ?? null;
   store.events.push({
     id: ctx.ids[0] ?? `${row.id}-r${store.events.length}`,
