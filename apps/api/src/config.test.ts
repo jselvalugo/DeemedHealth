@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { TEXT_DIGEST_KEY_ID, textDigest, textDigestKey } from '@deemed/auth';
 import { describe, expect, it } from 'vitest';
 import { redactedDiff } from './audit.js';
-import { ConfigError, isCanonicalKey32, loadApiConfig } from './config.js';
+import { ConfigError, DEPLOYED_MARKERS, isCanonicalKey32, loadApiConfig } from './config.js';
 import { clearCookie, cookieNames, readCookie, serializeCookie } from './cookies.js';
 
 const base = {
@@ -32,6 +32,23 @@ describe('loadApiConfig', () => {
       expect((error as Error).message).not.toContain('hunter2');
     }
     expect(() => loadApiConfig({ ...base, DH_DEV_ROOT_KEY: 'c2hvcnQ=' })).toThrow(ConfigError);
+  });
+
+  it('refuses DH_ENV=local on a deployed host, so local-only flags never switch on there', () => {
+    const local = { ...base, DH_ENV: 'local' };
+    expect(loadApiConfig(local).dhEnv).toBe('local');
+    for (const marker of DEPLOYED_MARKERS) {
+      try {
+        loadApiConfig({ ...local, [marker]: 'set-by-host' });
+        throw new Error(`expected a ConfigError for ${marker}`);
+      } catch (error) {
+        expect(error, marker).toBeInstanceOf(ConfigError);
+        expect((error as ConfigError).names).toEqual(['DH_ENV', marker]);
+        expect((error as Error).message).not.toContain('set-by-host');
+      }
+    }
+    // Deployed environments themselves are unaffected by the markers.
+    expect(loadApiConfig({ ...base, NETLIFY: 'true' }).dhEnv).toBe('development');
   });
 
   it('refuses production until the KMS key provider exists, and insecure cookies outside local', () => {

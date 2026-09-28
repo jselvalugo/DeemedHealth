@@ -48,20 +48,22 @@ export const SiteType = z.enum([
 ]);
 export type SiteType = z.infer<typeof SiteType>;
 
-export const Site = TenantScoped.extend({
-  id: Uuid,
+/** A site's own fields (the record type `site` picks its editable fields from these). */
+export const SiteFields = z.object({
   name: z.string().trim().min(1).max(200),
-  form5bSiteId: z.string().trim().min(1).nullable(),
+  form5bSiteId: z.string().trim().min(1).max(40).nullable(),
   siteType: SiteType,
-  addressLine1: z.string().trim().min(1),
-  addressLine2: z.string().trim().min(1).nullable(),
-  city: z.string().trim().min(1),
+  addressLine1: z.string().trim().min(1).max(200),
+  addressLine2: z.string().trim().min(1).max(200).nullable(),
+  city: z.string().trim().min(1).max(100),
   state: FloridaState,
   postalCode: z.string().regex(/^\d{5}(-\d{4})?$/, 'Expected a ZIP or ZIP+4'),
   timeZone: FloridaTimeZone,
   validFrom: IsoDate,
   validTo: IsoDate.nullable(),
-})
+});
+
+export const Site = TenantScoped.extend({ id: Uuid, ...SiteFields.shape })
   .merge(RecordMeta)
   .strict()
   .refine(validRange, { message: 'validTo must be on or after validFrom', path: ['validTo'] });

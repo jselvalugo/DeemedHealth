@@ -26,6 +26,8 @@ export const STATUS: Record<ApiErrorCode, number> = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  version_conflict: 409,
+  precondition_required: 428,
   csrf_failed: 403,
   payload_too_large: 413,
   unsupported: 400,
@@ -39,6 +41,8 @@ export class ApiError extends Error {
   constructor(
     readonly code: ApiErrorCode,
     readonly fields?: string[],
+    /** version_conflict: the record's current row version. */
+    readonly currentVersion?: number,
   ) {
     super(code);
   }
@@ -51,15 +55,20 @@ export interface DenialTarget {
   siteId?: string | null;
 }
 
-/** A request the policy refused. The error handler audits it with outcome = denied. */
+/**
+ * A request the policy refused. The error handler audits it with outcome = denied.
+ * `hidden`: the record is outside the viewer's scope, so the response is 404, not 403,
+ * and its existence does not leak (ADR-0014 section 2.2); the denial is still audited.
+ */
 export class DeniedError extends ApiError {
   override name = 'DeniedError';
 
   constructor(
     readonly reason: DenyReason | 'reauth_required' | 'self_service_forbidden',
     readonly target?: DenialTarget,
+    readonly hidden = false,
   ) {
-    super(reason === 'reauth_required' ? 'reauth_required' : 'forbidden');
+    super(reason === 'reauth_required' ? 'reauth_required' : hidden ? 'not_found' : 'forbidden');
   }
 }
 
@@ -67,6 +76,7 @@ export function errorBody(
   code: ApiErrorCode,
   correlationId: string,
   fields?: string[],
+  currentVersion?: number,
 ): ApiErrorBody {
   return {
     error: {
@@ -74,6 +84,7 @@ export function errorBody(
       messageKey: apiErrorMessageKey(code),
       correlationId,
       ...(fields && fields.length ? { fields } : {}),
+      ...(currentVersion !== undefined ? { currentVersion } : {}),
     },
   };
 }

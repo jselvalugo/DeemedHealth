@@ -10,6 +10,8 @@
  *     needs step-up).
  */
 import type { AuditAction, Permission } from '@deemed/domain';
+import { RECORD_ROUTES, type RecordRouteId } from './records/manifest.js';
+import type { UserLimitGroup } from './user-limits.js';
 
 export type Access =
   /** No session. `reason` says why the endpoint is open. */
@@ -26,19 +28,25 @@ export type Access =
   | { kind: 'permission'; permission: Permission; recentAuth?: boolean; record?: boolean };
 
 export interface RouteSpec {
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'PATCH';
   url: string;
   access: Access;
   /**
    * The audit action a mutation writes. `by: 'auth'` means packages/auth writes it in
    * the same transaction as the session change; otherwise the audit middleware
-   * refuses to commit a mutation that wrote no audit event.
+   * refuses to commit a mutation that wrote no audit event (unless the handler declares
+   * an explicit no-op). `perRow`: a bulk route writes one event per changed row and may
+   * change none (each refused row is still audited as denied).
    */
-  audit: { action: AuditAction; by?: 'auth' } | null;
+  audit: { action: AuditAction; by?: 'auth'; perRow?: true } | null;
+  /** A POST that writes nothing (a dry run), and why. */
+  writesNothing?: string;
+  /** Per-user limit group (reveal, export, import), checked after authentication. */
+  userLimit?: UserLimitGroup;
   summary: string;
 }
 
-export const ROUTES = {
+const STATIC_ROUTES = {
   health: {
     method: 'GET',
     url: '/api/health',
@@ -181,11 +189,20 @@ export const ROUTES = {
   },
 } as const satisfies Record<string, RouteSpec>;
 
-export type RouteId = keyof typeof ROUTES;
+export type StaticRouteId = keyof typeof STATIC_ROUTES;
+/** Hand-written routes, plus one generated route per record type and action. */
+export type RouteId = StaticRouteId | RecordRouteId;
+
+export const ROUTES: Readonly<Record<RouteId, RouteSpec>> = {
+  ...STATIC_ROUTES,
+  ...RECORD_ROUTES,
+};
 export const ROUTE_IDS = Object.keys(ROUTES) as RouteId[];
 
 export function routeSpec(id: RouteId): RouteSpec {
-  return ROUTES[id];
+  const spec = ROUTES[id];
+  if (!spec) throw new Error(`unknown route ${id}`);
+  return spec;
 }
 
 /** Integration test cases each access kind requires. */
@@ -196,14 +213,14 @@ export const REQUIRED_CASES = {
   permission: ['allowed', 'deniedRole', 'otherSite', 'otherTenant'],
 } as const;
 
-type Spec<Id extends RouteId> = (typeof ROUTES)[Id];
+type Spec<Id extends RouteId> = Id extends StaticRouteId ? (typeof STATIC_ROUTES)[Id] : RouteSpec;
 
 export type RequiredCase<Id extends RouteId> =
   | (typeof REQUIRED_CASES)[Spec<Id>['access']['kind']][number]
   | (Spec<Id>['access'] extends { recentAuth: true } ? 'reauthRequired' : never);
 
 export function requiredCases(id: RouteId): string[] {
-  const access = ROUTES[id].access as Access;
+  const access = routeSpec(id).access;
   const cases: string[] = [...REQUIRED_CASES[access.kind]];
   if (access.kind === 'permission' && access.recentAuth) cases.push('reauthRequired');
   return cases;

@@ -367,6 +367,28 @@ export async function seedTenant(
           siteId,
         );
       }
+
+      for (const [i, v] of fixture.savedViews.entries()) {
+        const viewId = id(KIND.savedView, i + 1);
+        await tx.insert(schema.savedView).values({
+          id: viewId,
+          organizationId,
+          recordType: v.recordType,
+          ownerUserAccountId: lookup(userIds, v.owner, 'account') as string,
+          name: v.name,
+          visibility: v.visibility,
+          sharedRoles: [...(v.sharedRoles ?? [])],
+          query: v.query,
+        });
+        await audit(
+          tx,
+          ctx,
+          'saved_view.create',
+          'saved_view',
+          viewId,
+          created({ record_type: v.recordType, visibility: v.visibility }),
+        );
+      }
     },
     runtime,
   );

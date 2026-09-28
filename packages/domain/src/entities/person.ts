@@ -17,13 +17,18 @@ import { RoleIdSchema } from '../permissions.js';
 export const PersonKind = z.enum(['staff', 'provider', 'board_member', 'contractor']);
 export type PersonKind = z.infer<typeof PersonKind>;
 
-export const Person = TenantScoped.extend({
-  id: Uuid,
+/** A person's own editable fields (the record type `person` picks from these). No SSN (D1). */
+export const PersonFields = z.object({
   givenName: z.string().trim().min(1).max(100),
   familyName: z.string().trim().min(1).max(100),
   preferredName: z.string().trim().min(1).max(100).nullable(),
-  workEmail: z.string().email().nullable(),
+  workEmail: z.string().max(254).email().nullable(),
   npi: Npi.nullable(),
+});
+
+export const Person = TenantScoped.extend({
+  id: Uuid,
+  ...PersonFields.shape,
   /** Current kinds, derived from open temporal rows; informational. */
   kinds: z.array(PersonKind),
   hasDob: z.boolean(),

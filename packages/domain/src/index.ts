@@ -9,6 +9,7 @@ export * from './permissions.js';
 export * from './audit-actions.js';
 export * from './policy/index.js';
 export * from './api/contracts.js';
+export * from './records/index.js';
 
 export * from './entities/organization.js';
 export * from './entities/person.js';
@@ -33,6 +34,7 @@ export {
 } from './audit-canonical.js';
 export {
   classifySsnColumnName,
+  containsSsnShape,
   detectSsnLikeColumns,
   isSsnShapedValue,
   tokenizeColumnName,

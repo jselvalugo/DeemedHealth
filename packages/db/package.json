@@ -17,7 +17,8 @@
     "migrate": "tsx --tsconfig tsconfig.test.json scripts/migrate.ts",
     "seed": "tsx --tsconfig tsconfig.test.json seed/run.ts",
     "seed:enroll": "tsx --tsconfig tsconfig.test.json seed/enroll.ts",
-    "dictionary": "tsx --tsconfig tsconfig.test.json scripts/data-dictionary.ts"
+    "dictionary": "tsx --tsconfig tsconfig.test.json scripts/data-dictionary.ts",
+    "generate": "tsx --tsconfig tsconfig.test.json scripts/generate-domain.ts"
   },
   "dependencies": {
     "@deemed/domain": "workspace:*",

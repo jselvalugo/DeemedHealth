@@ -31,6 +31,7 @@ import {
   siteScope,
   type Permission,
   type PolicyContext,
+  type RoleId,
 } from '@deemed/domain';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, {
@@ -46,14 +47,16 @@ import { chainSeq, deniedEvent } from './audit.js';
 import type { AppServices, Handler, Helpers, RequestContext } from './context.js';
 import { clearCookie, cookieNames, readCookie, serializeCookie } from './cookies.js';
 import { ApiError, DeniedError, STATUS, errorBody } from './errors.js';
-import { ROUTES, ROUTE_IDS, type RouteId, type RouteSpec } from './manifest.js';
+import { ROUTES, ROUTE_IDS, routeSpec, type RouteId, type RouteSpec } from './manifest.js';
 import { loadPrincipal } from './principal.js';
+import { UserLimiter, type UserLimitOptions } from './user-limits.js';
 import { adminHandlers } from './routes/admin.js';
 import { authHandlers } from './routes/auth.js';
 import { meHandlers } from './routes/me.js';
+import { recordHandlers } from './records/handlers.js';
 import { readinessHandlers } from './routes/readiness.js';
 
-export interface RateLimitOptions {
+export interface RateLimitOptions extends UserLimitOptions {
   /** Requests per minute per client address, every route (default 300). */
   globalPerMinute?: number;
   /** Requests per minute per client address on sign-in and step-up routes (default 30). */
@@ -83,6 +86,7 @@ const HANDLERS: Record<RouteId, Handler> = {
   ...authHandlers,
   ...readinessHandlers,
   ...adminHandlers,
+  ...recordHandlers(),
 };
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -109,10 +113,12 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     dhEnv: options.dhEnv,
     allowedOrigins: options.allowedOrigins,
     secureCookies: options.secureCookies,
+    ...(options.fieldCipher ? { fieldCipher: options.fieldCipher } : {}),
   };
   const names = cookieNames(services.secureCookies);
 
   const limits = { ...RATE_LIMIT_DEFAULTS, ...options.rateLimit };
+  const userLimiter = new UserLimiter(options.rateLimit ?? {}, services.clock);
   const app = Fastify({
     logger: options.logger ?? false,
     // No per-request log lines from Fastify (they carry the client address); the
@@ -244,6 +250,29 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     }
   }
 
+  /** Per-user limits on sensitive routes, keyed by user (security review M2). */
+  function checkUserLimit(req: FastifyRequest, group: NonNullable<RouteSpec['userLimit']>) {
+    const s = req.ctx.session as ActiveSession;
+    const r = userLimiter.hit(s.organizationId, s.userAccountId, group);
+    if (r.alert) {
+      // Ids and counts only; the S8 log alerting routes this to security-privacy-officer.
+      req.log.warn(
+        {
+          security_alert: 'records.reveal_volume',
+          organizationId: s.organizationId,
+          userAccountId: s.userAccountId,
+          routeId: req.ctx.routeId,
+          count: r.count,
+          limit: r.limit,
+          windowSeconds: 60,
+          refused: !r.allowed,
+        },
+        'security alert: reveal volume',
+      );
+    }
+    if (!r.allowed) throw new ApiError('too_many_attempts');
+  }
+
   function helpers(req: FastifyRequest, reply: FastifyReply, spec: RouteSpec): Helpers {
     const ctx = req.ctx;
     const session = () => {
@@ -259,11 +288,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       if (!result.success) throw new ApiError('bad_request', zodFields(result.error));
       return result.data;
     };
-    const mutation = MUTATING.has(spec.method) && spec.audit !== null && spec.audit.by !== 'auth';
+    const mutation =
+      MUTATING.has(spec.method) &&
+      spec.audit !== null &&
+      spec.audit.by !== 'auth' &&
+      spec.audit.perRow !== true;
     // Routes marked `record` must check the record itself (site scope, ownership, the
     // executive approval area) before their transaction commits.
     const needsRecordCheck = spec.access.kind === 'permission' && spec.access.record === true;
     let recordChecked = false;
+    let noChange = false;
     const setCookie = (value: string) => {
       const existing = reply.getHeader('set-cookie');
       const list =
@@ -294,7 +328,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           async (tx, txCtx) => {
             const before = mutation ? await chainSeq(tx, s.organizationId) : 0;
             const result = await fn(tx, txCtx);
-            if (mutation && (await chainSeq(tx, s.organizationId)) === before) {
+            if (mutation && !noChange && (await chainSeq(tx, s.organizationId)) === before) {
               throw new Error('audit middleware: a mutation wrote no audit event');
             }
             if (needsRecordCheck && !recordChecked) {
@@ -325,6 +359,38 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         );
         if (!decision.allowed) throw new DeniedError(decision.reason, target);
         recordChecked = true;
+      },
+      decide(permission, resource, decideOptions) {
+        const p = principal();
+        const only = decideOptions?.onlyRoles;
+        const scoped = only
+          ? { ...p, grants: p.grants.filter((g) => only.includes(g.roleId as RoleId)) }
+          : p;
+        return authorize(
+          scoped,
+          permission,
+          resource ? { organizationId: session().organizationId, ...resource } : undefined,
+          policyContext(ctx),
+        );
+      },
+      markRecordChecked() {
+        recordChecked = true;
+      },
+      declareNoChange() {
+        noChange = true;
+      },
+      recentAuth: () => services.auth.hasRecentAuth(session()),
+      async recordListView(tx, txCtx, table, ids) {
+        if (!auditsEveryView(principal(), services.clock.now())) return;
+        await appendAuditEvent(tx, txCtx, {
+          category: 'auth',
+          action: 'access.view',
+          targetTable: table,
+          ipAddress: ctx.meta.ip,
+          userAgent: ctx.meta.userAgent || 'unknown',
+          sessionId: session().id,
+          metadata: { route: ctx.routeId ?? 'unknown', ids: [...ids], count: ids.length },
+        });
       },
       async recordView(tx, txCtx, target) {
         if (!auditsEveryView(principal(), services.clock.now())) return;
@@ -363,8 +429,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   const registerRoutes = async (scope: FastifyInstance) => {
     for (const id of ROUTE_IDS) {
-      const spec: RouteSpec = ROUTES[id];
+      const spec = routeSpec(id);
       const handler = HANDLERS[id];
+      if (!handler) throw new Error(`route ${id} has no handler`);
       scope.route({
         method: spec.method,
         url: spec.url,
@@ -380,6 +447,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           if (spec.access.kind === 'session' || spec.access.kind === 'permission') {
             await authenticate(req, reply, spec);
           }
+          if (spec.userLimit && req.ctx.session) checkUserLimit(req, spec.userLimit);
         },
         handler: async (req, reply) => {
           const result = await handler(req, reply, helpers(req, reply, spec));
@@ -449,7 +517,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         );
       }
     }
-    reply.status(STATUS[apiError.code]).send(errorBody(apiError.code, req.id, apiError.fields));
+    reply
+      .status(STATUS[apiError.code])
+      .send(errorBody(apiError.code, req.id, apiError.fields, apiError.currentVersion));
   });
 
   // After the rate-limit plugin (plugin order is preserved), so every route gets both

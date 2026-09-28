@@ -183,6 +183,49 @@ export function authorize(
   return allowedBy.length > 0 ? { allowed: true, grantIds: allowedBy } : { allowed: false, reason };
 }
 
+/** Sites a set of grants covers: every site (`all`), or the listed ones. */
+export interface SiteCoverage {
+  all: boolean;
+  sites: readonly string[];
+}
+
+/**
+ * Where a permission applies, for compiling list queries to SQL (ADR-0014 section 2.2,
+ * "scope before paging"). Same grant logic as `authorize()`:
+ *  - `full`: grants that hold the permission (for reads, `read`); a record is covered
+ *    when one of its sites is listed, or when `all` is set (including organization-wide
+ *    records, which only an organization-wide grant covers);
+ *  - `own`: reads only, grants with nothing but `read_own`; they cover a record only when
+ *    it is about or assigned to the principal.
+ * The approval-area rule applies to `approve`, which lists never use.
+ */
+export interface PermissionScope {
+  full: SiteCoverage;
+  own: SiteCoverage;
+}
+
+export function permissionScope(
+  principal: Principal,
+  permission: Permission,
+  now: Date,
+): PermissionScope {
+  const grants = activeGrants(principal, now);
+  const [module, verb] = splitPermission(permission);
+  const reading = verb === 'read' || verb === 'read_own';
+  const fullPermission: Permission = reading ? `${module}:read` : permission;
+  const full = grants.filter((g) => roleOf(g).permissions.includes(fullPermission));
+  const own = reading
+    ? grants.filter(
+        (g) => !full.includes(g) && roleOf(g).permissions.includes(`${module}:read_own`),
+      )
+    : [];
+  const coverage = (gs: RoleGrant[]): SiteCoverage => ({
+    all: gs.some((g) => g.siteId === null),
+    sites: [...new Set(gs.flatMap((g) => (g.siteId === null ? [] : [g.siteId])))],
+  });
+  return { full: coverage(full), own: coverage(own) };
+}
+
 /** Structural shape of a module registry entry (packages/ui/module-registry.ts). */
 export interface NavigablePage {
   id: string;

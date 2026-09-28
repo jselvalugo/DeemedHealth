@@ -54,6 +54,20 @@ const Env = z.object({
   DH_TRUST_PROXY: z.string().optional(),
 });
 
+/**
+ * Variables that only a deployed host sets (Netlify builds and functions, AWS Lambda,
+ * ECS tasks). `DH_ENV=local` is refused when any is present, so behaviour that is on only
+ * locally (the `records.import` flag, insecure cookies) can never switch on in a
+ * deployed environment (security review L6).
+ */
+export const DEPLOYED_MARKERS = [
+  'NETLIFY',
+  'AWS_EXECUTION_ENV',
+  'AWS_LAMBDA_FUNCTION_NAME',
+  'ECS_CONTAINER_METADATA_URI',
+  'ECS_CONTAINER_METADATA_URI_V4',
+] as const;
+
 export class ConfigError extends Error {
   override name = 'ConfigError';
 
@@ -73,6 +87,15 @@ export function loadApiConfig(env: Record<string, string | undefined>): ApiConfi
     throw new ConfigError(`invalid or missing configuration: ${names.join(', ')}`, names);
   }
   const e = parsed.data;
+  if (e.DH_ENV === 'local') {
+    const present = DEPLOYED_MARKERS.filter((name) => (env[name] ?? '') !== '');
+    if (present.length > 0) {
+      throw new ConfigError(
+        `DH_ENV=local is refused on a deployed host (${present.join(', ')} set)`,
+        ['DH_ENV', ...present],
+      );
+    }
+  }
   if (isProduction(e.DH_ENV)) {
     // Production keys come from KMS (ADR-0007) once packages/crypto exists (S6); the
     // development root key is refused there, so production cannot start yet.

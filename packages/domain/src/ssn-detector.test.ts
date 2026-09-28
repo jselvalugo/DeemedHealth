@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   classifySsnColumnName,
+  containsSsnShape,
   detectSsnLikeColumns,
   isSsnShapedValue,
   tokenizeColumnName,
@@ -80,6 +81,31 @@ describe('isSsnShapedValue', () => {
     expect(isSsnShapedValue(shaped(''))).toBe(false);
     expect(isSsnShapedValue('32801-1234')).toBe(false);
     expect(isSsnShapedValue(123)).toBe(false);
+  });
+});
+
+describe('containsSsnShape', () => {
+  it('finds an SSN-shaped run inside free text, as the audit function does', () => {
+    expect(containsSsnShape(`Employee ${shaped('-')} left`)).toBe(true);
+    expect(containsSsnShape(shaped('-'))).toBe(true);
+    expect(containsSsnShape(shaped(' '))).toBe(true);
+    expect(containsSsnShape(`(${shaped('-')})`)).toBe(true);
+  });
+
+  it('ignores runs glued to other digits or hyphens, and non-strings', () => {
+    expect(containsSsnShape(`9${shaped('-')}`)).toBe(false);
+    expect(containsSsnShape(`${shaped('-')}7`)).toBe(false);
+    expect(containsSsnShape(`-${shaped('-')}`)).toBe(false);
+    expect(containsSsnShape('Call 305-555-0100')).toBe(false);
+    expect(containsSsnShape(123456789)).toBe(false);
+    expect(containsSsnShape(null)).toBe(false);
+  });
+
+  it('stays linear on long input', () => {
+    const long = '1-'.repeat(100_000);
+    const started = performance.now();
+    expect(containsSsnShape(long)).toBe(false);
+    expect(performance.now() - started).toBeLessThan(1000);
   });
 });
 
