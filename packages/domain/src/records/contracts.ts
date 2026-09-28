@@ -6,6 +6,7 @@
  */
 import { z } from 'zod';
 import { RoleIdSchema } from '../permissions.js';
+import { containsSsnShape } from '../ssn-detector.js';
 import { FILTER_OPS } from './query.js';
 
 const Id = z.string().uuid();
@@ -55,13 +56,23 @@ export const RecordGetResponse = z.object({
 });
 export type RecordGetResponse = z.infer<typeof RecordGetResponse>;
 
-/** Free text: 1 to 500 characters. Stored on the row; the audit log keeps a keyed digest. */
-const Reason = z.string().trim().min(1).max(500);
+/**
+ * Free text: 1 to 500 characters, never SSN-shaped (D1). Stored on the row; the audit log
+ * keeps only its length and a keyed digest.
+ */
+const Reason = z
+  .string()
+  .trim()
+  .min(1)
+  .max(500)
+  .refine((v) => !containsSsnShape(v), 'SSN-shaped text (D1)');
 
 export const ArchiveRequest = z.object({ reason: Reason }).strict();
 export type ArchiveRequest = z.infer<typeof ArchiveRequest>;
 
-export const RestoreRequest = z.object({}).strict();
+/** An optional reason for restoring; logged as its length and a keyed digest only. */
+export const RestoreRequest = z.object({ reason: Reason.optional() }).strict();
+export type RestoreRequest = z.infer<typeof RestoreRequest>;
 
 /**
  * Why a masked value is revealed. The code is stored as the audit event's `reason`; the
@@ -237,7 +248,12 @@ export const SavedViewQuery = z
   .strict();
 export type SavedViewQuery = z.infer<typeof SavedViewQuery>;
 
-const ViewName = z.string().trim().min(1).max(80);
+const ViewName = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .refine((v) => !containsSsnShape(v), 'SSN-shaped text (D1)');
 
 export const SavedViewCreate = z
   .object({
@@ -264,13 +280,30 @@ export const SavedViewUpdate = z
   .refine((v) => Object.keys(v).length > 0, { message: 'nothing to change' });
 export type SavedViewUpdate = z.infer<typeof SavedViewUpdate>;
 
+/**
+ * A saved view's query as returned. The owner sees it whole; anyone else sees a shared
+ * view's fields and operators only (no values, no search text).
+ */
+export const SavedViewQueryView = z.object({
+  filters: z.array(
+    z.object({
+      field: z.string(),
+      op: z.enum(FILTER_OPS),
+      value: z.union([z.string(), z.array(z.string())]).optional(),
+    }),
+  ),
+  sort: z.array(z.object({ field: z.string(), dir: z.enum(['asc', 'desc']) })),
+  q: z.string().nullable().optional(),
+});
+export type SavedViewQueryView = z.infer<typeof SavedViewQueryView>;
+
 export const SavedView = z.object({
   id: Id,
   recordType: z.string(),
   name: z.string(),
   visibility: z.enum(['private', 'roles']),
   sharedRoles: z.array(z.string()),
-  query: SavedViewQuery,
+  query: SavedViewQueryView,
   columns: z.array(z.string()),
   rowVersion: z.number().int(),
   /** The viewer owns the view (and may change it). */

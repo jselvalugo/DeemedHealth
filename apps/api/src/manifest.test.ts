@@ -89,6 +89,16 @@ describe('route manifest', () => {
     }
   });
 
+  it('limits reveals, exports, and import dry runs per user (security review M2)', () => {
+    for (const [id, meta] of Object.entries(RECORD_ROUTE_META)) {
+      const expected =
+        meta.action === 'reveal' || meta.action === 'export' || meta.action === 'import'
+          ? meta.action
+          : undefined;
+      expect(routeSpec(id as never).userLimit, id).toBe(expected);
+    }
+  });
+
   it('serves no DELETE route: records are archived and restored, never deleted (ADR-0014)', () => {
     for (const id of ROUTE_IDS) {
       expect(['GET', 'POST', 'PATCH'], id).toContain(routeSpec(id).method);

@@ -79,8 +79,8 @@ function field(def: RecordTypeDef, name: string): FieldDef {
 // Site scope and record rules
 // ---------------------------------------------------------------------------
 
-/** text[] of the record's site ids; empty means organization-wide. */
-export function sitesExpr(def: RecordTypeDef): SQL {
+/** text[] of the record's site ids (empty: no site). */
+export function sitesExpr(def: RecordTypeDef, now: string): SQL {
   const scope = def.siteScope;
   if (scope === 'organization') return sql`ARRAY[]::text[]`;
   if ('self' in scope) return sql`ARRAY[t.id::text]`;
@@ -88,30 +88,44 @@ export function sitesExpr(def: RecordTypeDef): SQL {
     const c = col(scope.column);
     return sql`CASE WHEN ${c} IS NULL THEN ARRAY[]::text[] ELSE ARRAY[${c}::text] END`;
   }
-  return SITE_JOINS[scope.via].sites;
+  return SITE_JOINS[scope.via].sites(now);
 }
 
-/** The record has one of these sites. Organization-wide records never match. */
-export function siteIn(def: RecordTypeDef, ids: readonly string[]): SQL {
+/** Changing the record needs an organization-wide grant (see SiteJoin.orgWide). */
+export function orgWideExpr(def: RecordTypeDef, now: string): SQL {
+  const scope = def.siteScope;
+  if (scope === 'organization') return sql`TRUE`;
+  if ('self' in scope) return sql`FALSE`;
+  if ('column' in scope) return sql`(${col(scope.column)} IS NULL)`;
+  return SITE_JOINS[scope.via].orgWide(now);
+}
+
+/** The record has one of these sites. Records with no site never match. */
+export function siteIn(def: RecordTypeDef, ids: readonly string[], now: string): SQL {
   const scope = def.siteScope;
   if (ids.length === 0 || scope === 'organization') return sql`FALSE`;
   if ('self' in scope) return uuidIn(sql`t.id`, ids);
   if ('column' in scope) return uuidIn(col(scope.column), ids);
-  return SITE_JOINS[scope.via].siteIn(ids);
+  return SITE_JOINS[scope.via].siteIn(ids, now);
 }
 
-function covered(def: RecordTypeDef, c: SiteCoverage): SQL {
-  return c.all ? sql`TRUE` : siteIn(def, c.sites);
+function covered(def: RecordTypeDef, c: SiteCoverage, now: string): SQL {
+  return c.all ? sql`TRUE` : siteIn(def, c.sites, now);
 }
 
 /** The compiled read scope: (full coverage) OR (own coverage AND the record is mine). */
-export function scopePredicate(def: RecordTypeDef, scope: PermissionScope, personId: string): SQL {
+export function scopePredicate(
+  def: RecordTypeDef,
+  scope: PermissionScope,
+  personId: string,
+  now: string,
+): SQL {
   const own = binding(def).own;
   const ownAllowed =
     own && def.access.recordRules.includes('own') && (scope.own.all || scope.own.sites.length > 0)
-      ? sql`(${covered(def, scope.own)} AND ${own.predicate(personId)})`
+      ? sql`(${covered(def, scope.own, now)} AND ${own.predicate(personId)})`
       : sql`FALSE`;
-  return sql`(${covered(def, scope.full)} OR ${ownAllowed})`;
+  return sql`(${covered(def, scope.full, now)} OR ${ownAllowed})`;
 }
 
 function ownersExpr(def: RecordTypeDef): SQL {
@@ -238,11 +252,12 @@ export interface Row {
   __archived_by?: string | null;
   __archive_reason?: string | null;
   __sites: string[];
+  __org_wide: boolean;
   __owners: string[];
   [field: string]: unknown;
 }
 
-function selectList(def: RecordTypeDef): SQL {
+function selectList(def: RecordTypeDef, now: string): SQL {
   const parts: SQL[] = [sql`t.id::text AS "__id"`];
   if (def.versioned) parts.push(sql`t.row_version AS "__v"`);
   if (def.archivable) {
@@ -252,7 +267,11 @@ function selectList(def: RecordTypeDef): SQL {
       sql`t.archive_reason AS "__archive_reason"`,
     );
   }
-  parts.push(sql`${sitesExpr(def)} AS "__sites"`, sql`${ownersExpr(def)} AS "__owners"`);
+  parts.push(
+    sql`${sitesExpr(def, now)} AS "__sites"`,
+    sql`${orgWideExpr(def, now)} AS "__org_wide"`,
+    sql`${ownersExpr(def)} AS "__owners"`,
+  );
   for (const [name, f] of Object.entries(def.fields)) {
     if (isHidden(def, name)) continue;
     const c = col(f.column);
@@ -266,6 +285,8 @@ function selectList(def: RecordTypeDef): SQL {
 }
 
 export interface SelectOptions {
+  /** The API clock (ISO), for active-grant rules in site joins. */
+  now: string;
   where: readonly SQL[];
   sort?: readonly SortKey[];
   /** Keyset: rows after this record id in `sort` order. */
@@ -280,7 +301,7 @@ export async function selectRows(tx: Tx, def: RecordTypeDef, o: SelectOptions): 
     ? sql`${tableRef(def)} t CROSS JOIN ${anchorSql(def, o.sort ?? [], o.after)}`
     : sql`${tableRef(def)} t`;
   if (o.after) where.push(keysetSql(def, o.sort ?? []));
-  const query = sql`SELECT ${selectList(def)} FROM ${from}
+  const query = sql`SELECT ${selectList(def, o.now)} FROM ${from}
     WHERE ${where.length ? sql.join(where, sql` AND `) : sql`TRUE`}
     ${o.sort ? sql`ORDER BY ${orderBySql(def, o.sort)}` : sql``}
     ${o.limit !== undefined ? sql`LIMIT ${o.limit}` : sql``}
@@ -305,9 +326,16 @@ export async function loadRow(
   tx: Tx,
   def: RecordTypeDef,
   id: string,
+  now: string,
   forUpdate = false,
 ): Promise<Row | undefined> {
-  return (await selectRows(tx, def, { where: [sql`t.id = ${id}::uuid`], limit: 1, forUpdate }))[0];
+  const rows = await selectRows(tx, def, {
+    now,
+    where: [sql`t.id = ${id}::uuid`],
+    limit: 1,
+    forUpdate,
+  });
+  return rows[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -326,6 +354,8 @@ export function toView(def: RecordTypeDef, row: Row, mode: 'record' | 'list'): R
       if (mode === 'record') fields[name] = { masked: true, hasValue: row[name] === true };
       continue;
     }
+    // Detail-only fields (free-text reasons) are on the record page, never in a list.
+    if (mode === 'list' && def.fields[name]?.detailOnly) continue;
     fields[name] = (row[name] ?? null) as RecordView['fields'][string];
   }
   return {

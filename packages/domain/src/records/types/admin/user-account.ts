@@ -68,6 +68,7 @@ export const userAccountRecord = defineRecordType({
     ],
     tabs: ['history'],
   },
+  history: { categories: ['mutation', 'permission'] },
   access: {
     read: 'admin:read',
     create: 'admin:write',

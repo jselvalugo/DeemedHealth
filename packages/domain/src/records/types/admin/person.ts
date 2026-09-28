@@ -87,6 +87,7 @@ export const personRecord = defineRecordType({
     ],
     tabs: ['evidence', 'tasks', 'comments', 'history'],
   },
+  history: { categories: ['mutation', 'reveal'] },
   access: {
     read: 'admin:read',
     create: 'admin:write',

@@ -5,7 +5,8 @@
  *
  * A record linked to several sites is visible when ANY of its sites is in scope, and
  * may be changed only when ALL of them are (fail closed for writes). A record with no
- * site is organization-wide: only an organization-wide grant covers it.
+ * site, or whose person holds an organization-wide grant, is organization-wide for
+ * changes: only an organization-wide grant covers it.
  *
  * A record outside the viewer's read scope answers 404, not 403, so its existence does
  * not leak; the refusal is still audited. A visible record with a forbidden action
@@ -25,11 +26,17 @@ import type { Row } from './rows.js';
 
 export interface RecordResource {
   sites: readonly string[];
+  /** Changing it needs an organization-wide grant (no site, or an org-wide grant holder). */
+  orgWide: boolean;
   owners: readonly string[];
 }
 
 export function resourceOf(row: Row): RecordResource {
-  return { sites: row.__sites ?? [], owners: row.__owners ?? [] };
+  return {
+    sites: row.__sites ?? [],
+    orgWide: row.__org_wide === true || (row.__sites ?? []).length === 0,
+    owners: row.__owners ?? [],
+  };
 }
 
 /**
@@ -49,6 +56,7 @@ export function newResource(
   const owner = def.owner ? values[def.owner.field] : undefined;
   return {
     sites: typeof site === 'string' ? [site] : [],
+    orgWide: typeof site !== 'string',
     owners: typeof owner === 'string' ? [owner] : [],
   };
 }
@@ -61,9 +69,12 @@ export function decideRecord(
   onlyRoles?: readonly RoleId[],
 ): Decision {
   const options = onlyRoles ? { onlyRoles } : undefined;
-  if (rec.sites.length === 0) {
-    return h.decide(permission, { siteId: null, ownerPersonIds: rec.owners }, options);
-  }
+  const organizationLevel = () =>
+    h.decide(permission, { siteId: null, ownerPersonIds: rec.owners }, options);
+  // No site, or (for a change) an organization-wide record: only an organization-wide
+  // grant covers it. A person who holds an organization-wide role is never changed by a
+  // site-scoped administrator, even if they also hold a role at that site.
+  if (rec.sites.length === 0 || (mode === 'all' && rec.orgWide)) return organizationLevel();
   let denied: Decision | null = null;
   const grants = new Set<string>();
   for (const siteId of rec.sites) {

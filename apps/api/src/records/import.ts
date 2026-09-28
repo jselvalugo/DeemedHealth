@@ -17,7 +17,7 @@ import {
   createSchema,
   detectSsnLikeColumns,
   importFields,
-  isSsnShapedValue,
+  containsSsnShape,
   normalizeHeader,
   parseCsv,
   permissionScope,
@@ -30,7 +30,7 @@ import {
 import { sql } from 'drizzle-orm';
 import { ApiError } from '../errors.js';
 import { flagEnabled } from '../flags.js';
-import type { RecordCall } from './http.js';
+import { nowIso, type RecordCall } from './http.js';
 import {
   archivedSql,
   binding,
@@ -122,14 +122,20 @@ export async function importDryRun(c: RecordCall): Promise<Report> {
 
   await h.tenant(async (tx) => {
     const p = h.principal();
-    const scope = scopePredicate(def, permissionScope(p, def.access.read, h.now()), p.personId);
+    const now = nowIso(h);
+    const scope = scopePredicate(
+      def,
+      permissionScope(p, def.access.read, h.now()),
+      p.personId,
+      now,
+    );
     for (const [index, cells] of rows.entries()) {
       const out: RowReport = { row: index + 1, action: 'error', errors: [] };
       report.rows.push(out);
 
       // D1: an SSN-shaped value anywhere in the row fails it; the value is never echoed.
       cells.forEach((cell, j) => {
-        if (isSsnShapedValue(cell)) {
+        if (containsSsnShape(cell)) {
           out.errors.push({ field: columns[j]?.field ?? `column ${j + 1}`, code: 'ssn_value' });
         }
       });
@@ -156,6 +162,7 @@ export async function importDryRun(c: RecordCall): Promise<Report> {
       const existing = complete
         ? (
             await selectRows(tx, def, {
+              now,
               where: [
                 scope,
                 archivedSql(def, 'exclude'),

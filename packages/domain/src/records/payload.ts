@@ -4,6 +4,7 @@
  * type's cross-field refine). The server re-parses every payload with these.
  */
 import { z, type ZodTypeAny } from 'zod';
+import { containsSsnShape } from '../ssn-detector.js';
 import type { RecordTypeDef } from './define.js';
 
 type Mask = Record<string, true>;
@@ -36,12 +37,22 @@ export function importFields(def: RecordTypeDef): string[] {
     .map(([n]) => n);
 }
 
+/** D1: no SSN-shaped text in any field, whole or embedded. */
+function noSsnShapes(value: Record<string, unknown>, ctx: z.RefinementCtx): void {
+  for (const [key, v] of Object.entries(value)) {
+    if (containsSsnShape(v)) {
+      ctx.addIssue({ code: 'custom', path: [key], message: 'SSN-shaped text (D1)' });
+    }
+  }
+}
+
 function picked(def: RecordTypeDef, names: readonly string[]) {
   // The registry test guarantees every editable field is a key of the schema.
   return def.schema
     .pick(mask(names) as never)
     .partial()
-    .strict();
+    .strict()
+    .superRefine(noSsnShapes);
 }
 
 /**

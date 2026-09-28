@@ -124,6 +124,7 @@ function routesFor(def: RecordTypeDef): [RecordRouteId, RouteSpec, RecordRouteMe
       url: `${base}/exports`,
       access: { kind: 'permission', permission: a.export, recentAuth: true },
       audit: { action: action(`${def.id}.export`) },
+      userLimit: 'export',
       summary: `Export ${def.noun} records to CSV (re-authentication, masked fields excluded)`,
     });
   }
@@ -133,6 +134,7 @@ function routesFor(def: RecordTypeDef): [RecordRouteId, RouteSpec, RecordRouteMe
       url: `${base}/imports`,
       access: { kind: 'permission', permission: a.create },
       audit: null,
+      userLimit: 'import',
       writesNothing:
         'import dry run: a row-level report, nothing is written (ADR-0014 section 2.8)',
       summary: `Import dry run for ${def.noun} (feature flag records.import; off in deployed environments until G4)`,
@@ -148,6 +150,7 @@ function routesFor(def: RecordTypeDef): [RecordRouteId, RouteSpec, RecordRouteMe
           url: `${base}/:id/reveal/${name}`,
           access: { kind: 'permission', permission: a.read, recentAuth: true, record: true },
           audit: { action: action(revealAction(def.id, name)) },
+          userLimit: 'reveal',
           summary: `Reveal ${def.noun} ${name} (step-up, reason, audited)`,
         },
         name,

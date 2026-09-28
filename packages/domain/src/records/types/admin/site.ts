@@ -119,6 +119,7 @@ export const siteRecord = defineRecordType({
     ],
     tabs: ['evidence', 'tasks', 'comments', 'history'],
   },
+  history: { categories: ['mutation'] },
   access: {
     read: 'admin:read',
     create: 'admin:write',

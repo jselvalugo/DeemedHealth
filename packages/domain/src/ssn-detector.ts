@@ -112,6 +112,33 @@ export function isSsnShapedValue(value: unknown): boolean {
   return typeof value === 'string' && SSN_FORMATTED.test(value);
 }
 
+const isDigit = (c: number) => c >= 48 && c <= 57;
+const HYPHEN = 45;
+
+/**
+ * True when free text holds an SSN-shaped run `ddd-dd-dddd` anywhere, not glued to
+ * another digit or hyphen: the same shape the audit function and `check:no-ssn` refuse
+ * (decision D1). A single pass with index checks, so hostile input cannot backtrack.
+ */
+export function containsSsnShape(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  if (isSsnShapedValue(value)) return true;
+  const n = value.length;
+  for (let i = 0; i + 11 <= n; i++) {
+    const before = i > 0 ? value.charCodeAt(i - 1) : -1;
+    if (isDigit(before) || before === HYPHEN) continue;
+    let ok = true;
+    for (let j = 0; j < 11 && ok; j++) {
+      const c = value.charCodeAt(i + j);
+      ok = j === 3 || j === 6 ? c === HYPHEN : isDigit(c);
+    }
+    if (!ok) continue;
+    const after = i + 11 < n ? value.charCodeAt(i + 11) : -1;
+    if (!isDigit(after) && after !== HYPHEN) return true;
+  }
+  return false;
+}
+
 /** Share of non-empty sample values that are bare nine-digit strings or numbers. */
 function nineDigitShare(values: readonly unknown[]): { share: number; nonEmpty: number } {
   let nonEmpty = 0;

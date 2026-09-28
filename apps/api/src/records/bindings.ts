@@ -21,41 +21,60 @@ export function uuidIn(expr: SQL, ids: readonly string[]): SQL {
   )})`;
 }
 
-/** Active grants of a user account (the account's sites). */
-const ACTIVE_GRANT = sql`ra.revoked_at IS NULL AND ra.site_id IS NOT NULL`;
+/**
+ * An active grant, with exactly the rules of the policy engine (`grantInactiveReason` in
+ * packages/domain/src/policy/policy.ts): not revoked by `now`, started, not expired, and
+ * for an end-dated role (auditor) an end date within the role's maximum. Grants of an
+ * archived or deprovisioned account count for nothing. `now` is the API clock, the same
+ * instant the policy engine uses. Aliases: `ra` grant, `r` role, `ua` account.
+ */
+function activeGrant(now: string): SQL {
+  return sql`(ra.revoked_at IS NULL OR ra.revoked_at > ${now}::timestamptz)
+    AND ra.valid_from <= ${now}::timestamptz
+    AND (ra.expires_at IS NULL OR ra.expires_at > ${now}::timestamptz)
+    AND (NOT r.requires_expiry
+         OR (ra.expires_at IS NOT NULL AND ra.expires_at - ra.valid_from <= r.max_duration))
+    AND ua.archived_at IS NULL AND ua.status <> 'deprovisioned'`;
+}
+
+const GRANTS = sql`public.role_assignment ra
+  JOIN public.role r ON r.key = ra.role_key
+  JOIN public.user_account ua ON ua.organization_id = ra.organization_id AND ua.id = ra.user_account_id`;
 
 export interface SiteJoin {
-  /** text[] of the record's site ids (empty = organization-wide). */
-  sites: SQL;
+  /** text[] of the record's site ids. */
+  sites(now: string): SQL;
   /** The record has at least one of these sites. */
-  siteIn(ids: readonly string[]): SQL;
+  siteIn(ids: readonly string[], now: string): SQL;
+  /**
+   * The record is organization-wide: it has no site, or an organization-wide grant (a
+   * grant with no site). Changing it then needs an organization-wide grant, whatever
+   * site grants it also has.
+   */
+  orgWide(now: string): SQL;
+}
+
+/** The grants that belong to the record at `t`. */
+function siteJoin(owner: SQL): SiteJoin {
+  const grants = (now: string, extra: SQL) =>
+    sql`SELECT 1 FROM ${GRANTS} WHERE ${owner} AND ${activeGrant(now)} AND ${extra}`;
+  return {
+    sites: (now) =>
+      sql`ARRAY(SELECT DISTINCT ra.site_id::text FROM ${GRANTS}
+                WHERE ${owner} AND ${activeGrant(now)} AND ra.site_id IS NOT NULL)`,
+    siteIn: (ids, now) => sql`EXISTS (${grants(now, uuidIn(sql`ra.site_id`, ids))})`,
+    orgWide: (now) =>
+      sql`(EXISTS (${grants(now, sql`ra.site_id IS NULL`)})
+           OR NOT EXISTS (${grants(now, sql`ra.site_id IS NOT NULL`)}))`,
+  };
 }
 
 /** Named joins for records linked to several sites (a person working at two sites). */
 export const SITE_JOINS: Record<SiteScopeJoin, SiteJoin> = {
-  // A person's sites: the sites of the active role grants of their user accounts.
-  person_sites: {
-    sites: sql`ARRAY(SELECT DISTINCT ra.site_id::text
-                     FROM public.user_account ua
-                     JOIN public.role_assignment ra
-                       ON ra.organization_id = ua.organization_id AND ra.user_account_id = ua.id
-                     WHERE ua.person_id = t.id AND ${ACTIVE_GRANT})`,
-    siteIn: (ids) =>
-      sql`EXISTS (SELECT 1 FROM public.user_account ua
-                  JOIN public.role_assignment ra
-                    ON ra.organization_id = ua.organization_id AND ra.user_account_id = ua.id
-                  WHERE ua.person_id = t.id AND ra.revoked_at IS NULL
-                    AND ${uuidIn(sql`ra.site_id`, ids)})`,
-  },
-  // A user account's sites: the sites of its own active role grants.
-  user_account_sites: {
-    sites: sql`ARRAY(SELECT DISTINCT ra.site_id::text FROM public.role_assignment ra
-                     WHERE ra.user_account_id = t.id AND ${ACTIVE_GRANT})`,
-    siteIn: (ids) =>
-      sql`EXISTS (SELECT 1 FROM public.role_assignment ra
-                  WHERE ra.user_account_id = t.id AND ra.revoked_at IS NULL
-                    AND ${uuidIn(sql`ra.site_id`, ids)})`,
-  },
+  // A person's sites: the sites of the active grants of their live user accounts.
+  person_sites: siteJoin(sql`ua.person_id = t.id`),
+  // A user account's sites: the sites of its own active grants (none if it is not live).
+  user_account_sites: siteJoin(sql`ua.id = t.id`),
 };
 
 /** Archive is refused while one of these exists (ADR-0014 section 2.4). */

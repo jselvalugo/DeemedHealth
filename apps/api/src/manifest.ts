@@ -11,6 +11,7 @@
  */
 import type { AuditAction, Permission } from '@deemed/domain';
 import { RECORD_ROUTES, type RecordRouteId } from './records/manifest.js';
+import type { UserLimitGroup } from './user-limits.js';
 
 export type Access =
   /** No session. `reason` says why the endpoint is open. */
@@ -40,6 +41,8 @@ export interface RouteSpec {
   audit: { action: AuditAction; by?: 'auth'; perRow?: true } | null;
   /** A POST that writes nothing (a dry run), and why. */
   writesNothing?: string;
+  /** Per-user limit group (reveal, export, import), checked after authentication. */
+  userLimit?: UserLimitGroup;
   summary: string;
 }
 

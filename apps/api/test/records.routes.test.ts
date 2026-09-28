@@ -12,6 +12,7 @@ import { afterAll, beforeAll, expect } from 'vitest';
 import { ctx } from '../../../packages/db/test/helpers.js';
 import { defineRecordActionTests, type RecordCase } from './record-tests.js';
 import {
+  archiveAsSetup,
   as,
   createPayload,
   eventsFor,
@@ -71,12 +72,7 @@ const scoped = (c: RecordCase, role: 'reader' | 'writer' | 'exporter' | 'reveale
 const gulf = (c: RecordCase, role: 'reader' | 'writer' | 'exporter' | 'revealer') =>
   as(c.roles[role] as never, { tenant: 'gulf' });
 
-async function archiveDirectly(c: RecordCase, id: string) {
-  await w().api.admin.query(
-    `UPDATE ${c.def.table} SET archived_at = now(), archive_reason = 'test setup' WHERE id = $1`,
-    [id],
-  );
-}
+const archiveDirectly = (c: RecordCase, id: string) => archiveAsSetup(c.def, id);
 
 // ---------------------------------------------------------------------------
 // list
