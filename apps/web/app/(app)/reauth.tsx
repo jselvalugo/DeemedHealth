@@ -72,21 +72,28 @@ export function ApiProvider({
   stepUp?: StepUpAdapter | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const pending = useRef<((ok: boolean) => void) | null>(null);
-
-  const askForReauth = useCallback(
-    () =>
-      new Promise<boolean>((resolve) => {
-        pending.current = resolve;
-        setOpen(true);
-      }),
-    [],
+  // One dialog and one answer for every request that needs step-up at the same time:
+  // concurrent callers share the pending promise, and `finish` resolves all of them.
+  const pending = useRef<{ promise: Promise<boolean>; resolve: (ok: boolean) => void } | null>(
+    null,
   );
 
+  const askForReauth = useCallback(() => {
+    if (pending.current) return pending.current.promise;
+    let resolve: (ok: boolean) => void = () => {};
+    const promise = new Promise<boolean>((r) => {
+      resolve = r;
+    });
+    pending.current = { promise, resolve };
+    setOpen(true);
+    return promise;
+  }, []);
+
   const finish = useCallback((ok: boolean) => {
-    setOpen(false);
-    pending.current?.(ok);
+    const current = pending.current;
     pending.current = null;
+    setOpen(false);
+    current?.resolve(ok);
   }, []);
 
   const api = useMemo<Api>(() => {
