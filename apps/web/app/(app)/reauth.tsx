@@ -21,7 +21,7 @@ import {
   type ReactNode,
 } from 'react';
 import { t, type Locale } from '@deemed/i18n';
-import { Alert, Button, Card, Input } from '@deemed/ui';
+import { Alert, Button, Input, Modal } from '@deemed/ui';
 import {
   apiPost,
   apiRequest,
@@ -144,13 +144,6 @@ export function ReauthDialog({
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
-
   async function withCode(e: React.FormEvent) {
     e.preventDefault();
     const value = compactCode(code);
@@ -202,57 +195,56 @@ export function ReauthDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
-      <Card
-        className="w-full max-w-md p-6"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="reauth-title"
-        aria-describedby="reauth-body"
+    // A Radix dialog (focus trap, Esc, aria-modal): it also stacks above another open
+    // dialog, such as the reveal dialog that asked for the step-up.
+    <Modal
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onCancel();
+      }}
+      title={tr('reauth.title')}
+      description={tr('reauth.body')}
+      closeLabel={tr('records.close')}
+      onOpenAutoFocus={(e) => {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }}
+    >
+      {error && (
+        <Alert tone="critical" title={tr('signIn.error.title')}>
+          {error}
+        </Alert>
+      )}
+      <Button
+        type="button"
+        fullWidth
+        icon={<KeyRound aria-hidden="true" size={20} strokeWidth={1.75} />}
+        onClick={withPasskey}
+        disabled={busy}
       >
-        <h2 id="reauth-title" className="text-lg font-semibold text-navy-900">
-          {tr('reauth.title')}
-        </h2>
-        <p id="reauth-body" className="mt-2 text-sm text-gray-700">
-          {tr('reauth.body')}
-        </p>
-        {error && (
-          <Alert tone="critical" title={tr('signIn.error.title')} className="mt-4">
-            {error}
-          </Alert>
-        )}
-        <Button
-          type="button"
-          fullWidth
-          className="mt-4"
-          icon={<KeyRound aria-hidden="true" size={20} strokeWidth={1.75} />}
-          onClick={withPasskey}
-          disabled={busy}
-        >
-          {tr('reauth.passkey')}
-        </Button>
-        <form onSubmit={withCode} noValidate className="mt-4 flex flex-col gap-4">
-          <Input
-            ref={inputRef}
-            id="reauth-code"
-            name="code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            label={tr('reauth.code.label')}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-          <div className="flex gap-2">
-            <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
-              {tr('reauth.cancel')}
-            </Button>
-            <Button type="submit" fullWidth loading={busy} loadingLabel={tr('mfa.verifying')}>
-              {tr('reauth.submit')}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+        {tr('reauth.passkey')}
+      </Button>
+      <form onSubmit={withCode} noValidate className="flex flex-col gap-4">
+        <Input
+          ref={inputRef}
+          id="reauth-code"
+          name="code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          label={tr('reauth.code.label')}
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
+            {tr('reauth.cancel')}
+          </Button>
+          <Button type="submit" fullWidth loading={busy} loadingLabel={tr('mfa.verifying')}>
+            {tr('reauth.submit')}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

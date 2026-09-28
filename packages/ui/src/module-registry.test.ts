@@ -6,11 +6,15 @@ import { ICONS } from './icons.js';
 import {
   AUTH_ROUTES,
   MODULES,
+  RECORD_NAV,
   findRoute,
   homeRoute,
+  isUuid,
   launcherModules,
   matchModule,
+  matchRecordRoute,
   normalizeRoute,
+  withRecordEntries,
   type ModuleEntry,
 } from './module-registry.js';
 
@@ -120,6 +124,66 @@ describe('auth routes', () => {
     const routes = [...section.matchAll(/^\|[^|]+\|\s*`([^`]+)`\s*\|/gm)].map((m) => m[1]);
     expect(routes).toEqual(Object.values(AUTH_ROUTES));
     for (const r of routes) expect(findRoute(r!), r).toBeUndefined();
+  });
+});
+
+describe('record types (module map "Record types", ADR-0014 section 3)', () => {
+  const md = readFileSync(new URL('../../../docs/product/module-map.md', import.meta.url), 'utf8');
+  const section = md.split('## Record types')[1]?.split('\n## ')[0] ?? '';
+  const rows = section
+    .split('\n')
+    .filter((l) => l.startsWith('| `'))
+    .map((l) => l.split('|').map((c) => c.trim().replace(/`/g, '')));
+
+  it('matches RECORD_NAV, generated from the domain registry', () => {
+    expect(rows.map((r) => r[1])).toEqual(RECORD_NAV.map((e) => e.recordType));
+    for (const e of RECORD_NAV) {
+      const row = rows.find((r) => r[1] === e.recordType)!;
+      const module = MODULES.find((m) => m.id === e.module)!;
+      const page = module.pages.find((p) => p.id === e.pageId)!;
+      expect(row[2], e.recordType).toBe(t('en', module.name));
+      expect(row[3], e.recordType).toBe(t('en', page.name).replace(/’/g, "'"));
+      expect(row[4], e.recordType).toBe(e.listRoute);
+      expect(row[5], e.recordType).toBe(e.recordRoute);
+      expect(row[6], e.recordType).toBe(e.readPermission);
+      expect(row[7]?.startsWith(e.createPermission ?? '—'), e.recordType).toBe(true);
+      expect(isMessageKey(e.plural)).toBe(true);
+      if (e.newLabel) expect(isMessageKey(e.newLabel)).toBe(true);
+      expect(ICONS[e.icon]).toBeDefined();
+    }
+  });
+
+  it('matches record routes by UUID only, so page routes never collide', () => {
+    const id = 'd0000001-0002-4000-8000-000000000001';
+    expect(matchRecordRoute('/admin/org')?.entry.recordType).toBe('site');
+    expect(matchRecordRoute(`/admin/org/${id}`)).toMatchObject({
+      id,
+      entry: { recordType: 'site' },
+    });
+    expect(matchRecordRoute(`/readiness/${id}`)?.entry.recordType).toBe('requirement_instance');
+    expect(matchRecordRoute('/readiness/evidence')).toBeUndefined();
+    expect(matchRecordRoute('/admin/org/not-a-uuid')).toBeUndefined();
+    expect(matchRecordRoute(`/admin/org/${id}/extra`)).toBeUndefined();
+    expect(isUuid(id)).toBe(true);
+    expect(isUuid(`${id}x`)).toBe(false);
+    // A hosted list belongs to its page's module bar tab.
+    expect(matchModule('/admin/role-assignments')?.page.id).toBe('users');
+    expect(matchModule(`/admin/role-assignments/${id}`)?.page.id).toBe('users');
+  });
+
+  it('adds hosted lists and "New …" to the launcher only when the role allows', () => {
+    const officer = withRecordEntries(
+      launcherModules(permissionsFor(['compliance_officer'])),
+      permissionsFor(['compliance_officer']),
+    );
+    const admin = officer.find((m) => m.id === 'admin')!;
+    const extra = admin.pages.filter((p) => p.launcherOnly).map((p) => p.route);
+    expect(extra).toEqual(['/admin/org?new=1', '/admin/people?new=1', '/admin/role-assignments']);
+    const auditor = withRecordEntries(
+      launcherModules(permissionsFor(['auditor'])),
+      permissionsFor(['auditor']),
+    );
+    expect(auditor.flatMap((m) => m.pages).some((p) => p.id.startsWith('new-'))).toBe(false);
   });
 });
 

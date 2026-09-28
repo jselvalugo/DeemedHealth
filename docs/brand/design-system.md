@@ -213,12 +213,51 @@ outline, ghost, danger; `loading` keeps focus and uses `aria-disabled`) · Badge
 Keycap · Eyebrow · Highlight · LogoMark · PreviewBanner · PageHeader · StepCard /
 HowItWorks · EmptyState · Header · ModuleBar · ModuleLauncher · AppShell.
 
-Still to build: KpiTile · DataTable (sticky header, column filters, CSV export,
-row actions) · Drawer (record detail) · Tabs · other form controls with inline
-validation · DatePicker (UTC-safe) · FileDrop (evidence upload) · Timeline
-(audit/history) · Toast · ConfirmDialog
-(for approvals, requires typed reason) · CitationChip (shows `CM Ch.5` and opens
-the requirement drawer) · AssistantPanel (right-side panel, see AI agent).
+Built in Phase 1 slice S4b (ADR-0014 §3; DataTable, Drawer, Timeline, and form
+controls are delivered as parts of the records components):
+
+- Controls (`components/controls.tsx`): **Select**, **Textarea**, **Checkbox**
+  (20px box in a 40px hit area, `indeterminate` for "select all"), **Modal** (Radix
+  Dialog; full screen below 640px; stacks above another open dialog, so step-up can
+  open over the reveal dialog), **Drawer** (right side, 560px, full screen below
+  640px), **Tabs** (WAI-ARIA tabs: arrow keys, Home/End, roving tabindex, 3px teal-400
+  underline on the selected tab), **CitationChip** (mono chip with the requirement id;
+  opening the requirement drawer waits for the catalog record type).
+- **RecordTable** (`records/RecordTable.tsx`): native `<table>` with a visually hidden
+  caption (name and "Showing 1–25 of N"), `scope` headers, `aria-sort` on sortable
+  columns, the first column as the row header linking to the record, sticky header in
+  a keyboard-focusable scroll region; column chooser (Modal); filter bar from
+  `filterable` fields (enum and boolean selects, date ranges in the health center's
+  zone, record pickers for references); search over `searchable` fields; archived
+  filter for roles that may restore; saved views (private or shared to roles; a view
+  shared by someone else is applied by the API without showing its values); row
+  selection and a bulk bar with only the allowed actions and a per-row result summary;
+  cursor pager; polite live region with the result count; loading, empty,
+  filtered-empty, error (Try again), and no-permission states. "New …" opens
+  RecordForm in the Drawer.
+- **RecordPage** (`records/RecordPage.tsx`): back link, eyebrow, title, lifecycle
+  status Badge, owner and site (linked titles), requirement CitationChips; actions from
+  the API's `allowedActions` only (Edit, Archive, Restore); archived banner; detail
+  sections as Cards with `<dl>`; tabs: Details, then Evidence, Tasks, Comments, and
+  Approvals as "Coming soon", then History (Timeline: action, time in the health
+  center's zone, actor, changed field names, reason code; never values).
+- Masked fields show `•••` and a **Reveal** button when the API lists the field as
+  revealable. The reveal dialog asks for a reason code (and a note for "Other"), says
+  the reveal is recorded in the audit log, and the client runs step-up (re-auth
+  dialog) before the value is shown. The value lives only in component state; Hide
+  drops it.
+- **RecordForm** (`records/RecordForm.tsx`): fields from the registry (`editable`),
+  widgets by kind, "(required)" markers, validation with the same Zod schemas and
+  record rules the API uses, inline errors plus a focused error summary (EN/ES),
+  `If-Match` on save, and a 409 panel ("Someone else changed this record", the
+  changed field names, "Load their version" or "…and keep my edits").
+- Archive and restore dialogs: archive needs a reason (kept on the row; the audit log
+  keeps its length and a digest); restore takes an optional reason.
+
+Still to build: KpiTile · DatePicker (UTC-safe; native date inputs for now) · FileDrop
+(evidence upload) · Toast · ConfirmDialog (for approvals, requires typed reason) ·
+AssistantPanel (right-side panel, see AI agent) · export and import buttons on
+RecordTable (the API serves them; the UI follows with S6).
 
 ## 6. Iconography & imagery
 - Use Lucide icons at a 1.75px stroke. Use 20px icons in navigation and 16px icons inline.

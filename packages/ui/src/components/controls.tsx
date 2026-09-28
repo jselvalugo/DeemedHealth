@@ -195,7 +195,10 @@ export function Modal({
   children,
   footer,
   size = 'md',
+  onOpenAutoFocus,
 }: {
+  /** Where focus goes on open (default: the first focusable element). */
+  onOpenAutoFocus?: ((event: Event) => void) | undefined;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -211,6 +214,7 @@ export function Modal({
         <Dialog.Overlay className="fixed inset-0 z-40 bg-overlay backdrop-blur-[2px] motion-safe:animate-fade-in" />
         <Dialog.Content
           {...(description ? {} : { 'aria-describedby': undefined })}
+          {...(onOpenAutoFocus ? { onOpenAutoFocus } : {})}
           className={cn(
             'fixed inset-0 z-50 flex flex-col overflow-y-auto bg-white p-6 outline-none',
             'sm:inset-auto sm:top-24 sm:left-1/2 sm:max-h-[calc(100dvh-8rem)] sm:-translate-x-1/2 sm:rounded-modal sm:shadow-modal',
