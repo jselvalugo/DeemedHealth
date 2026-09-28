@@ -108,6 +108,8 @@ export interface World {
   org: Record<Tenant, string>;
   /** Plain people of each tenant (owners and subjects). */
   people: Record<Tenant, string[]>;
+  /** A user account per tenant that acts in test setup (archiving needs a human actor). */
+  actors: Record<Tenant, string>;
 }
 
 let world: World | undefined;
@@ -183,12 +185,20 @@ export async function startWorld(options: Parameters<typeof startApi>[0] = {}): 
     },
     sites: { xyz: { S1: s1.id, S2: s2.id, S3: s3.id, siteA: '' }, gulf: { G1: g1.id } },
     people: { xyz: [], gulf: [] },
+    actors: { xyz: '', gulf: '' },
   };
   for (const tenant of ['xyz', 'gulf'] as const) {
     for (let i = 0; i < 3; i++) {
       const person = fixture('person')(refs(tenant, null));
       world.people[tenant].push(await insertRecord(tenant, getRecordType('person'), person));
     }
+  }
+  for (const tenant of ['xyz', 'gulf'] as const) {
+    world.actors[tenant] = await insertRecord(
+      tenant,
+      getRecordType('user_account'),
+      fixture('user_account')(refs(tenant, null, { personId: world.people[tenant][0] as string })),
+    );
   }
   world.sites.xyz.siteA = await insertRecord(
     'xyz',
@@ -433,4 +443,25 @@ export async function listAll(client: Client, url: string, max = 50): Promise<st
 
 export async function eventsFor(res: Parameters<typeof auditFor>[1]) {
   return auditFor(w().api, res);
+}
+
+/**
+ * Archives a record directly (test setup), as the tenant's setup actor: set_row_meta()
+ * stamps archived_by from the transaction actor, and a reason is required.
+ */
+export async function archiveAsSetup(
+  def: RecordTypeDef,
+  id: string,
+  tenant: Tenant = 'xyz',
+): Promise<void> {
+  const current = w();
+  const actor = {
+    type: 'user' as const,
+    userId: current.actors[tenant],
+    label: 'record test setup',
+  };
+  await current.setup.withTenant(current.org[tenant], actor, (tx) =>
+    tx.execute(sql`UPDATE ${tableRef(def)} SET archived_at = now(), archive_reason = 'test setup'
+                   WHERE id = ${id}::uuid`),
+  );
 }

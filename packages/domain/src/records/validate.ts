@@ -15,6 +15,7 @@ import {
   ARCHIVE_BLOCKERS,
   DETAIL_TABS,
   FIELD_KINDS,
+  HISTORY_CATEGORIES,
   RECORD_ACTIONS,
   RECORD_RULES,
   SITE_SCOPE_JOINS,
@@ -125,8 +126,21 @@ export function validateRecordType(def: RecordTypeDef): string[] {
       p(`${where}: bulk-editable fields must be editable after create`);
     }
     if (f.importable && !f.editable) p(`${where}: importable fields must be editable`);
-    if (f.searchable === 'text' && f.kind !== 'text')
+    if (f.searchable === 'text' && f.kind !== 'text') {
       p(`${where}: text search on a non-text field`);
+    }
+    if (cls.freeText && !f.detailOnly) p(`${where}: free text must be detail-only`);
+    if (f.detailOnly) {
+      const why = `${where} is detail-only`;
+      if (f.searchable) p(`${why} and cannot be searchable`);
+      if (f.filterable) p(`${why} and cannot be filterable`);
+      if (f.sortable) p(`${why} and cannot be sortable`);
+      if (f.bulkEditable) p(`${why} and cannot be bulk-editable`);
+      if (f.importable) p(`${why} and cannot be importable`);
+      if ((def.list.defaultColumns as readonly string[]).includes(name)) {
+        p(`${why} and cannot be a default list column`);
+      }
+    }
   }
   if (has('reveal') && revealable === 0) p('declares reveal but no field can be revealed');
   if (!has('reveal') && revealable > 0) p('has revealable fields but no reveal action');
@@ -158,6 +172,16 @@ export function validateRecordType(def: RecordTypeDef): string[] {
   if (def.detail.tabs.includes('comments') !== def.comments) {
     p('the comments tab and the comments opt-in disagree');
   }
+
+  // History: an allowlist of categories, never auth, integration, or system events.
+  const categories = def.history?.categories ?? [];
+  if (categories.length === 0) p('history needs at least one audit category');
+  for (const c of categories) {
+    if (!(HISTORY_CATEGORIES as readonly string[]).includes(c)) {
+      p(`history category ${c} is not allowed`);
+    }
+  }
+  if (new Set(categories).size !== categories.length) p('history categories repeat');
 
   // Access
   for (const [action, verbs] of Object.entries(ACCESS_VERBS)) {

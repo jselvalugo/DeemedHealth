@@ -75,7 +75,12 @@ export const requirementInstanceRecord = defineRecordType({
       filterable: true,
       sortable: true,
     },
-    notApplicableReason: { column: 'not_applicable_reason', kind: 'text', nullable: true },
+    notApplicableReason: {
+      column: 'not_applicable_reason',
+      kind: 'text',
+      nullable: true,
+      detailOnly: true,
+    },
     nextDueOn: {
       column: 'next_due_on',
       kind: 'date',
@@ -121,6 +126,7 @@ export const requirementInstanceRecord = defineRecordType({
     ],
     tabs: ['evidence', 'tasks', 'comments', 'approvals', 'history'],
   },
+  history: { categories: ['mutation', 'approval'] },
   access: {
     read: 'readiness:read',
     create: 'readiness:write',

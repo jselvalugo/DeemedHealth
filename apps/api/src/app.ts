@@ -49,13 +49,14 @@ import { clearCookie, cookieNames, readCookie, serializeCookie } from './cookies
 import { ApiError, DeniedError, STATUS, errorBody } from './errors.js';
 import { ROUTES, ROUTE_IDS, routeSpec, type RouteId, type RouteSpec } from './manifest.js';
 import { loadPrincipal } from './principal.js';
+import { UserLimiter, type UserLimitOptions } from './user-limits.js';
 import { adminHandlers } from './routes/admin.js';
 import { authHandlers } from './routes/auth.js';
 import { meHandlers } from './routes/me.js';
 import { recordHandlers } from './records/handlers.js';
 import { readinessHandlers } from './routes/readiness.js';
 
-export interface RateLimitOptions {
+export interface RateLimitOptions extends UserLimitOptions {
   /** Requests per minute per client address, every route (default 300). */
   globalPerMinute?: number;
   /** Requests per minute per client address on sign-in and step-up routes (default 30). */
@@ -117,6 +118,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const names = cookieNames(services.secureCookies);
 
   const limits = { ...RATE_LIMIT_DEFAULTS, ...options.rateLimit };
+  const userLimiter = new UserLimiter(options.rateLimit ?? {}, services.clock);
   const app = Fastify({
     logger: options.logger ?? false,
     // No per-request log lines from Fastify (they carry the client address); the
@@ -246,6 +248,29 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         throw new DeniedError('reauth_required');
       }
     }
+  }
+
+  /** Per-user limits on sensitive routes, keyed by user (security review M2). */
+  function checkUserLimit(req: FastifyRequest, group: NonNullable<RouteSpec['userLimit']>) {
+    const s = req.ctx.session as ActiveSession;
+    const r = userLimiter.hit(s.organizationId, s.userAccountId, group);
+    if (r.alert) {
+      // Ids and counts only; the S8 log alerting routes this to security-privacy-officer.
+      req.log.warn(
+        {
+          security_alert: 'records.reveal_volume',
+          organizationId: s.organizationId,
+          userAccountId: s.userAccountId,
+          routeId: req.ctx.routeId,
+          count: r.count,
+          limit: r.limit,
+          windowSeconds: 60,
+          refused: !r.allowed,
+        },
+        'security alert: reveal volume',
+      );
+    }
+    if (!r.allowed) throw new ApiError('too_many_attempts');
   }
 
   function helpers(req: FastifyRequest, reply: FastifyReply, spec: RouteSpec): Helpers {
@@ -422,6 +447,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           if (spec.access.kind === 'session' || spec.access.kind === 'permission') {
             await authenticate(req, reply, spec);
           }
+          if (spec.userLimit && req.ctx.session) checkUserLimit(req, spec.userLimit);
         },
         handler: async (req, reply) => {
           const result = await handler(req, reply, helpers(req, reply, spec));

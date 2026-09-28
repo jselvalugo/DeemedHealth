@@ -15,8 +15,8 @@ import {
 import { createDatabase, schema, type Database } from '@deemed/db';
 import type { RoleId } from '@deemed/domain';
 import pg from 'pg';
-import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
-import { buildApp } from '../src/app.js';
+import type { FastifyInstance, FastifyServerOptions, LightMyRequestResponse } from 'fastify';
+import { buildApp, type RateLimitOptions } from '../src/app.js';
 import type { FieldCipher } from '../src/context.js';
 import { fixtureId, KIND } from '../../../packages/db/seed/fixtures.js';
 import { need } from '../../../packages/db/test/helpers.js';
@@ -41,7 +41,12 @@ export interface TestApi {
  * test production-only behavior such as what an MFA reset returns.
  */
 export async function startApi(
-  options: { dhEnv?: string; fieldCipher?: FieldCipher } = {},
+  options: {
+    dhEnv?: string;
+    fieldCipher?: FieldCipher;
+    rateLimit?: RateLimitOptions;
+    logger?: FastifyServerOptions['logger'];
+  } = {},
 ): Promise<TestApi> {
   const c = need();
   // Seeded grants start at seed time (real clock); run the fake clock a little later.
@@ -60,8 +65,18 @@ export async function startApi(
     dhEnv: options.dhEnv ?? 'local',
     allowedOrigins: [ORIGIN],
     secureCookies: true,
-    // Rate limits are tested on their own (src/rate-limit.test.ts).
-    rateLimit: { globalPerMinute: 1_000_000, signinPerMinute: 1_000_000 },
+    // Rate limits are tested on their own (src/rate-limit.test.ts, and the per-user
+    // limits in records.behavior.test.ts, which pass their own).
+    rateLimit: {
+      globalPerMinute: 1_000_000,
+      signinPerMinute: 1_000_000,
+      revealPerMinute: 1_000_000,
+      exportPerMinute: 1_000_000,
+      importPerMinute: 1_000_000,
+      revealAlertAt: 1_000_000,
+      ...options.rateLimit,
+    },
+    ...(options.logger ? { logger: options.logger } : {}),
     ...(options.fieldCipher ? { fieldCipher: options.fieldCipher } : {}),
   });
   await app.ready();

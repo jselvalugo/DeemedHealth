@@ -44,3 +44,8 @@ export function ifMatch(req: FastifyRequest): number {
   if (!Number.isSafeInteger(n) || n < 1) throw new ApiError('bad_request', ['If-Match']);
   return n;
 }
+
+/** The API clock as ISO text: the instant site joins apply active-grant rules at. */
+export function nowIso(h: Helpers): string {
+  return h.now().toISOString();
+}

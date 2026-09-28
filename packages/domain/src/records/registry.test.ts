@@ -7,7 +7,10 @@
 import { describe, expect, it } from 'vitest';
 import { AUDIT_ACTIONS } from '../audit-actions.js';
 import {
+  ArchiveRequest,
   COLUMN_CLASSES,
+  RestoreRequest,
+  RevealRequest,
   createSchema,
   getRecordType,
   recordAuditActions,
@@ -198,6 +201,34 @@ describe('record type registry', () => {
       );
     });
 
+    it('lists a free-text field anywhere but the record page (security review L3)', () => {
+      const problems = variant('role_assignment', (d) => ({
+        ...withField(d, 'grantReason', { detailOnly: false, filterable: true }),
+        list: { ...d.list, defaultColumns: [...d.list.defaultColumns, 'grantReason'] },
+      }));
+      expect(problems).toContain(
+        'role_assignment: field grantReason: free text must be detail-only',
+      );
+      const listed = variant('role_assignment', (d) => ({
+        ...d,
+        list: { ...d.list, defaultColumns: [...d.list.defaultColumns, 'grantReason'] },
+      }));
+      expect(listed).toContain(
+        'role_assignment: field grantReason is detail-only and cannot be a default list column',
+      );
+    });
+
+    it('shows auth or system events in history, or none at all (security review L1)', () => {
+      const auth = variant('user_account', (d) => ({
+        ...d,
+        history: { categories: ['mutation', 'auth' as never] },
+      }));
+      expect(auth).toContain('user_account: history category auth is not allowed');
+      expect(variant('site', (d) => ({ ...d, history: { categories: [] } }))).toContain(
+        'site: history needs at least one audit category',
+      );
+    });
+
     it('duplicates an id or a list route', () => {
       const site = getRecordType('site');
       expect(validateRegistry([site, site])).toEqual(
@@ -249,6 +280,24 @@ describe('payload schemas', () => {
     expect(updateSchema(ri).safeParse({ requirementId: 'CM-05-X' }).success).toBe(false);
     expect(updateSchema(ri).safeParse({ status: 'met' }).success).toBe(false);
     expect(updateSchema(ri).safeParse({}).success).toBe(false);
+  });
+
+  it('refuses SSN-shaped text in any create, update, or bulk field (security review L4)', () => {
+    const shaped = ['000', '12', '3456'].join('-');
+    const create = createSchema(site).safeParse({ ...valid, name: `Clinic ${shaped}` });
+    expect(create.success).toBe(false);
+    expect(create.error?.issues.map((i) => i.path.join('.'))).toContain('name');
+    expect(updateSchema(site).safeParse({ city: shaped }).success).toBe(false);
+    expect(updateSchema(site).safeParse({ city: 'Orlando' }).success).toBe(true);
+  });
+
+  it('refuses SSN-shaped archive, restore, and reveal reasons (security review L4)', () => {
+    const shaped = ['000', '12', '3456'].join('-');
+    expect(ArchiveRequest.safeParse({ reason: `Duplicate of ${shaped}` }).success).toBe(false);
+    expect(ArchiveRequest.safeParse({ reason: 'Duplicate entry' }).success).toBe(true);
+    expect(RestoreRequest.safeParse({ reason: shaped }).success).toBe(false);
+    expect(RestoreRequest.safeParse({}).success).toBe(true);
+    expect(RevealRequest.safeParse({ reasonCode: 'other', note: shaped }).success).toBe(false);
   });
 
   it('never accepts an SSN field on a person (strict schemas, D1)', () => {

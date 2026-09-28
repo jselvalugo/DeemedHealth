@@ -43,9 +43,9 @@ export function isRestricted(c: ColumnClass | undefined): boolean {
   return c === undefined || c.class === 'PHI' || c.display !== 'shown';
 }
 
-/** The field is shown in lists and exports (classified, not restricted). */
+/** The field is shown in lists and exports (classified, not restricted, not detail-only). */
 export function isListable(def: RecordTypeDef, field: string): boolean {
-  return !isRestricted(fieldClass(def, field));
+  return def.fields[field]?.detailOnly !== true && !isRestricted(fieldClass(def, field));
 }
 
 /** Fields shown as `{ masked: true }` until revealed; hidden fields are never returned. */

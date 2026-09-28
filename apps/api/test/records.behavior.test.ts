@@ -24,6 +24,7 @@ import {
   type TestUser,
 } from './harness.js';
 import {
+  archiveAsSetup,
   as,
   eventsFor,
   fresh,
@@ -311,6 +312,380 @@ describeDb('records linked to several sites: read any, write all', () => {
         ).patch(`/api/records/person/${personId}`, { preferredName: 'M' }, match(1))
       ).statusCode,
     ).toBe(200);
+  });
+});
+
+/** A person whose one user account holds these grants (field values), in the test tenant. */
+async function personWithGrants(
+  grants: Record<string, unknown>[],
+  account: Record<string, unknown> = {},
+): Promise<{ personId: string; accountId: string }> {
+  const n = nextSeq();
+  const personId = await insertRecord('xyz', getRecordType('person'), {
+    givenName: 'Grant',
+    familyName: `Case ${n}`,
+    workEmail: `grant.case.${n}@example.org`,
+  });
+  const accountId = await insertRecord('xyz', getRecordType('user_account'), {
+    personId,
+    loginEmail: `grant.case.${n}@example.org`,
+    status: 'active',
+    idpIssuer: 'local',
+    idpSubject: `grant-case-${n}`,
+    ...account,
+  });
+  const from = new Date(w().api.clock.now().getTime() - 60_000).toISOString();
+  for (const g of grants) {
+    await insertRecord('xyz', getRecordType('role_assignment'), {
+      userAccountId: accountId,
+      roleKey: 'staff_provider',
+      validFrom: from,
+      grantReason: 'grant case',
+      ...g,
+    });
+  }
+  return { personId, accountId };
+}
+
+describeDb('organization-wide people and active grants (security review H1, M1)', () => {
+  it("keeps a person with an organization-wide grant out of a site administrator's reach, even with a site grant too (H1)", async () => {
+    const { S1 } = w().sites.xyz;
+    const { personId } = await personWithGrants([
+      { roleKey: 'compliance_officer', siteId: null },
+      { siteId: S1 },
+    ]);
+    const scoped = await as('org_admin', { siteId: S1 });
+    // Visible through the site grant, but not changeable.
+    const got = await scoped.get(`/api/records/person/${personId}`);
+    expect(got.statusCode).toBe(200);
+    expect(got.json().allowedActions).toEqual(['history']);
+    const res = await scoped.patch(
+      `/api/records/person/${personId}`,
+      { preferredName: 'X' },
+      match(1),
+    );
+    expect(res.statusCode).toBe(403);
+    expect((await eventsFor(res))[0]).toMatchObject({ action: 'person.update', outcome: 'denied' });
+    const bulk = await scoped.post('/api/records/person/bulk', {
+      action: 'archive',
+      items: [{ id: personId, rowVersion: 1 }],
+      reason: 'Cleanup',
+    });
+    expect(bulk.json().results).toEqual([{ id: personId, status: 'forbidden' }]);
+    expect(await versionOf(getRecordType('person'), personId)).toBe(1);
+    // An organization-wide administrator may.
+    const admin = await as('org_admin');
+    expect(
+      (await admin.patch(`/api/records/person/${personId}`, { preferredName: 'X' }, match(1)))
+        .statusCode,
+    ).toBe(200);
+  });
+
+  it('does not let a site administrator pull an organization-wide officer into reach by granting a site role (H1)', async () => {
+    const { S1 } = w().sites.xyz;
+    const { personId, accountId } = await personWithGrants([
+      { roleKey: 'compliance_officer', siteId: null },
+    ]);
+    const scoped = await fresh('org_admin', { siteId: S1 });
+    expect((await scoped.get(`/api/records/person/${personId}`)).statusCode).toBe(404);
+    const grant = await scoped.post('/api/admin/role-assignments', {
+      userAccountId: accountId,
+      roleId: 'staff_provider',
+      siteId: S1,
+      reason: 'Covers the S1 clinic',
+    });
+    expect(grant.statusCode, grant.body).toBe(200);
+    expect((await scoped.get(`/api/records/person/${personId}`)).statusCode).toBe(200);
+    const res = await scoped.patch(
+      `/api/records/person/${personId}`,
+      { preferredName: 'X' },
+      match(1),
+    );
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('derives sites only from grants the policy engine counts, on live accounts (M1)', async () => {
+    const { S1 } = w().sites.xyz;
+    const now = w().api.clock.now().getTime();
+    const at = (ms: number) => new Date(now + ms).toISOString();
+    const cases: {
+      name: string;
+      grant: Record<string, unknown>;
+      account?: Record<string, unknown>;
+      archive?: boolean;
+    }[] = [
+      { name: 'revoked', grant: { validFrom: at(-3_600_000), revokedAt: at(-30_000) } },
+      { name: 'expired', grant: { validFrom: at(-3_600_000), expiresAt: at(-60_000) } },
+      { name: 'not started', grant: { validFrom: at(3_600_000) } },
+      { name: 'deprovisioned account', grant: {}, account: { status: 'deprovisioned' } },
+      { name: 'archived account', grant: {}, archive: true },
+    ];
+    const scoped = await as('org_admin', { siteId: S1 });
+    for (const c of cases) {
+      const { personId, accountId } = await personWithGrants(
+        [{ siteId: S1, ...c.grant }],
+        c.account,
+      );
+      if (c.archive) await archiveAsSetup(getRecordType('user_account'), accountId);
+      expect((await scoped.get(`/api/records/person/${personId}`)).statusCode, c.name).toBe(404);
+      expect((await scoped.get(`/api/records/user_account/${accountId}`)).statusCode, c.name).toBe(
+        404,
+      );
+      expect(await listAll(scoped, '/api/records/person'), c.name).not.toContain(personId);
+    }
+    // The control: an active grant on a live account puts the person in S1's scope.
+    const live = await personWithGrants([{ siteId: S1 }]);
+    expect((await scoped.get(`/api/records/person/${live.personId}`)).statusCode).toBe(200);
+    expect(
+      (await scoped.patch(`/api/records/person/${live.personId}`, { preferredName: 'L' }, match(1)))
+        .statusCode,
+    ).toBe(200);
+  });
+});
+
+describeDb(
+  'history, saved views, detail-only fields, and SSN-shaped text (security review L1 to L4)',
+  () => {
+    it("shows only the type's audit categories and successful events, never sign-in or MFA events (L1)", async () => {
+      const { S1 } = w().sites.xyz;
+      const target = await createUser(w().api, { organizationId: w().org.xyz }, [
+        { roleId: 'staff_provider', siteId: S1 },
+      ]);
+      await signIn(w().api, target);
+      const admin = await fresh('org_admin');
+      const reset = await admin.post(`/api/admin/users/${target.userAccountId}/mfa-reset`, {
+        reason: 'Lost phone',
+      });
+      expect(reset.statusCode, reset.body).toBe(200);
+      const { rows } = await w().api.admin.query<{ category: string }>(
+        `SELECT DISTINCT category FROM audit.audit_event WHERE target_id = $1`,
+        [target.userAccountId],
+      );
+      expect(rows.map((r) => r.category)).toContain('auth');
+      const history = (
+        await admin.get(`/api/records/user_account/${target.userAccountId}/history`)
+      ).json();
+      const allowed = getRecordType('user_account').history.categories as readonly string[];
+      for (const item of history.items) {
+        expect(allowed, item.action).toContain(item.category);
+        expect(item.outcome).toBe('success');
+      }
+      expect(JSON.stringify(history)).not.toMatch(/mfa|session|factor/i);
+
+      // A role grant is a permission event on the grant, with only safe metadata.
+      const grant = await admin.post('/api/admin/role-assignments', {
+        userAccountId: target.userAccountId,
+        roleId: 'staff_provider',
+        siteId: w().sites.xyz.S3,
+        reason: 'Covers S3',
+      });
+      const grantHistory = (
+        await admin.get(`/api/records/role_assignment/${grant.json().id}/history`)
+      ).json();
+      expect(grantHistory.items[0]).toMatchObject({ category: 'permission', action: 'role.grant' });
+      expect(Object.keys(grantHistory.items[0].metadata).sort()).toEqual([
+        'role',
+        'subject_user_account_id',
+      ]);
+
+      // Refused attempts on a record stay in the audit log, out of its history.
+      const person = await makeRecord('person', 'B');
+      const scoped = await as('org_admin', { siteId: S1 });
+      expect((await scoped.get(`/api/records/person/${person}`)).statusCode).toBe(404);
+      const personHistory = (await admin.get(`/api/records/person/${person}/history`)).json();
+      expect(personHistory.items.every((i: { outcome: string }) => i.outcome === 'success')).toBe(
+        true,
+      );
+    });
+
+    it("shows a shared view's fields and operators only to others, and keeps search text and personal data out of shared views (L2)", async () => {
+      const owner = await as('compliance_officer');
+      const created = await owner.post('/api/records/site/saved-views', {
+        name: 'Central sites',
+        visibility: 'roles',
+        sharedRoles: ['org_admin'],
+        query: { filters: [{ field: 'timeZone', op: 'eq', value: 'America/Chicago' }], sort: [] },
+      });
+      expect(created.statusCode, created.body).toBe(201);
+      const id = created.json().id as string;
+      const find = async (client: Client) =>
+        (
+          (await client.get('/api/records/site/saved-views')).json().items as {
+            id: string;
+            query: unknown;
+          }[]
+        ).find((v) => v.id === id);
+      expect((await find(owner))?.query).toMatchObject({ filters: [{ value: 'America/Chicago' }] });
+      const other = await as('org_admin');
+      expect((await find(other))?.query).toEqual({
+        filters: [{ field: 'timeZone', op: 'eq' }],
+        sort: [],
+      });
+      // Applying it still uses the values, server-side.
+      const rows = (await other.get(`/api/records/site?view=${id}&limit=200`)).json().items;
+      expect(
+        rows.every(
+          (r: { fields: { timeZone: string } }) => r.fields.timeZone === 'America/Chicago',
+        ),
+      ).toBe(true);
+
+      const npi = { filters: [{ field: 'npi', op: 'eq', value: '1234567893' }], sort: [] };
+      const shared = { name: 'NPI', visibility: 'roles', sharedRoles: ['org_admin'] };
+      const refused = await owner.post('/api/records/person/saved-views', {
+        ...shared,
+        query: npi,
+      });
+      expect(refused.statusCode).toBe(400);
+      expect(refused.json().error.fields).toEqual(['query.filters.npi']);
+      const search = await owner.post('/api/records/site/saved-views', {
+        ...shared,
+        query: { filters: [], sort: [], q: 'Main' },
+      });
+      expect(search.json().error.fields).toEqual(['query.q']);
+      const priv = await owner.post('/api/records/person/saved-views', {
+        name: 'NPI',
+        visibility: 'private',
+        query: npi,
+      });
+      expect(priv.statusCode).toBe(201);
+      const widen = await owner.patch(
+        `/api/records/person/saved-views/${priv.json().id}`,
+        { visibility: 'roles', sharedRoles: ['org_admin'] },
+        match(1),
+      );
+      expect(widen.statusCode).toBe(400);
+    });
+
+    it('keeps free-text reasons on the record page only: not in lists or exports (L3)', async () => {
+      const id = await makeRecord('role_assignment', 'A');
+      const reader = await as('org_admin');
+      const list = (await reader.get('/api/records/role_assignment?limit=200')).json();
+      for (const item of list.items) {
+        expect(item.fields).not.toHaveProperty('grantReason');
+        expect(item.fields).not.toHaveProperty('revokeReason');
+      }
+      expect(
+        (await reader.get(`/api/records/role_assignment/${id}`)).json().record.fields.grantReason,
+      ).toBe('Synthetic fixture grant');
+      const exporter = await fresh('compliance_officer');
+      const res = await exporter.post('/api/records/role_assignment/exports', {
+        format: 'csv',
+        query: {},
+        columns: ['roleKey', 'grantReason'],
+      });
+      expect(res.statusCode).toBe(400);
+      const csv = await exporter.post('/api/records/role_assignment/exports', {
+        format: 'csv',
+        query: {},
+      });
+      expect(csv.body).not.toContain('Synthetic fixture grant');
+    });
+
+    it('refuses SSN-shaped text in fields and reasons, and writes nothing (L4)', async () => {
+      const shaped = ['000', '12', '3456'].join('-');
+      const writer = await as('org_admin');
+      const id = await makeRecord('site', 'new');
+      const create = await writer.post('/api/records/site', {
+        name: `Clinic ${shaped}`,
+        siteType: 'service_delivery',
+        addressLine1: '1 Test Way',
+        city: 'Tampa',
+        postalCode: '33602',
+        timeZone: 'America/New_York',
+        validFrom: '2026-01-01',
+      });
+      expect(create.statusCode).toBe(400);
+      expect(create.json().error.fields).toEqual(['name']);
+      expect(create.body).not.toContain(shaped);
+      const update = await writer.patch(
+        `/api/records/site/${id}`,
+        { city: `Tampa ${shaped}` },
+        match(1),
+      );
+      expect(update.json().error.fields).toEqual(['city']);
+      const archive = await writer.post(
+        `/api/records/site/${id}/archive`,
+        { reason: `Dup of ${shaped}` },
+        match(1),
+      );
+      expect(archive.statusCode).toBe(400);
+      expect(
+        (await writer.post(`/api/records/site/${id}/archive`, { reason: 'Duplicate' }, match(1)))
+          .statusCode,
+      ).toBe(200);
+      const restore = await writer.post(
+        `/api/records/site/${id}/restore`,
+        { reason: shaped },
+        match(2),
+      );
+      expect(restore.statusCode).toBe(400);
+      const ok = await writer.post(
+        `/api/records/site/${id}/restore`,
+        { reason: 'Archived in error' },
+        match(2),
+      );
+      expect(ok.statusCode).toBe(200);
+      expect((await eventsFor(ok))[0]?.metadata).toMatchObject({ reason_length: 17 });
+      expect(JSON.stringify(await eventsFor(ok))).not.toContain('Archived in error');
+      for (const r of [create, update, archive, restore]) expect(await eventsFor(r)).toEqual([]);
+    });
+  },
+);
+
+describeDb('per-user limits on sensitive routes (security review M2)', () => {
+  it('limits reveals, exports, and import dry runs per user whatever the address, and alerts on reveal volume', async () => {
+    const lines: string[] = [];
+    const limited = await startApi({
+      rateLimit: { revealPerMinute: 2, revealAlertAt: 2, exportPerMinute: 1, importPerMinute: 1 },
+      logger: { level: 'warn', stream: { write: (line: string) => void lines.push(line) } },
+    });
+    try {
+      const officer = await createUser(limited, { organizationId: w().org.xyz }, [
+        { roleId: 'compliance_officer' },
+      ]);
+      const client = await signIn(limited, officer);
+      await stepUp(limited, officer, client);
+      const id = await makeRecord('person', 'A');
+      const reveal = (c: Client) =>
+        c.post(`/api/records/person/${id}/reveal/dob`, { reasonCode: 'data_correction' });
+      expect((await reveal(client)).statusCode).toBe(200);
+      expect((await reveal(client)).statusCode).toBe(200);
+      // The same user from another network is still the same user.
+      const elsewhere = new Client(limited);
+      for (const [k, v] of client.jar) elsewhere.jar.set(k, v);
+      elsewhere.csrf = client.csrf;
+      expect(elsewhere.ip).not.toBe(client.ip);
+      const third = await reveal(elsewhere);
+      expect(third.statusCode).toBe(429);
+      expect(third.json().error.code).toBe('too_many_attempts');
+      const alerts = lines
+        .map((l) => JSON.parse(l) as Record<string, unknown>)
+        .filter((l) => l.security_alert === 'records.reveal_volume');
+      expect(alerts).toEqual([
+        expect.objectContaining({ userAccountId: officer.userAccountId, count: 2, refused: false }),
+        expect.objectContaining({ userAccountId: officer.userAccountId, count: 3, refused: true }),
+      ]);
+      // Another user has their own allowance.
+      const colleague = await createUser(limited, { organizationId: w().org.xyz }, [
+        { roleId: 'compliance_officer' },
+      ]);
+      const other = await signIn(limited, colleague);
+      await stepUp(limited, colleague, other);
+      expect((await reveal(other)).statusCode).toBe(200);
+
+      const exportBody = { format: 'csv', query: {} };
+      expect((await client.post('/api/records/site/exports', exportBody)).statusCode).toBe(200);
+      expect((await client.post('/api/records/site/exports', exportBody)).statusCode).toBe(429);
+      const csv = 'name\nX\n';
+      expect((await client.post('/api/records/site/imports', { csv })).statusCode).toBe(200);
+      expect((await client.post('/api/records/site/imports', { csv })).statusCode).toBe(429);
+      // A new minute, a new allowance.
+      limited.clock.advance({ seconds: 61 });
+      await stepUp(limited, officer, client);
+      expect((await reveal(client)).statusCode).toBe(200);
+    } finally {
+      await limited.close();
+    }
   });
 });
 

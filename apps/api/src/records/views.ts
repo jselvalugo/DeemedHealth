@@ -19,8 +19,9 @@ import {
   SavedViewUpdate,
   activeRoleIds,
   checkStoredQuery,
+  fieldClass,
   isListable,
-  isSsnShapedValue,
+  containsSsnShape,
   type JsonValue,
   type ListQuery,
   type RecordTypeDef,
@@ -51,17 +52,28 @@ interface ViewRow {
 
 const ViewParams = z.object({ viewId: z.string().uuid() });
 
+/**
+ * The owner sees the whole view. Anyone else sees a shared view's fields and operators
+ * only: filter values and search text stay server-side, where applying the view uses
+ * them (security review L2).
+ */
 function toSavedView(h: Helpers, v: ViewRow): SavedView {
+  const owned = v.owner_user_account_id === h.session().userAccountId;
   return {
     id: v.id,
     recordType: v.record_type,
     name: v.name,
     visibility: v.visibility,
     sharedRoles: v.shared_roles,
-    query: v.query,
+    query: owned
+      ? v.query
+      : {
+          filters: v.query.filters.map((f) => ({ field: f.field, op: f.op })),
+          sort: v.query.sort,
+        },
     columns: v.columns,
     rowVersion: v.row_version,
-    owned: v.owner_user_account_id === h.session().userAccountId,
+    owned,
   };
 }
 
@@ -117,7 +129,7 @@ function checkView(
   },
 ): void {
   const bad: string[] = [];
-  if (v.name !== undefined && isSsnShapedValue(v.name)) bad.push('name');
+  if (v.name !== undefined && containsSsnShape(v.name)) bad.push('name');
   if (v.query) {
     const stored = checkStoredQuery(def, v.query);
     if (!stored.ok) bad.push(...stored.fields);
@@ -132,12 +144,33 @@ function checkView(
 }
 
 /** Sharing with roles is a policy change: it needs the type's update permission. */
+/**
+ * A view shared with roles shows its query shape to other people, so it carries no search
+ * text and no filter on a personal-data or free-text field (security review L2).
+ */
+function sharedQueryProblems(def: RecordTypeDef, query: SavedViewQuery): string[] {
+  const bad: string[] = [];
+  if (query.q) bad.push('query.q');
+  for (const f of query.filters) {
+    const c = fieldClass(def, f.field);
+    if (!c || c.class === 'PII' || c.class === 'PHI' || c.freeText) {
+      bad.push(`query.filters.${f.field}`);
+    }
+  }
+  return bad;
+}
+
 function checkSharing(
   h: Helpers,
   def: RecordTypeDef,
   visibility: string,
   roles: readonly string[],
+  query: SavedViewQuery,
 ) {
+  if (visibility === 'roles') {
+    const bad = sharedQueryProblems(def, query);
+    if (bad.length > 0) throw new ApiError('bad_request', bad);
+  }
   if (visibility === 'roles' && roles.length === 0)
     throw new ApiError('bad_request', ['sharedRoles']);
   if (visibility === 'private' && roles.length > 0)
@@ -215,7 +248,7 @@ async function createView(c: RecordCall): Promise<SavedView> {
   const body = h.body(SavedViewCreate);
   const roles = body.sharedRoles ?? [];
   checkView(h, def, body);
-  checkSharing(h, def, body.visibility, roles);
+  checkSharing(h, def, body.visibility, roles, body.query);
   return h.tenant(async (tx, txCtx) => {
     const r = await tx.execute<ViewRow>(sql`
       INSERT INTO public.saved_view AS v
@@ -249,7 +282,7 @@ async function updateView(c: RecordCall): Promise<SavedView> {
     if (view.row_version !== expected) throw new ApiError('version_conflict', [], view.row_version);
     const visibility = body.visibility ?? view.visibility;
     const roles = body.sharedRoles ?? (body.visibility === 'private' ? [] : view.shared_roles);
-    checkSharing(h, def, visibility, roles);
+    checkSharing(h, def, visibility, roles, body.query ?? view.query);
     const r = await tx.execute<ViewRow>(sql`
       UPDATE public.saved_view AS v SET
         name = ${body.name ?? view.name},

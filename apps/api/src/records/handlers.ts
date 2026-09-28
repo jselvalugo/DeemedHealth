@@ -48,7 +48,7 @@ import type { Handler, Helpers } from '../context.js';
 import { ApiError, DeniedError } from '../errors.js';
 import { ARCHIVE_BLOCKER_SQL } from './bindings.js';
 import { signCursor, verifyCursor } from './cursor.js';
-import { digestOf, ifMatch, type RecordCall } from './http.js';
+import { digestOf, ifMatch, nowIso, type RecordCall } from './http.js';
 import { importDryRun } from './import.js';
 import {
   RECORD_ROUTE_META,
@@ -134,6 +134,38 @@ export async function appendMutation(
   });
 }
 
+/**
+ * The status of a bulk row whose savepoint threw: an API error (a version conflict, a
+ * refusal, a validation failure) or a constraint violation fails that row only. Returns
+ * null for anything else (a bug or an outage), which fails the whole request.
+ */
+export function bulkRowStatusFor(error: unknown): BulkRowStatus | null {
+  if (error instanceof DeniedError) return error.hidden ? 'not_found' : 'forbidden';
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case 'version_conflict':
+        return 'version_conflict';
+      case 'not_found':
+        return 'not_found';
+      case 'forbidden':
+        return 'forbidden';
+      case 'conflict':
+        return 'blocked';
+      case 'bad_request':
+      case 'precondition_required':
+        return 'invalid';
+      default:
+        return null;
+    }
+  }
+  const code = (error as { code?: unknown } | null)?.code;
+  // Class 22 (data) and 23 (integrity constraint) SQLSTATEs.
+  if (typeof code === 'string' && (code.startsWith('22') || code.startsWith('23'))) {
+    return 'invalid';
+  }
+  return null;
+}
+
 /** Maps constraint errors to the stable model; everything else stays a 500. */
 async function withDbErrors<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -205,7 +237,7 @@ function listWhere(h: Helpers, def: RecordTypeDef, q: ListQuery): SQL[] {
   const p = h.principal();
   const scope = permissionScope(p, def.access.read, h.now());
   return [
-    scopePredicate(def, scope, p.personId),
+    scopePredicate(def, scope, p.personId, nowIso(h)),
     archivedSql(def, q.archived),
     ...q.filters.map((f) => filterSql(def, f)),
     ...(q.q ? [searchSql(def, q.q)] : []),
@@ -256,7 +288,7 @@ function revealable(h: Helpers, def: RecordTypeDef, row: Row): string[] {
 }
 
 async function lockVisible(c: RecordCall, tx: Tx, id: string): Promise<Row> {
-  const row = await loadRow(tx, c.def, id, true);
+  const row = await loadRow(tx, c.def, id, nowIso(c.h), true);
   // RLS hides other tenants' rows: "not found", never "forbidden".
   if (!row) throw new ApiError('not_found');
   requireVisible(c.h, c.def, row);
@@ -290,6 +322,7 @@ async function list(c: RecordCall): Promise<RecordListResponse> {
     const fingerprint = queryFingerprint(def.id, q);
     const after = q.cursor ? verifyCursor(h, 'list', def.id, fingerprint, q.cursor) : undefined;
     const rows = await selectRows(tx, def, {
+      now: nowIso(h),
       where,
       sort: q.sort,
       limit: q.limit + 1,
@@ -322,7 +355,7 @@ async function get(c: RecordCall): Promise<RecordGetResponse> {
   const { h, def, reply } = c;
   const { id } = h.params(IdParams);
   return h.tenant(async (tx, txCtx) => {
-    const row = await loadRow(tx, def, id);
+    const row = await loadRow(tx, def, id, nowIso(h));
     if (!row) throw new ApiError('not_found');
     const read = requireVisible(h, def, row);
     await h.recordView(tx, txCtx, targetOf(def, row));
@@ -375,7 +408,7 @@ async function create(c: RecordCall): Promise<{ recordType: string; record: Reco
         sql`, `,
       )})
       RETURNING id::text AS id`);
-    const row = await loadRow(tx, def, inserted.rows[0]?.id as string);
+    const row = await loadRow(tx, def, inserted.rows[0]?.id as string, nowIso(h));
     if (!row) throw new Error('records: the created row is not readable');
     await appendMutation(
       h,
@@ -421,7 +454,7 @@ async function update(c: RecordCall): Promise<{ recordType: string; record: Reco
     }
     const changes = Object.fromEntries(changed.map((k) => [k, patch[k]]));
     await updateColumns(tx, def, id, expected, fieldSets(def, changes));
-    const after = (await loadRow(tx, def, id)) as Row;
+    const after = (await loadRow(tx, def, id, nowIso(h))) as Row;
     const pick = (values: Record<string, unknown>) =>
       toColumns(def, Object.fromEntries(changed.map((k) => [k, values[k]]))) as Diffable;
     await appendMutation(
@@ -466,12 +499,12 @@ async function archiveRow(
     return { status: 'version_conflict', error: await versionConflict(tx, def, row, expected) };
   const blocked = await archiveBlockers(tx, def, row.__id);
   if (blocked.length > 0) return { status: 'blocked', fields: blocked };
+  // archived_by is the transaction's actor, set by set_row_meta() (migration 0009).
   await updateColumns(tx, def, row.__id, expected, [
     sql`archived_at = now()`,
-    sql`archived_by = ${h.session().userAccountId}::uuid`,
     sql`archive_reason = ${reason}::text`,
   ]);
-  return { status: 'archived', row: (await loadRow(tx, def, row.__id)) as Row };
+  return { status: 'archived', row: (await loadRow(tx, def, row.__id, nowIso(h))) as Row };
 }
 
 async function archive(c: RecordCall): Promise<{ recordType: string; record: RecordView }> {
@@ -505,19 +538,36 @@ async function restore(c: RecordCall): Promise<{ recordType: string; record: Rec
   const { h, def, req, reply } = c;
   const { id } = h.params(IdParams);
   const expected = ifMatch(req);
-  h.body(RestoreRequest);
+  const { reason } = h.body(RestoreRequest);
   return h.tenant(async (tx, txCtx) => {
     const row = await lockVisible(c, tx, id);
     requireAction(h, def, row, def.access.update);
     if (!row.__archived_at) throw new ApiError('conflict', ['archivedAt']);
     if (row.__v !== expected) throw await versionConflict(tx, def, row, expected);
+    // set_row_meta() clears archived_by when archived_at clears (migration 0009).
     await updateColumns(tx, def, id, expected, [
       sql`archived_at = NULL`,
-      sql`archived_by = NULL`,
       sql`archive_reason = NULL`,
     ]);
-    const after = (await loadRow(tx, def, id)) as Row;
-    await appendMutation(h, tx, txCtx, def, 'restore', after, archiveDiff(row), archiveDiff(after));
+    const after = (await loadRow(tx, def, id, nowIso(h))) as Row;
+    const digest = digestOf(h);
+    await appendMutation(
+      h,
+      tx,
+      txCtx,
+      def,
+      'restore',
+      after,
+      archiveDiff(row),
+      archiveDiff(after),
+      reason
+        ? {
+            reason_length: [...reason].length,
+            reason_hmac_sha256: digest.digest(reason),
+            reason_digest_key: digest.keyId,
+          }
+        : {},
+    );
     reply.header('etag', etag(after));
     return { recordType: def.id, record: toView(def, after, 'record') };
   });
@@ -559,7 +609,7 @@ async function bulk(c: RecordCall): Promise<BulkResponse> {
       let fieldsOut: string[] | undefined;
       try {
         await tx.transaction(async (sp) => {
-          const row = await loadRow(sp, def, item.id, true);
+          const row = await loadRow(sp, def, item.id, nowIso(h), true);
           if (!row) {
             status = 'not_found';
             return;
@@ -633,7 +683,7 @@ async function bulk(c: RecordCall): Promise<BulkResponse> {
           }
           const changes = Object.fromEntries(changed.map((k) => [k, fields[k]]));
           await updateColumns(sp, def, row.__id, item.rowVersion, fieldSets(def, changes));
-          const after = (await loadRow(sp, def, row.__id)) as Row;
+          const after = (await loadRow(sp, def, row.__id, nowIso(h))) as Row;
           const pick = (values: Record<string, unknown>) =>
             toColumns(def, Object.fromEntries(changed.map((k) => [k, values[k]]))) as Diffable;
           await appendMutation(
@@ -652,10 +702,11 @@ async function bulk(c: RecordCall): Promise<BulkResponse> {
           written++;
         });
       } catch (error) {
-        const code = (error as { code?: unknown }).code;
-        // A constraint on one row fails that row only (its savepoint rolled back).
-        if (typeof code !== 'string' || !code.startsWith('2')) throw error;
-        status = 'invalid';
+        // One row's failure is that row's status; its savepoint rolled back, and the
+        // rest of the batch carries on. Anything unexpected still fails the request.
+        const mapped = bulkRowStatusFor(error);
+        if (mapped === null) throw error;
+        status = mapped;
       }
       results.push({
         id: item.id,
@@ -682,6 +733,30 @@ async function bulk(c: RecordCall): Promise<BulkResponse> {
   });
 }
 
+/**
+ * Metadata keys a record's history may show. Everything else (session and request ids,
+ * factor ids, network data, digests) stays in the audit log for the people who may read
+ * it there (ADR-0014 section 2.6, security review L1).
+ */
+const HISTORY_METADATA_KEYS = [
+  'record_type',
+  'row_version',
+  'bulk_id',
+  'import_id',
+  'field',
+  'value_present',
+  'role',
+  'subject_user_account_id',
+] as const;
+
+function historyMetadata(metadata: Record<string, unknown> | null): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of HISTORY_METADATA_KEYS) {
+    if (metadata && Object.prototype.hasOwnProperty.call(metadata, key)) out[key] = metadata[key];
+  }
+  return out;
+}
+
 const HistoryQuery = z
   .object({
     cursor: z.string().min(1).max(512).optional(),
@@ -697,7 +772,7 @@ async function history(c: RecordCall): Promise<HistoryResponse> {
   if (!query.success) throw new ApiError('bad_request', ['query']);
   const limit = query.data.limit ?? 50;
   return h.tenant(async (tx, txCtx) => {
-    const row = await loadRow(tx, def, id);
+    const row = await loadRow(tx, def, id, nowIso(h));
     if (!row) throw new ApiError('not_found');
     const read = requireVisible(h, def, row);
     if (!historyAllowed(h, def, read)) throw new DeniedError('record_rule', targetOf(def, row));
@@ -723,6 +798,11 @@ async function history(c: RecordCall): Promise<HistoryResponse> {
              e.outcome, e.actor_type, e.actor_label, e.diff, e.metadata, e.reason
       FROM audit.audit_event e
       WHERE e.target_table = ${bareTable(def.table)} AND e.target_id = ${id}::uuid
+        AND e.outcome = 'success'
+        AND e.category IN (${sql.join(
+          def.history.categories.map((c) => sql`${c}`),
+          sql`, `,
+        )})
         ${before !== null && Number.isSafeInteger(before) ? sql`AND e.chain_seq < ${before}` : sql``}
       ORDER BY e.chain_seq DESC
       LIMIT ${limit + 1}`);
@@ -741,7 +821,7 @@ async function history(c: RecordCall): Promise<HistoryResponse> {
         actorType: e.actor_type,
         actorLabel: e.actor_label,
         diff: e.diff ?? null,
-        metadata: e.metadata,
+        metadata: historyMetadata(e.metadata),
         reason: e.reason,
       })),
       nextCursor:
@@ -787,6 +867,7 @@ async function exportCsv(c: RecordCall): Promise<string> {
   return h.tenant(async (tx, txCtx) => {
     const q = await applySavedView(tx, h, def, parsed.value, body.query.sort !== undefined);
     const rows = await selectRows(tx, def, {
+      now: nowIso(h),
       where: listWhere(h, def, q),
       sort: q.sort,
       limit: EXPORT_MAX_ROWS + 1,
@@ -864,7 +945,7 @@ async function reveal(c: RecordCall): Promise<{ field: string; value: string | n
   const f = def.fields[name];
   if (!f?.reveal) throw new ApiError('not_found');
   return h.tenant(async (tx, txCtx) => {
-    const row = await loadRow(tx, def, id);
+    const row = await loadRow(tx, def, id, nowIso(h));
     if (!row) throw new ApiError('not_found');
     requireVisible(h, def, row);
     const d = decideRecord(h, def.access.read, resourceOf(row), 'any', f.reveal?.roles);

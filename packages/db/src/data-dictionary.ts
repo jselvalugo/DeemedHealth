@@ -56,7 +56,10 @@ const rowVersion = {
 const archived = {
   archived_at: c('internal', 'Soft-delete time; archived rows are hidden, never hard-deleted'),
   ...rowVersion,
-  archived_by: c('internal', 'user_account that archived the row (NULL for a service actor)'),
+  archived_by: c(
+    'internal',
+    'user_account that archived the row; always the transaction actor (set_row_meta)',
+  ),
   archive_reason: c('PII', 'Why the row was archived (free text)', { freeText: true }),
 };
 const tenantKey = {

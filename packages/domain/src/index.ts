@@ -34,6 +34,7 @@ export {
 } from './audit-canonical.js';
 export {
   classifySsnColumnName,
+  containsSsnShape,
   detectSsnLikeColumns,
   isSsnShapedValue,
   tokenizeColumnName,

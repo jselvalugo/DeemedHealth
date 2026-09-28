@@ -120,7 +120,26 @@ export interface FieldDef {
   importable?: boolean;
   /** Masked fields only: revealed one at a time, audited (ADR-0007, ADR-0014 section 4.5). */
   reveal?: RevealSpec;
+  /**
+   * Shown on the record page only: never in lists, exports, filters, sorts, or search.
+   * Required for free-text columns (reasons, comments), which may hold anything.
+   */
+  detailOnly?: boolean;
 }
+
+/**
+ * Audit categories a record's history may show (ADR-0014 section 2.6). Never `auth`
+ * (sessions, MFA, step-up, and denials belong to the audit log, not the record page),
+ * `integration`, or `system`.
+ */
+export const HISTORY_CATEGORIES = [
+  'mutation',
+  'permission',
+  'reveal',
+  'export',
+  'approval',
+] as const;
+export type HistoryCategory = (typeof HISTORY_CATEGORIES)[number];
 
 export interface LifecycleTransition {
   id: string;
@@ -205,6 +224,8 @@ export interface RecordTypeDef<
     defaultSort: readonly { field: keyof F & string; dir: 'asc' | 'desc' }[];
   };
   detail: { sections: readonly DetailSection[]; tabs: readonly DetailTab[] };
+  /** Which audit categories the History tab shows (successful events only). */
+  history: { categories: readonly HistoryCategory[] };
   access: AccessDecl;
   /** Generic actions this type serves. Read-only types declare no write action. */
   actions: readonly RecordAction[];

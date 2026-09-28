@@ -13,7 +13,7 @@
  * a masked, hidden, or PHI column.
  */
 import { IsoDate, Uuid, UtcTimestamp } from '../primitives.js';
-import { isSsnShapedValue } from '../ssn-detector.js';
+import { containsSsnShape } from '../ssn-detector.js';
 import type { FieldDef, FieldKind, RecordTypeDef } from './define.js';
 import { isFieldName } from './validate.js';
 
@@ -113,7 +113,7 @@ export function checkScalar(f: FieldDef, raw: string): string | null {
       const text = raw.trim();
       if (text.length === 0 || text.length > TEXT_VALUE_MAX) return null;
       // D1: an SSN-shaped value is never accepted, not even as a filter.
-      return isSsnShapedValue(text) ? null : text;
+      return containsSsnShape(text) ? null : text;
     }
     default:
       return null;
@@ -217,7 +217,7 @@ export function checkSearch(raw: string | undefined): string | null | false {
   if (raw === undefined) return null;
   const q = raw.trim();
   if (q.length === 0) return null;
-  if (q.length > TEXT_VALUE_MAX || isSsnShapedValue(q)) return false;
+  if (q.length > TEXT_VALUE_MAX || containsSsnShape(q)) return false;
   return q;
 }
 
