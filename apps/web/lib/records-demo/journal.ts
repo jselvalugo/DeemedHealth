@@ -6,7 +6,14 @@
  * more than the viewer could do through the UI.
  */
 import { z } from 'zod';
-import { MUTATING_OPS, runOp, seedStore, type DemoOp, type DemoStore, type DemoViewer } from './engine';
+import {
+  MUTATING_OPS,
+  runOp,
+  seedStore,
+  type DemoOp,
+  type DemoStore,
+  type DemoViewer,
+} from './engine';
 
 const Id = z.string().uuid();
 const Type = z.string().min(1).max(64);
@@ -17,20 +24,44 @@ export const DemoOpSchema: z.ZodType<DemoOp> = z.discriminatedUnion('op', [
   z.object({ op: z.literal('get'), type: Type, id: Id }).strict(),
   z.object({ op: z.literal('create'), type: Type, fields: Fields }).strict(),
   z
-    .object({ op: z.literal('update'), type: Type, id: Id, version: z.number().int(), fields: Fields })
+    .object({
+      op: z.literal('update'),
+      type: Type,
+      id: Id,
+      version: z.number().int(),
+      fields: Fields,
+    })
     .strict(),
   z
-    .object({ op: z.literal('archive'), type: Type, id: Id, version: z.number().int(), body: z.unknown() })
+    .object({
+      op: z.literal('archive'),
+      type: Type,
+      id: Id,
+      version: z.number().int(),
+      body: z.unknown(),
+    })
     .strict(),
   z
-    .object({ op: z.literal('restore'), type: Type, id: Id, version: z.number().int(), body: z.unknown() })
+    .object({
+      op: z.literal('restore'),
+      type: Type,
+      id: Id,
+      version: z.number().int(),
+      body: z.unknown(),
+    })
     .strict(),
   z.object({ op: z.literal('bulk'), type: Type, body: z.unknown() }).strict(),
   z
     .object({ op: z.literal('history'), type: Type, id: Id, cursor: z.string().max(64).nullable() })
     .strict(),
   z
-    .object({ op: z.literal('reveal'), type: Type, id: Id, field: z.string().max(64), body: z.unknown() })
+    .object({
+      op: z.literal('reveal'),
+      type: Type,
+      id: Id,
+      field: z.string().max(64),
+      body: z.unknown(),
+    })
     .strict(),
   z.object({ op: z.literal('views.list'), type: Type }).strict(),
   z.object({ op: z.literal('views.create'), type: Type, body: z.unknown() }).strict(),
@@ -73,7 +104,10 @@ export function encodeJournal(entries: readonly JournalEntry[]): string {
 export function decodeJournal(text: string | undefined): JournalEntry[] {
   if (!text || text.length > JOURNAL_MAX_BYTES * 2) return [];
   try {
-    const parsed = z.array(Entry).max(200).safeParse(JSON.parse(Buffer.from(text, 'base64url').toString('utf8')));
+    const parsed = z
+      .array(Entry)
+      .max(200)
+      .safeParse(JSON.parse(Buffer.from(text, 'base64url').toString('utf8')));
     return parsed.success ? parsed.data : [];
   } catch {
     return [];

@@ -28,7 +28,9 @@ function FieldError({ id, children }: { id: string; children: string }) {
 }
 
 function describedBy(id: string, hint?: string, error?: string): string | undefined {
-  return [hint ? `${id}-hint` : '', error ? `${id}-error` : ''].filter(Boolean).join(' ') || undefined;
+  return (
+    [hint ? `${id}-hint` : '', error ? `${id}-error` : ''].filter(Boolean).join(' ') || undefined
+  );
 }
 
 const fieldClasses = (error?: string) =>
@@ -38,7 +40,15 @@ const fieldClasses = (error?: string) =>
     error ? 'border-status-critical-text' : 'border-gray-500',
   );
 
-function Label({ id, label, required }: { id: string; label: string; required?: string | undefined }) {
+function Label({
+  id,
+  label,
+  required,
+}: {
+  id: string;
+  label: string;
+  required?: string | undefined;
+}) {
   return (
     <label htmlFor={id} className="block text-sm font-semibold text-gray-900">
       {label}
@@ -204,7 +214,9 @@ export function Modal({
           className={cn(
             'fixed inset-0 z-50 flex flex-col overflow-y-auto bg-white p-6 outline-none',
             'sm:inset-auto sm:top-24 sm:left-1/2 sm:max-h-[calc(100dvh-8rem)] sm:-translate-x-1/2 sm:rounded-modal sm:shadow-modal',
-            size === 'lg' ? 'sm:w-[min(720px,calc(100vw-4rem))]' : 'sm:w-[min(520px,calc(100vw-4rem))]',
+            size === 'lg'
+              ? 'sm:w-[min(720px,calc(100vw-4rem))]'
+              : 'sm:w-[min(520px,calc(100vw-4rem))]',
             'motion-safe:animate-launcher-in',
           )}
         >

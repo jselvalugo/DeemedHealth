@@ -120,8 +120,12 @@ export const STEP_UP_MS = 5 * 60 * 1000;
 const HISTORY_PAGE = 50;
 
 type Result<T> = RecordsResult<T>;
-const fail = <T>(status: number, code: Parameters<typeof errorOf>[0], fields?: string[], currentVersion?: number): Result<T> =>
-  errorOf(code, status, fields, currentVersion);
+const fail = <T>(
+  status: number,
+  code: Parameters<typeof errorOf>[0],
+  fields?: string[],
+  currentVersion?: number,
+): Result<T> => errorOf(code, status, fields, currentVersion);
 
 function errorOf(
   code:
@@ -165,17 +169,31 @@ export function seedStore(): DemoStore {
         outcome: 'success',
         actorType: 'system',
         actorLabel: 'Synthetic data seed',
-        diff: { fields: Object.fromEntries(Object.keys(values).map((f) => [def.fields[f]?.column ?? f, { changed: true }])) },
+        diff: {
+          fields: Object.fromEntries(
+            Object.keys(values).map((f) => [def.fields[f]?.column ?? f, { changed: true }]),
+          ),
+        },
         metadata: { record_type: type, row_version: 1 },
         reason: null,
       });
-      return { id: r.id, v: 1, archivedAt: r.archivedAt ?? null, values, secrets: { ...r.secrets } };
+      return {
+        id: r.id,
+        v: 1,
+        archivedAt: r.archivedAt ?? null,
+        values,
+        secrets: { ...r.secrets },
+      };
     });
   }
   const views: ViewRow[] = SEED_VIEWS.map((v) => ({
     ...v,
     sharedRoles: [...v.sharedRoles],
-    query: { filters: v.query.filters.map((f) => ({ ...f })), sort: v.query.sort.map((s) => ({ ...s })), q: v.query.q },
+    query: {
+      filters: v.query.filters.map((f) => ({ ...f })),
+      sort: v.query.sort.map((s) => ({ ...s })),
+      q: v.query.q,
+    },
     columns: [...v.columns],
     v: 1,
     archived: false,
@@ -268,11 +286,17 @@ function matches(def: RecordTypeDef, row: Row, f: ListFilter): boolean {
   }
 }
 
-function list(store: DemoStore, def: RecordTypeDef, ctx: RunContext, raw: Record<string, string>): Result<RecordListResponse> {
+function list(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  raw: Record<string, string>,
+): Result<RecordListResponse> {
   const parsed = parseListQuery(def, raw);
   if (!parsed.ok) return fail(400, 'bad_request', parsed.fields);
   const q = parsed.value;
-  if (q.archived !== 'exclude' && !can(ctx.viewer, def.access.update, ctx.now)) return fail(403, 'forbidden');
+  if (q.archived !== 'exclude' && !can(ctx.viewer, def.access.update, ctx.now))
+    return fail(403, 'forbidden');
   let filters = q.filters;
   let sort = q.sort;
   let search = q.q;
@@ -285,7 +309,9 @@ function list(store: DemoStore, def: RecordTypeDef, ctx: RunContext, raw: Record
     if (raw.sort === undefined && stored.value.sort.length > 0) sort = stored.value.sort;
     search = search ?? stored.value.q;
   }
-  const searchable = Object.entries(def.fields).filter(([n, f]) => f.searchable && isListable(def, n));
+  const searchable = Object.entries(def.fields).filter(
+    ([n, f]) => f.searchable && isListable(def, n),
+  );
   let rows = (store.rows[def.id] ?? []).filter((r) =>
     q.archived === 'exclude' ? !r.archivedAt : q.archived === 'only' ? !!r.archivedAt : true,
   );
@@ -343,7 +369,11 @@ function find(store: DemoStore, def: RecordTypeDef, id: string): Row | undefined
   return store.rows[def.id]?.find((r) => r.id === id);
 }
 
-function allowedActions(def: RecordTypeDef, row: Row, ctx: RunContext): RecordGetResponse['allowedActions'] {
+function allowedActions(
+  def: RecordTypeDef,
+  row: Row,
+  ctx: RunContext,
+): RecordGetResponse['allowedActions'] {
   const out: RecordGetResponse['allowedActions'] = [];
   const archived = row.archivedAt !== null;
   const ok = (p: Permission) => can(ctx.viewer, p, ctx.now);
@@ -362,7 +392,9 @@ function revealable(def: RecordTypeDef, ctx: RunContext): string[] {
 }
 
 function columnDiff(def: RecordTypeDef, names: readonly string[]) {
-  return { fields: Object.fromEntries(names.map((n) => [def.fields[n]?.column ?? n, { changed: true }])) };
+  return {
+    fields: Object.fromEntries(names.map((n) => [def.fields[n]?.column ?? n, { changed: true }])),
+  };
 }
 
 function addEvent(
@@ -392,12 +424,20 @@ function addEvent(
   });
 }
 
-function versionConflict<T>(store: DemoStore, def: RecordTypeDef, row: Row, expected: number): Result<T> {
+function versionConflict<T>(
+  store: DemoStore,
+  def: RecordTypeDef,
+  row: Row,
+  expected: number,
+): Result<T> {
   const byColumn = new Map(Object.entries(def.fields).map(([n, f]) => [f.column, n]));
   const changed = new Set<string>();
   for (const e of store.events) {
     if (e.type !== def.id || e.targetId !== row.id || (e.rowVersion ?? 0) <= expected) continue;
-    const cols = e.diff && typeof e.diff === 'object' ? Object.keys((e.diff as { fields?: object }).fields ?? {}) : [];
+    const cols =
+      e.diff && typeof e.diff === 'object'
+        ? Object.keys((e.diff as { fields?: object }).fields ?? {})
+        : [];
     for (const c of cols) {
       const n = byColumn.get(c) ?? (c === 'archived_at' ? 'archivedAt' : undefined);
       if (n && (n === 'archivedAt' || isListable(def, n))) changed.add(n);
@@ -418,10 +458,17 @@ const BLOCKERS: Record<string, (store: DemoStore, row: Row) => boolean> = {
 };
 
 function blockers(store: DemoStore, def: RecordTypeDef, row: Row): string[] {
-  return (def.archiveBlockedBy ?? []).filter((b) => BLOCKERS[b]?.(store, row)).map((b) => `blockedBy.${b}`);
+  return (def.archiveBlockedBy ?? [])
+    .filter((b) => BLOCKERS[b]?.(store, row))
+    .map((b) => `blockedBy.${b}`);
 }
 
-function create(store: DemoStore, def: RecordTypeDef, ctx: RunContext, fields: Record<string, unknown>): Result<{ recordType: string; record: RecordView }> {
+function create(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  fields: Record<string, unknown>,
+): Result<{ recordType: string; record: RecordView }> {
   const parsed = createSchema(def).safeParse(fields);
   if (!parsed.success) return fail(400, 'bad_request', issuePaths(parsed.error));
   const bad = ruleProblems(def, parsed.data as Record<string, unknown>);
@@ -431,14 +478,22 @@ function create(store: DemoStore, def: RecordTypeDef, ctx: RunContext, fields: R
   const values: Record<string, unknown> = {};
   for (const [name, f] of Object.entries(def.fields)) values[name] = f.nullable ? null : undefined;
   Object.assign(values, parsed.data);
-  if (def.lifecycle && values[def.lifecycle.field] === undefined) values[def.lifecycle.field] = def.lifecycle.initial;
+  if (def.lifecycle && values[def.lifecycle.field] === undefined)
+    values[def.lifecycle.field] = def.lifecycle.initial;
   if ('state' in def.fields) values.state = 'FL';
   if ('isTestRecord' in def.fields) values.isTestRecord = true;
   if ('createdAt' in def.fields) values.createdAt = ctx.now;
   if ('updatedAt' in def.fields) values.updatedAt = ctx.now;
   const row: Row = { id, v: 1, archivedAt: null, values, secrets: {} };
   (store.rows[def.id] ??= []).push(row);
-  addEvent(store, def, row, { ...ctx, ids: [ctx.ids[1] ?? `${id}-e`] }, 'create', Object.keys(parsed.data as object));
+  addEvent(
+    store,
+    def,
+    row,
+    { ...ctx, ids: [ctx.ids[1] ?? `${id}-e`] },
+    'create',
+    Object.keys(parsed.data as object),
+  );
   return { ok: true, data: { recordType: def.id, record: viewOf(def, row, 'record') } };
 }
 
@@ -449,7 +504,9 @@ function applyUpdate(
   row: Row,
   patch: Record<string, unknown>,
 ): string[] {
-  const changed = Object.keys(patch).filter((k) => JSON.stringify(row.values[k] ?? null) !== JSON.stringify(patch[k] ?? null));
+  const changed = Object.keys(patch).filter(
+    (k) => JSON.stringify(row.values[k] ?? null) !== JSON.stringify(patch[k] ?? null),
+  );
   if (changed.length === 0) return [];
   for (const k of changed) row.values[k] = patch[k];
   row.v++;
@@ -458,7 +515,14 @@ function applyUpdate(
   return changed;
 }
 
-function update(store: DemoStore, def: RecordTypeDef, ctx: RunContext, id: string, version: number, fields: Record<string, unknown>): Result<{ recordType: string; record: RecordView }> {
+function update(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  id: string,
+  version: number,
+  fields: Record<string, unknown>,
+): Result<{ recordType: string; record: RecordView }> {
   const row = find(store, def, id);
   if (!row) return fail(404, 'not_found');
   if (row.v !== version) return versionConflict(store, def, row, version);
@@ -471,7 +535,13 @@ function update(store: DemoStore, def: RecordTypeDef, ctx: RunContext, id: strin
   return { ok: true, data: { recordType: def.id, record: viewOf(def, row, 'record') } };
 }
 
-function archiveRow(store: DemoStore, def: RecordTypeDef, ctx: RunContext, row: Row, reason: string): 'archived' | 'archived_already' | 'blocked' {
+function archiveRow(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  row: Row,
+  reason: string,
+): 'archived' | 'archived_already' | 'blocked' {
   if (row.archivedAt) return 'archived_already';
   if (blockers(store, def, row).length) return 'blocked';
   row.archivedAt = ctx.now;
@@ -484,7 +554,14 @@ function archiveRow(store: DemoStore, def: RecordTypeDef, ctx: RunContext, row: 
   return 'archived';
 }
 
-function archive(store: DemoStore, def: RecordTypeDef, ctx: RunContext, id: string, version: number, body: unknown): Result<{ recordType: string; record: RecordView }> {
+function archive(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  id: string,
+  version: number,
+  body: unknown,
+): Result<{ recordType: string; record: RecordView }> {
   const parsed = ArchiveRequest.safeParse(body);
   if (!parsed.success) return fail(400, 'bad_request', issuePaths(parsed.error));
   const row = find(store, def, id);
@@ -497,7 +574,14 @@ function archive(store: DemoStore, def: RecordTypeDef, ctx: RunContext, id: stri
   return { ok: true, data: { recordType: def.id, record: viewOf(def, row, 'record') } };
 }
 
-function restore(store: DemoStore, def: RecordTypeDef, ctx: RunContext, id: string, version: number, body: unknown): Result<{ recordType: string; record: RecordView }> {
+function restore(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  id: string,
+  version: number,
+  body: unknown,
+): Result<{ recordType: string; record: RecordView }> {
   const parsed = RestoreRequest.safeParse(body ?? {});
   if (!parsed.success) return fail(400, 'bad_request', issuePaths(parsed.error));
   const row = find(store, def, id);
@@ -517,16 +601,28 @@ function restore(store: DemoStore, def: RecordTypeDef, ctx: RunContext, id: stri
   return { ok: true, data: { recordType: def.id, record: viewOf(def, row, 'record') } };
 }
 
-function bulk(store: DemoStore, def: RecordTypeDef, ctx: RunContext, body: unknown): Result<BulkResponse> {
+function bulk(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  body: unknown,
+): Result<BulkResponse> {
   const parsed = BulkRequest.safeParse(body);
   if (!parsed.success) return fail(400, 'bad_request', issuePaths(parsed.error));
   const req = parsed.data;
-  if (new Set(req.items.map((i) => i.id)).size !== req.items.length) return fail(400, 'bad_request', ['items']);
-  if (req.action === 'archive' && !can(ctx.viewer, def.access.archive, ctx.now)) return fail(403, 'forbidden');
+  if (new Set(req.items.map((i) => i.id)).size !== req.items.length)
+    return fail(400, 'bad_request', ['items']);
+  if (req.action === 'archive' && !can(ctx.viewer, def.access.archive, ctx.now))
+    return fail(403, 'forbidden');
   let fields: Record<string, unknown> = {};
   if (req.action === 'update') {
     const p = bulkUpdateSchema(def).safeParse(req.fields);
-    if (!p.success) return fail(400, 'bad_request', issuePaths(p.error).map((x) => `fields.${x}`));
+    if (!p.success)
+      return fail(
+        400,
+        'bad_request',
+        issuePaths(p.error).map((x) => `fields.${x}`),
+      );
     fields = p.data as Record<string, unknown>;
   }
   const bulkId = ctx.ids[0] ?? 'bulk';
@@ -534,7 +630,8 @@ function bulk(store: DemoStore, def: RecordTypeDef, ctx: RunContext, body: unkno
     const row = find(store, def, item.id);
     const rowCtx = { ...ctx, ids: [ctx.ids[i + 1] ?? `${bulkId}-${i}`] };
     if (!row) return { id: item.id, status: 'not_found' as const };
-    if (row.v !== item.rowVersion) return { id: item.id, status: 'version_conflict' as const, rowVersion: row.v };
+    if (row.v !== item.rowVersion)
+      return { id: item.id, status: 'version_conflict' as const, rowVersion: row.v };
     if (req.action === 'archive') {
       const r = archiveRow(store, def, rowCtx, row, req.reason);
       return { id: item.id, status: r, rowVersion: row.v };
@@ -548,7 +645,12 @@ function bulk(store: DemoStore, def: RecordTypeDef, ctx: RunContext, body: unkno
   return { ok: true, data: { bulkId, results } };
 }
 
-function history(store: DemoStore, def: RecordTypeDef, id: string, cursor: string | null): Result<HistoryResponse> {
+function history(
+  store: DemoStore,
+  def: RecordTypeDef,
+  id: string,
+  cursor: string | null,
+): Result<HistoryResponse> {
   if (!find(store, def, id)) return fail(404, 'not_found');
   const all = store.events
     .filter((e) => e.type === def.id && e.targetId === id && e.outcome === 'success')
@@ -561,13 +663,31 @@ function history(store: DemoStore, def: RecordTypeDef, id: string, cursor: strin
     data: {
       recordType: def.id,
       id,
-      items: page.map(({ type: _t, targetId: _i, rowVersion: _v, ...e }) => e),
+      items: page.map((e) => ({
+        id: e.id,
+        occurredAt: e.occurredAt,
+        category: e.category,
+        action: e.action,
+        outcome: e.outcome,
+        actorType: e.actorType,
+        actorLabel: e.actorLabel,
+        diff: e.diff,
+        metadata: e.metadata,
+        reason: e.reason,
+      })),
       nextCursor: offset + HISTORY_PAGE < all.length ? `o${offset + HISTORY_PAGE}` : null,
     },
   };
 }
 
-function reveal(store: DemoStore, def: RecordTypeDef, ctx: RunContext, id: string, field: string, body: unknown): Result<RevealResponse> {
+function reveal(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  id: string,
+  field: string,
+  body: unknown,
+): Result<RevealResponse> {
   const f = def.fields[field];
   if (!f?.reveal || !def.actions.includes('reveal')) return fail(404, 'not_found');
   const parsed = RevealRequest.safeParse(body);
@@ -609,7 +729,8 @@ function visibleViews(store: DemoStore, def: RecordTypeDef, viewer: DemoViewer):
       v.recordType === def.id &&
       !v.archived &&
       (v.owner === viewer.id ||
-        (v.visibility === 'roles' && v.sharedRoles.some((r) => viewer.roles.includes(r as RoleId)))),
+        (v.visibility === 'roles' &&
+          v.sharedRoles.some((r) => viewer.roles.includes(r as RoleId)))),
   );
 }
 
@@ -624,14 +745,22 @@ function toSavedView(v: ViewRow, viewer: DemoViewer): SavedView {
     // Someone else's view: fields and operators only (no values, no search text).
     query: owned
       ? { filters: v.query.filters, sort: v.query.sort, q: v.query.q ?? null }
-      : { filters: v.query.filters.map((f) => ({ field: f.field, op: f.op })), sort: v.query.sort, q: null },
+      : {
+          filters: v.query.filters.map((f) => ({ field: f.field, op: f.op })),
+          sort: v.query.sort,
+          q: null,
+        },
     columns: v.columns,
     rowVersion: v.v,
     owned,
   };
 }
 
-function checkView(def: RecordTypeDef, query: ViewRow['query'] | undefined, columns: readonly string[] | undefined): string[] {
+function checkView(
+  def: RecordTypeDef,
+  query: ViewRow['query'] | undefined,
+  columns: readonly string[] | undefined,
+): string[] {
   const bad: string[] = [];
   if (query) {
     const stored = checkStoredQuery(def, query);
@@ -641,13 +770,20 @@ function checkView(def: RecordTypeDef, query: ViewRow['query'] | undefined, colu
   return bad;
 }
 
-function createView(store: DemoStore, def: RecordTypeDef, ctx: RunContext, body: unknown): Result<SavedView> {
+function createView(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  body: unknown,
+): Result<SavedView> {
   const parsed = SavedViewCreate.safeParse(body);
   if (!parsed.success) return fail(400, 'bad_request', issuePaths(parsed.error));
   const b = parsed.data;
   const roles = b.sharedRoles ?? [];
-  if ((b.visibility === 'roles') !== roles.length > 0) return fail(400, 'bad_request', ['sharedRoles']);
-  if (b.visibility === 'roles' && !can(ctx.viewer, def.access.update, ctx.now)) return fail(403, 'forbidden');
+  if ((b.visibility === 'roles') !== roles.length > 0)
+    return fail(400, 'bad_request', ['sharedRoles']);
+  if (b.visibility === 'roles' && !can(ctx.viewer, def.access.update, ctx.now))
+    return fail(403, 'forbidden');
   const bad = checkView(def, b.query as ViewRow['query'], b.columns);
   if (bad.length) return fail(400, 'bad_request', bad);
   const view: ViewRow = {
@@ -666,7 +802,14 @@ function createView(store: DemoStore, def: RecordTypeDef, ctx: RunContext, body:
   return { ok: true, data: toSavedView(view, ctx.viewer) };
 }
 
-function updateView(store: DemoStore, def: RecordTypeDef, ctx: RunContext, viewId: string, version: number, body: unknown): Result<SavedView> {
+function updateView(
+  store: DemoStore,
+  def: RecordTypeDef,
+  ctx: RunContext,
+  viewId: string,
+  version: number,
+  body: unknown,
+): Result<SavedView> {
   const parsed = SavedViewUpdate.safeParse(body);
   if (!parsed.success) return fail(400, 'bad_request', issuePaths(parsed.error));
   const view = visibleViews(store, def, ctx.viewer).find((v) => v.id === viewId);
@@ -676,8 +819,10 @@ function updateView(store: DemoStore, def: RecordTypeDef, ctx: RunContext, viewI
   const b = parsed.data;
   const visibility = b.visibility ?? view.visibility;
   const roles = b.sharedRoles ?? (b.visibility === 'private' ? [] : view.sharedRoles);
-  if ((visibility === 'roles') !== roles.length > 0) return fail(400, 'bad_request', ['sharedRoles']);
-  if (visibility === 'roles' && !can(ctx.viewer, def.access.update, ctx.now)) return fail(403, 'forbidden');
+  if ((visibility === 'roles') !== roles.length > 0)
+    return fail(400, 'bad_request', ['sharedRoles']);
+  if (visibility === 'roles' && !can(ctx.viewer, def.access.update, ctx.now))
+    return fail(403, 'forbidden');
   const bad = checkView(def, b.query as ViewRow['query'] | undefined, b.columns);
   if (bad.length) return fail(400, 'bad_request', bad);
   Object.assign(view, {
@@ -764,7 +909,9 @@ export function runOp(store: DemoStore, op: DemoOp, ctx: RunContext): Result<unk
     case 'views.list':
       return {
         ok: true,
-        data: { items: visibleViews(store, def, ctx.viewer).map((v) => toSavedView(v, ctx.viewer)) } satisfies SavedViewListResponse,
+        data: {
+          items: visibleViews(store, def, ctx.viewer).map((v) => toSavedView(v, ctx.viewer)),
+        } satisfies SavedViewListResponse,
       };
     case 'views.create':
       return createView(store, def, ctx, op.body);

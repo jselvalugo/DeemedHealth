@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { t } from '@deemed/i18n';
-import { launcherModules } from '@deemed/ui';
+import { launcherModules, withRecordEntries } from '@deemed/ui';
 import { modulesFromNavigation } from '../../lib/navigation';
 import { getLocale, getNavigation, getSession } from '../../lib/session';
 import { ShellClient } from './shell-client';
@@ -18,14 +18,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = session.user;
   const locale = await getLocale();
   const nav = await getNavigation();
-  const modules = nav ? modulesFromNavigation(nav) : launcherModules(user.permissions);
+  // Record lists without their own page and "New …" join the launcher (ADR-0014 section 3).
+  const modules = withRecordEntries(
+    nav ? modulesFromNavigation(nav) : launcherModules(user.permissions),
+    user.permissions,
+  );
   const primaryRole = user.roles[0];
 
   return (
     <ShellClient
       locale={locale}
       modules={modules}
-      homeHref={modules[0]?.pages[0]?.route ?? '/no-permission'}
+      homeHref={modules[0]?.pages.find((p) => !p.launcherOnly)?.route ?? '/no-permission'}
       tenant={{ name: user.tenant.name }}
       user={{
         name: user.name,

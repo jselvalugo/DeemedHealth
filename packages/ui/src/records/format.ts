@@ -35,7 +35,12 @@ export function typePlural(locale: Locale, def: RecordTypeDef): string {
 }
 
 /** Label of an enum value: `recordValue.<type>.<field>.<value>`, role keys use role names. */
-export function enumLabel(locale: Locale, def: RecordTypeDef, field: string, value: string): string {
+export function enumLabel(
+  locale: Locale,
+  def: RecordTypeDef,
+  field: string,
+  value: string,
+): string {
   if (field === 'roleKey') {
     const role = `role.${value}.name`;
     if (isMessageKey(role)) return t(locale, role);
@@ -183,7 +188,8 @@ export function formatValue(
   if (typeof value === 'object' && !Array.isArray(value)) return t(locale, 'records.value.masked');
   const kind = def.fields[field]?.kind;
   if (Array.isArray(value)) return value.join(', ');
-  if (typeof value === 'boolean') return t(locale, value ? 'records.value.yes' : 'records.value.no');
+  if (typeof value === 'boolean')
+    return t(locale, value ? 'records.value.yes' : 'records.value.no');
   if (typeof value === 'number') return new Intl.NumberFormat(LOCALE_TAGS[locale]).format(value);
   switch (kind) {
     case 'enum':

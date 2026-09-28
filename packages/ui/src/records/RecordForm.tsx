@@ -169,7 +169,11 @@ export function RecordForm({ def, mode, record, onSaved, onCancel }: RecordFormP
               <p className="mt-1">
                 {t(locale, 'records.conflict.fields', {
                   fields: conflict.fields
-                    .map((f) => (f === 'archivedAt' ? t(locale, 'records.value.archived') : fieldLabel(locale, def, f)))
+                    .map((f) =>
+                      f === 'archivedAt'
+                        ? t(locale, 'records.value.archived')
+                        : fieldLabel(locale, def, f),
+                    )
                     .join(', '),
                 })}
               </p>

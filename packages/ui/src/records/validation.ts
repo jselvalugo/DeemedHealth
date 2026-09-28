@@ -92,7 +92,11 @@ type Issue = {
   validation?: unknown;
 };
 
-type Problem = { field: string; key: 'required' | 'choose' | 'tooLong' | 'email' | 'date' | 'id' | 'invalid' | 'rule'; max?: number };
+type Problem = {
+  field: string;
+  key: 'required' | 'choose' | 'tooLong' | 'email' | 'date' | 'id' | 'invalid' | 'rule';
+  max?: number;
+};
 
 function problemOf(def: RecordTypeDef, issue: Issue, value: unknown): Problem | null {
   const field = String(issue.path[0] ?? '');

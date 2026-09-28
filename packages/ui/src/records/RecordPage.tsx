@@ -57,8 +57,6 @@ type Load =
   | { state: 'ok'; data: RecordGetResponse }
   | { state: 'error'; error: RecordsError };
 
-const PLACEHOLDER_TABS: readonly DetailTab[] = ['evidence', 'tasks', 'comments', 'approvals'];
-
 export function RecordPage({ def, id, moduleName, listHref }: RecordPageProps) {
   const { client, locale, Link, timeZone } = useRecords();
   const [load, setLoad] = useState<Load>({ state: 'loading' });
@@ -68,15 +66,20 @@ export function RecordPage({ def, id, moduleName, listHref }: RecordPageProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const fetchRecord = useCallback(async () => {
-    const res = await client.get(def.id, id);
-    setLoad(res.ok ? { state: 'ok', data: res.data } : { state: 'error', error: res });
-  }, [client, def.id, id]);
+  // Bumped to fetch again (after a change, or Try again).
+  const [fetches, setFetches] = useState(0);
+  const fetchRecord = () => setFetches((n) => n + 1);
 
+  // The page is keyed by record id (a new id mounts a new page), so no reset is needed.
   useEffect(() => {
-    setLoad({ state: 'loading' });
-    void fetchRecord();
-  }, [fetchRecord]);
+    let live = true;
+    void client.get(def.id, id).then((res) => {
+      if (live) setLoad(res.ok ? { state: 'ok', data: res.data } : { state: 'error', error: res });
+    });
+    return () => {
+      live = false;
+    };
+  }, [client, def.id, id, fetches]);
 
   const plural = typePlural(locale, def);
   const back = (
@@ -304,7 +307,7 @@ export function RecordPage({ def, id, moduleName, listHref }: RecordPageProps) {
             )
           ) : tab === 'history' ? (
             allowedActions.includes('history') ? (
-              <HistoryTimeline def={def} id={record.id} version={record.rowVersion} />
+              <HistoryTimeline key={record.rowVersion ?? 0} def={def} id={record.id} />
             ) : (
               <p className="text-gray-700">{t(locale, 'records.tabs.historyDenied')}</p>
             )
@@ -446,13 +449,23 @@ function FieldDisplay({
 }) {
   const { locale, timeZone } = useRecords();
   if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-    return <MaskedField def={def} record={record} field={field} hasValue={value.hasValue} canReveal={canReveal} />;
+    return (
+      <MaskedField
+        def={def}
+        record={record}
+        field={field}
+        hasValue={value.hasValue}
+        canReveal={canReveal}
+      />
+    );
   }
   const target = refTarget(def, field, record.fields);
   if (target && typeof value === 'string' && value) return <RefValue type={target} id={value} />;
   const status = statusField(def);
   if (field === status && typeof value === 'string') {
-    return <Badge status={statusTone(value)}>{formatValue(locale, def, field, value, timeZone)}</Badge>;
+    return (
+      <Badge status={statusTone(value)}>{formatValue(locale, def, field, value, timeZone)}</Badge>
+    );
   }
   const mono = def.fields[field]?.kind === 'uuid' || field === 'npi' || field === 'requirementId';
   return (
@@ -575,7 +588,10 @@ function RevealDialog({
   async function submit(e: FormEvent) {
     e.preventDefault();
     const errs: typeof errors = {};
-    if (!reason) errs.reason = t(locale, 'records.validation.choose', { field: t(locale, 'records.reveal.reason') });
+    if (!reason)
+      errs.reason = t(locale, 'records.validation.choose', {
+        field: t(locale, 'records.reveal.reason'),
+      });
     if (reason === 'other' && !note.trim()) errs.note = t(locale, 'records.reveal.noteRequired');
     setErrors(errs);
     setFailure(null);
@@ -721,7 +737,12 @@ function ArchiveDialog({
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>
             {t(locale, 'records.cancel')}
           </Button>
-          <Button type="submit" variant="danger" loading={busy} loadingLabel={t(locale, 'records.form.saving')}>
+          <Button
+            type="submit"
+            variant="danger"
+            loading={busy}
+            loadingLabel={t(locale, 'records.form.saving')}
+          >
             {t(locale, 'records.archive.submit')}
           </Button>
         </div>
@@ -779,7 +800,11 @@ function RestoreDialog({
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>
             {t(locale, 'records.cancel')}
           </Button>
-          <Button onClick={() => void confirm()} loading={busy} loadingLabel={t(locale, 'records.form.saving')}>
+          <Button
+            onClick={() => void confirm()}
+            loading={busy}
+            loadingLabel={t(locale, 'records.form.saving')}
+          >
             {t(locale, 'records.restore.submit')}
           </Button>
         </>
@@ -822,7 +847,15 @@ export function mutationFailure(locale: Locale, res: RecordsError): string {
 // History timeline
 // ---------------------------------------------------------------------------
 
-const HISTORY_VERBS = ['create', 'update', 'archive', 'restore', 'transition', 'export', 'import'] as const;
+const HISTORY_VERBS = [
+  'create',
+  'update',
+  'archive',
+  'restore',
+  'transition',
+  'export',
+  'import',
+] as const;
 
 function actionLabel(locale: Locale, action: string): string {
   const verb = action.slice(action.lastIndexOf('.') + 1);
@@ -834,7 +867,9 @@ function actionLabel(locale: Locale, action: string): string {
 /** Field names from a redacted diff (`diff.fields` keyed by column); values are never shown. */
 function changedFields(locale: Locale, def: RecordTypeDef, diff: unknown): string[] {
   const fields =
-    diff && typeof diff === 'object' && 'fields' in diff ? (diff as { fields: unknown }).fields : null;
+    diff && typeof diff === 'object' && 'fields' in diff
+      ? (diff as { fields: unknown }).fields
+      : null;
   if (!fields || typeof fields !== 'object') return [];
   const byColumn = new Map(Object.entries(def.fields).map(([n, f]) => [f.column, n]));
   return Object.keys(fields)
@@ -846,16 +881,8 @@ function changedFields(locale: Locale, def: RecordTypeDef, diff: unknown): strin
     .filter((x): x is string => x !== null);
 }
 
-export function HistoryTimeline({
-  def,
-  id,
-  version,
-}: {
-  def: RecordTypeDef;
-  id: string;
-  /** Reloads when the record changes. */
-  version: number | null;
-}) {
+/** The record's history. The caller keys it by row version, so a change reloads it. */
+export function HistoryTimeline({ def, id }: { def: RecordTypeDef; id: string }) {
   const { client, locale, timeZone } = useRecords();
   const [items, setItems] = useState<HistoryEvent[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -879,9 +906,19 @@ export function HistoryTimeline({
   );
 
   useEffect(() => {
-    setItems(null);
-    void loadPage(null);
-  }, [loadPage, version]);
+    let live = true;
+    void client.history(def.id, id, null).then((res) => {
+      if (!live) return;
+      if (!res.ok) setError(true);
+      else {
+        setItems(res.data.items);
+        setCursor(res.data.nextCursor);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [client, def.id, id]);
 
   if (error && !items) {
     return (
@@ -899,7 +936,8 @@ export function HistoryTimeline({
       </p>
     );
   }
-  if (items.length === 0) return <p className="text-gray-700">{t(locale, 'records.history.empty')}</p>;
+  if (items.length === 0)
+    return <p className="text-gray-700">{t(locale, 'records.history.empty')}</p>;
 
   return (
     <div className="flex flex-col gap-4">

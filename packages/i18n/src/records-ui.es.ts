@@ -111,8 +111,7 @@ export const recordsUiEs: Record<keyof typeof recordsUiEn, string> = {
   'records.empty.title': 'Todavía no hay {records}',
   'records.empty.body': 'Cuando se agreguen {records}, aparecerán aquí.',
   'records.emptyFiltered.title': 'No hay {records} que coincidan',
-  'records.emptyFiltered.body':
-    'Pruebe con otros filtros o quítelos para ver todos los registros.',
+  'records.emptyFiltered.body': 'Pruebe con otros filtros o quítelos para ver todos los registros.',
   'records.error.title': 'No pudimos cargar {records}',
   'records.error.body':
     'Inténtelo de nuevo. Si sigue pasando, comuníquese con soporte y dígales la hora en que ocurrió.',

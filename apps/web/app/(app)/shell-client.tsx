@@ -9,7 +9,9 @@ import { apiPost } from '../../lib/api-browser';
 import type { AuthMode } from '../../lib/auth-mode';
 import { signOut } from '../../lib/auth-stub';
 import { setLocaleCookie } from '../../lib/locale-client';
+import { demoStepUp } from '../../lib/records-demo/client';
 import { ApiProvider } from './reauth';
+import { RecordsBridge } from './records-view';
 
 type Props = Pick<AppShellProps, 'locale' | 'modules' | 'user' | 'tenant' | 'homeHref'> & {
   children: ReactNode;
@@ -31,7 +33,11 @@ export function ShellClient({ children, authMode, csrfToken, ...props }: Props) 
       : startTransition(() => signOut());
 
   return (
-    <ApiProvider locale={props.locale as Locale} csrfToken={csrfToken}>
+    <ApiProvider
+      locale={props.locale as Locale}
+      csrfToken={csrfToken}
+      stepUp={authMode === 'stub' ? demoStepUp : undefined}
+    >
       <AppShell
         {...props}
         pathname={pathname}
@@ -44,7 +50,9 @@ export function ShellClient({ children, authMode, csrfToken, ...props }: Props) 
         }}
         onSignOut={onSignOut}
       >
-        {children}
+        <RecordsBridge mode={authMode} locale={props.locale as Locale}>
+          {children}
+        </RecordsBridge>
       </AppShell>
     </ApiProvider>
   );

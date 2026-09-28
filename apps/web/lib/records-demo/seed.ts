@@ -24,10 +24,46 @@ export type SeedRow = {
 const CREATED = '2026-01-05T14:00:00.000Z';
 
 const SITES = [
-  ['XYZ-S1 Main', 'TEST-5B-0001', 'service_delivery', '100 Example Health Way', 'Orlando', '32801', 'America/New_York', '2020-01-01'],
-  ['XYZ-S2 East', 'TEST-5B-0002', 'service_delivery', '200 Sample Clinic Road', 'Jacksonville', '32202', 'America/New_York', '2021-07-01'],
-  ['XYZ-S3 Panhandle', 'TEST-5B-0003', 'service_delivery', '300 Placeholder Avenue', 'Pensacola', '32501', 'America/Chicago', '2023-03-01'],
-  ['XYZ-S4 Mobile Unit', 'TEST-5B-0004', 'mobile', '100 Example Health Way', 'Orlando', '32801', 'America/New_York', '2025-06-01'],
+  [
+    'XYZ-S1 Main',
+    'TEST-5B-0001',
+    'service_delivery',
+    '100 Example Health Way',
+    'Orlando',
+    '32801',
+    'America/New_York',
+    '2020-01-01',
+  ],
+  [
+    'XYZ-S2 East',
+    'TEST-5B-0002',
+    'service_delivery',
+    '200 Sample Clinic Road',
+    'Jacksonville',
+    '32202',
+    'America/New_York',
+    '2021-07-01',
+  ],
+  [
+    'XYZ-S3 Panhandle',
+    'TEST-5B-0003',
+    'service_delivery',
+    '300 Placeholder Avenue',
+    'Pensacola',
+    '32501',
+    'America/Chicago',
+    '2023-03-01',
+  ],
+  [
+    'XYZ-S4 Mobile Unit',
+    'TEST-5B-0004',
+    'mobile',
+    '100 Example Health Way',
+    'Orlando',
+    '32801',
+    'America/New_York',
+    '2025-06-01',
+  ],
 ] as const;
 
 export const SITE_IDS = SITES.map((_, i) => demoId(2, i + 1));
@@ -47,7 +83,13 @@ type Person = {
 // Synthetic NPIs: makeTestNpi(101) and makeTestNpi(102) from @deemed/test-fixtures.
 const PEOPLE: readonly Person[] = [
   { key: 'angela.morales', given: 'Angela', family: 'Morales', roles: [['org_admin']] },
-  { key: 'maria.delgado', given: 'María', family: 'Delgado', preferred: 'Mari', roles: [['compliance_officer']] },
+  {
+    key: 'maria.delgado',
+    given: 'María',
+    family: 'Delgado',
+    preferred: 'Mari',
+    roles: [['compliance_officer']],
+  },
   { key: 'james.whitfield', given: 'James', family: 'Whitfield', roles: [['executive']] },
   {
     key: 'luis.fernandez',
@@ -114,9 +156,7 @@ export function demoSeed(): DemoSeed {
   const roleAssignment: SeedRow[] = [];
   PEOPLE.forEach((p, i) => {
     const id = demoId(3, i + 1);
-    const email = p.key.endsWith('park')
-      ? `${p.key}@auditor.example`
-      : `${p.key}@xyz-chc.example`;
+    const email = p.key.endsWith('park') ? `${p.key}@auditor.example` : `${p.key}@xyz-chc.example`;
     person.push({
       id,
       values: {
@@ -171,10 +211,42 @@ export function demoSeed(): DemoSeed {
 
   const pid = (key: string) => PERSON_IDS[key] as string;
   const requirementInstance: SeedRow[] = [
-    ['CM-05-C&P-LIP-LICENSURE', 'person', pid('priya.raman'), SITE_IDS[0], pid('luis.fernandez'), 'met', '2028-02-29'],
-    ['CM-05-C&P-LIP-LICENSURE', 'person', pid('tomas.rivera'), SITE_IDS[2], pid('luis.fernandez'), 'due_soon', '2026-10-31'],
-    ['CM-20-BOARD-COMPOSITION', 'organization', DEMO_ORG_ID, null, pid('maria.delgado'), 'missing', null],
-    ['CM-09-SLIDING-FEE-DISCOUNT', 'site', SITE_IDS[2], SITE_IDS[2], pid('maria.delgado'), 'overdue', '2026-09-01'],
+    [
+      'CM-05-C&P-LIP-LICENSURE',
+      'person',
+      pid('priya.raman'),
+      SITE_IDS[0],
+      pid('luis.fernandez'),
+      'met',
+      '2028-02-29',
+    ],
+    [
+      'CM-05-C&P-LIP-LICENSURE',
+      'person',
+      pid('tomas.rivera'),
+      SITE_IDS[2],
+      pid('luis.fernandez'),
+      'due_soon',
+      '2026-10-31',
+    ],
+    [
+      'CM-20-BOARD-COMPOSITION',
+      'organization',
+      DEMO_ORG_ID,
+      null,
+      pid('maria.delgado'),
+      'missing',
+      null,
+    ],
+    [
+      'CM-09-SLIDING-FEE-DISCOUNT',
+      'site',
+      SITE_IDS[2],
+      SITE_IDS[2],
+      pid('maria.delgado'),
+      'overdue',
+      '2026-09-01',
+    ],
   ].map(([requirementId, subjectType, subjectId, siteId, owner, status, due], i) => ({
     id: demoId(6, i + 1),
     values: {

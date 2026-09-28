@@ -36,7 +36,7 @@ import {
   type TimeZone,
 } from '@deemed/dates';
 import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, Plus, Save, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { cn } from '../cn.js';
 import { Alert } from '../components/Alert.js';
 import { Badge } from '../components/Badge.js';
@@ -45,7 +45,12 @@ import { Checkbox, Drawer, Modal, Select, Textarea } from '../components/control
 import { Input } from '../components/Input.js';
 import { EmptyState } from '../components/scaffolds.js';
 import { isUuid } from '../module-registry.js';
-import { useRecords, type ArchivedMode, type ListFilterInput, type RecordsError } from './client.js';
+import {
+  useRecords,
+  type ArchivedMode,
+  type ListFilterInput,
+  type RecordsError,
+} from './client.js';
 import {
   enumLabel,
   fieldLabel,
@@ -73,10 +78,10 @@ export type RecordTableProps = {
 
 type Draft = { value: string; from: string; to: string };
 type SortKey = { field: string; dir: 'asc' | 'desc' };
-type Load =
-  | { state: 'loading'; data?: RecordListResponse }
-  | { state: 'ok'; data: RecordListResponse }
-  | { state: 'error'; error: RecordsError };
+/** The latest answer, tagged with the query it answers (loading = tag differs). */
+type Answer =
+  | { key: string; ok: true; data: RecordListResponse }
+  | { key: string; ok: false; error: RecordsError };
 
 const EMPTY_DRAFT: Draft = { value: '', from: '', to: '' };
 
@@ -180,7 +185,9 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
     () => def.list.defaultSort.map((s) => ({ field: s.field, dir: s.dir })),
     [def],
   );
-  const searchable = Object.entries(def.fields).filter(([n, f]) => f.searchable && isListable(def, n));
+  const searchable = Object.entries(def.fields).filter(
+    ([n, f]) => f.searchable && isListable(def, n),
+  );
   const filterable = filterableFields(def);
 
   const [columns, setColumns] = useState<string[]>(defaultColumns);
@@ -192,14 +199,21 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
   const [invalid, setInvalid] = useState<string[]>([]);
   const [archived, setArchived] = useState<ArchivedMode>('exclude');
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
-  const [load, setLoad] = useState<Load>({ state: 'loading' });
+  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [lastData, setLastData] = useState<RecordListResponse | null>(null);
   const [reload, setReload] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [views, setViews] = useState<SavedView[]>([]);
   const [viewId, setViewId] = useState('');
-  const [dialog, setDialog] = useState<null | 'columns' | 'saveView' | 'bulkArchive' | `bulk:${string}`>(null);
+  const [dialog, setDialog] = useState<
+    null | 'columns' | 'saveView' | 'bulkArchive' | `bulk:${string}`
+  >(null);
   const [createOpen, setCreateOpen] = useState(initialCreate && actions.create);
-  const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; title: string; body?: string } | null>(null);
+  const [notice, setNotice] = useState<{
+    tone: 'ok' | 'warn';
+    title: string;
+    body?: string;
+  } | null>(null);
   const [announce, setAnnounce] = useState('');
 
   const cursor = cursors[cursors.length - 1] ?? null;
@@ -207,33 +221,38 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
   const sharedViewId = views.find((v) => v.id === viewId && !v.owned)?.id ?? null;
   const pageIndex = cursors.length - 1;
 
+  const queryKey = JSON.stringify([filters, sort, q, cursor, archived, sharedViewId, reload]);
   useEffect(() => {
     let live = true;
-    setLoad((prev) => ({ state: 'loading', ...(prev.state === 'ok' ? { data: prev.data } : {}) }));
     void client
       .list(def.id, { filters, sort, q, limit: PAGE_SIZE, cursor, archived, view: sharedViewId })
       .then((res) => {
         if (!live) return;
         if (res.ok) {
-          setLoad({ state: 'ok', data: res.data });
+          setAnswer({ key: queryKey, ok: true, data: res.data });
+          setLastData(res.data);
           setAnnounce(tCount(locale, 'records.list.announce', res.data.total));
-        } else setLoad({ state: 'error', error: res });
+        } else setAnswer({ key: queryKey, ok: false, error: res });
         setSelected(new Set());
       });
     return () => {
       live = false;
     };
-  }, [client, def.id, filters, sort, q, cursor, archived, reload, locale, sharedViewId]);
+  }, [client, def.id, filters, sort, q, cursor, archived, locale, sharedViewId, queryKey]);
 
-  const loadViews = useCallback(async () => {
-    if (!def.actions.includes('views')) return;
-    const res = await client.listViews(def.id);
-    if (res.ok) setViews(res.data.items);
-  }, [client, def]);
-
+  const [viewsVersion, setViewsVersion] = useState(0);
+  const loadViews = () => setViewsVersion((n) => n + 1);
   useEffect(() => {
-    void loadViews();
-  }, [loadViews]);
+    let live = true;
+    if (def.actions.includes('views')) {
+      void client.listViews(def.id).then((res) => {
+        if (live && res.ok) setViews(res.data.items);
+      });
+    }
+    return () => {
+      live = false;
+    };
+  }, [client, def, viewsVersion]);
 
   const resetPaging = () => setCursors([null]);
 
@@ -292,7 +311,9 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
     resetPaging();
   }
 
-  const data = load.state === 'error' ? undefined : load.data;
+  const loading = answer?.key !== queryKey;
+  const failed = !loading && answer && !answer.ok ? answer.error : null;
+  const data = failed ? undefined : (lastData ?? undefined);
   const items = data?.items ?? [];
   const selectable = actions.update && def.actions.includes('bulk');
   const bulkable = bulkFields(def).filter((f) => isListable(def, f));
@@ -305,13 +326,17 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
   const selectedItems = items.filter((r) => selected.has(r.id));
 
   function bulkDone(res: BulkResponse, kind: 'update' | 'archive') {
-    const done = res.results.filter((r) => r.status === (kind === 'update' ? 'updated' : 'archived'));
+    const done = res.results.filter(
+      (r) => r.status === (kind === 'update' ? 'updated' : 'archived'),
+    );
     const skipped = res.results.filter((r) => !done.includes(r));
     const reasons = [...new Set(skipped.map((r) => t(locale, `records.bulk.status.${r.status}`)))];
     setNotice({
       tone: skipped.length > 0 ? 'warn' : 'ok',
       title: t(locale, 'records.bulk.result', { done: done.length, skipped: skipped.length }),
-      ...(reasons.length > 0 ? { body: t(locale, 'records.bulk.skipped', { reasons: reasons.join(', ') }) } : {}),
+      ...(reasons.length > 0
+        ? { body: t(locale, 'records.bulk.skipped', { reasons: reasons.join(', ') }) }
+        : {}),
     });
     setDialog(null);
     setReload((n) => n + 1);
@@ -319,7 +344,10 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
 
   const newLabelKey = `recordType.${def.id}.new` as 'recordType.site.new';
   const newButton = canCreate ? (
-    <Button icon={<Plus aria-hidden="true" size={16} strokeWidth={1.75} />} onClick={() => setCreateOpen(true)}>
+    <Button
+      icon={<Plus aria-hidden="true" size={16} strokeWidth={1.75} />}
+      onClick={() => setCreateOpen(true)}
+    >
       {t(locale, newLabelKey)}
     </Button>
   ) : null;
@@ -344,7 +372,9 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
               <option value="">{t(locale, 'records.views.default')}</option>
               {views.map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.visibility === 'roles' ? t(locale, 'records.views.sharedTag', { name: v.name }) : v.name}
+                  {v.visibility === 'roles'
+                    ? t(locale, 'records.views.sharedTag', { name: v.name })
+                    : v.name}
                 </option>
               ))}
             </Select>
@@ -481,8 +511,8 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
       )}
 
       {/* States */}
-      {load.state === 'error' ? (
-        load.error.code === 'forbidden' ? (
+      {failed ? (
+        failed.code === 'forbidden' ? (
           <EmptyState
             icon="lock"
             title={t(locale, 'records.noPermission.title', { records: plural })}
@@ -529,14 +559,18 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
         )
       ) : (
         <>
+          {/* Keyboard users can scroll a wide table (axe: scrollable-region-focusable). */}
           <div
             role="region"
             aria-label={t(locale, 'records.list.scrollRegion', { records: plural })}
-            // Keyboard users can scroll a wide table (axe: scrollable-region-focusable).
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
             tabIndex={0}
             className="focus-ring max-h-[70vh] overflow-auto rounded-card border border-gray-200"
           >
-            <table aria-busy={load.state === 'loading' || undefined} className="w-full border-collapse text-left text-sm">
+            <table
+              aria-busy={loading || undefined}
+              className="w-full border-collapse text-left text-sm"
+            >
               <caption className="sr-only">
                 {`${plural}. ${t(locale, 'records.list.range', rangeVars(pageIndex, items.length, data.total))}`}
               </caption>
@@ -550,20 +584,29 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
                         labelHidden
                         checked={items.length > 0 && selected.size === items.length}
                         indeterminate={selected.size > 0 && selected.size < items.length}
-                        onChange={(c) => setSelected(c ? new Set(items.map((r) => r.id)) : new Set())}
+                        onChange={(c) =>
+                          setSelected(c ? new Set(items.map((r) => r.id)) : new Set())
+                        }
                       />
                     </th>
                   )}
                   {columns.map((col) => {
                     const sortable = def.fields[col]?.sortable === true;
                     const active = sort[0]?.field === col ? sort[0].dir : null;
-                    const Glyph = active === 'asc' ? ArrowUp : active === 'desc' ? ArrowDown : ArrowUpDown;
+                    const Glyph =
+                      active === 'asc' ? ArrowUp : active === 'desc' ? ArrowDown : ArrowUpDown;
                     return (
                       <th
                         key={col}
                         scope="col"
                         aria-sort={
-                          sortable ? (active === 'asc' ? 'ascending' : active === 'desc' ? 'descending' : 'none') : undefined
+                          sortable
+                            ? active === 'asc'
+                              ? 'ascending'
+                              : active === 'desc'
+                                ? 'descending'
+                                : 'none'
+                            : undefined
                         }
                         className="sticky top-0 z-10 border-b border-gray-200 bg-gray-25 px-3 py-2 text-xs font-semibold tracking-[0.04em] whitespace-nowrap text-gray-700 uppercase"
                       >
@@ -574,7 +617,12 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
                             className="focus-ring -mx-1 inline-flex min-h-10 items-center gap-1 rounded-sm px-1 uppercase hover:text-navy-900"
                           >
                             {fieldLabel(locale, def, col)}
-                            <Glyph aria-hidden="true" size={14} strokeWidth={1.75} className={active ? 'text-navy-900' : 'text-gray-500'} />
+                            <Glyph
+                              aria-hidden="true"
+                              size={14}
+                              strokeWidth={1.75}
+                              className={active ? 'text-navy-900' : 'text-gray-500'}
+                            />
                           </button>
                         ) : (
                           fieldLabel(locale, def, col)
@@ -612,7 +660,10 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
               </tbody>
             </table>
           </div>
-          <nav aria-label={t(locale, 'records.pager.label')} className="flex flex-wrap items-center justify-between gap-3">
+          <nav
+            aria-label={t(locale, 'records.pager.label')}
+            className="flex flex-wrap items-center justify-between gap-3"
+          >
             <p className="text-sm text-gray-700">
               {t(locale, 'records.list.range', rangeVars(pageIndex, items.length, data.total))}
             </p>
@@ -636,33 +687,37 @@ export function RecordTable({ def, actions, initialCreate = false }: RecordTable
         </>
       )}
 
-      <ColumnsDialog
-        def={def}
-        open={dialog === 'columns'}
-        onOpenChange={(o) => setDialog(o ? 'columns' : null)}
-        listable={listable}
-        columns={columns}
-        defaults={defaultColumns}
-        onApply={(cols) => {
-          setColumns(cols);
-          setDialog(null);
-        }}
-      />
-      <SaveViewDialog
-        def={def}
-        open={dialog === 'saveView'}
-        onOpenChange={(o) => setDialog(o ? 'saveView' : null)}
-        existing={activeView?.owned ? activeView : undefined}
-        canShare={actions.update}
-        query={{ filters, sort, q }}
-        columns={columns}
-        onSaved={(view) => {
-          setDialog(null);
-          setNotice({ tone: 'ok', title: t(locale, 'records.views.saved') });
-          setViews((prev) => [...prev.filter((v) => v.id !== view.id), view]);
-          setViewId(view.id);
-        }}
-      />
+      {dialog === 'columns' && (
+        <ColumnsDialog
+          def={def}
+          open
+          onOpenChange={(o) => setDialog(o ? 'columns' : null)}
+          listable={listable}
+          columns={columns}
+          defaults={defaultColumns}
+          onApply={(cols) => {
+            setColumns(cols);
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog === 'saveView' && (
+        <SaveViewDialog
+          def={def}
+          open
+          onOpenChange={(o) => setDialog(o ? 'saveView' : null)}
+          existing={activeView?.owned ? activeView : undefined}
+          canShare={actions.update}
+          query={{ filters, sort, q }}
+          columns={columns}
+          onSaved={(view) => {
+            setDialog(null);
+            setNotice({ tone: 'ok', title: t(locale, 'records.views.saved') });
+            setViews((prev) => [...prev.filter((v) => v.id !== view.id), view]);
+            setViewId(view.id);
+          }}
+        />
+      )}
       {bulkable.map((f) => (
         <BulkEditDialog
           key={f}
@@ -729,7 +784,9 @@ function Row({
   const href = recordHref(def.id, row.id) ?? '#';
   const title = recordTitle(locale, def, row.fields);
   return (
-    <tr className={cn('border-b border-gray-100 last:border-b-0', selection?.checked && 'bg-blue-50')}>
+    <tr
+      className={cn('border-b border-gray-100 last:border-b-0', selection?.checked && 'bg-blue-50')}
+    >
       {selection && (
         <td className="px-2 align-middle">
           <Checkbox
@@ -758,7 +815,9 @@ function Row({
                     formatValue(locale, def, col, value, timeZone)
                   )}
                 </Link>
-                {row.archivedAt && <Badge status="neutral">{t(locale, 'records.value.archived')}</Badge>}
+                {row.archivedAt && (
+                  <Badge status="neutral">{t(locale, 'records.value.archived')}</Badge>
+                )}
               </span>
             </th>
           );
@@ -766,11 +825,17 @@ function Row({
         return (
           <td key={col} className="px-3 py-2 align-middle text-gray-900">
             {col === statusCol && typeof value === 'string' ? (
-              <Badge status={statusTone(value)}>{formatValue(locale, def, col, value, timeZone)}</Badge>
+              <Badge status={statusTone(value)}>
+                {formatValue(locale, def, col, value, timeZone)}
+              </Badge>
             ) : target && typeof value === 'string' ? (
               <RefValue type={target} id={value} />
             ) : (
-              <span className={def.fields[col]?.kind === 'uuid' || col === 'npi' ? 'font-mono' : undefined}>
+              <span
+                className={
+                  def.fields[col]?.kind === 'uuid' || col === 'npi' ? 'font-mono' : undefined
+                }
+              >
                 {formatValue(locale, def, col, value, timeZone)}
               </span>
             )}
@@ -826,7 +891,12 @@ function FilterInput({
   if (f.kind === 'enum' || f.kind === 'boolean') {
     const values = f.kind === 'boolean' ? ['true', 'false'] : (f.values ?? []);
     return (
-      <Select id={id} label={label} value={draft.value} onChange={(e) => onChange({ ...draft, value: e.target.value })}>
+      <Select
+        id={id}
+        label={label}
+        value={draft.value}
+        onChange={(e) => onChange({ ...draft, value: e.target.value })}
+      >
         <option value="">{t(locale, 'records.filters.any')}</option>
         {values.map((v) => (
           <option key={v} value={v}>
@@ -887,9 +957,6 @@ function ColumnsDialog({
   const { locale } = useRecords();
   const base = useId();
   const [picked, setPicked] = useState<string[]>([...columns]);
-  useEffect(() => {
-    if (open) setPicked([...columns]);
-  }, [open, columns]);
   const ordered = (list: readonly string[]) => listable.filter((c) => list.includes(c));
   return (
     <Modal
@@ -906,7 +973,9 @@ function ColumnsDialog({
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
             {t(locale, 'records.cancel')}
           </Button>
-          <Button onClick={() => onApply(ordered(picked))}>{t(locale, 'records.columns.apply')}</Button>
+          <Button onClick={() => onApply(ordered(picked))}>
+            {t(locale, 'records.columns.apply')}
+          </Button>
         </>
       }
     >
@@ -951,27 +1020,26 @@ function SaveViewDialog({
 }) {
   const { client, locale } = useRecords();
   const base = useId();
-  const [name, setName] = useState('');
-  const [visibility, setVisibility] = useState<'private' | 'roles'>('private');
-  const [roles, setRoles] = useState<RoleId[]>([]);
+  // Mounted only while open (see RecordTable), so state starts from the current view.
+  const [name, setName] = useState(existing?.name ?? '');
+  const [visibility, setVisibility] = useState<'private' | 'roles'>(
+    existing?.visibility ?? 'private',
+  );
+  const [roles, setRoles] = useState<RoleId[]>(() =>
+    (existing?.sharedRoles ?? []).filter((r): r is RoleId =>
+      (ROLE_IDS as readonly string[]).includes(r),
+    ),
+  );
   const [errors, setErrors] = useState<{ name?: string; roles?: string }>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setName(existing?.name ?? '');
-    setVisibility(existing?.visibility ?? 'private');
-    setRoles((existing?.sharedRoles ?? []).filter((r): r is RoleId => (ROLE_IDS as readonly string[]).includes(r)));
-    setErrors({});
-    setFailure(null);
-  }, [open, existing]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     const errs: typeof errors = {};
     if (!name.trim()) errs.name = t(locale, 'records.views.nameRequired');
-    if (visibility === 'roles' && roles.length === 0) errs.roles = t(locale, 'records.views.rolesRequired');
+    if (visibility === 'roles' && roles.length === 0)
+      errs.roles = t(locale, 'records.views.rolesRequired');
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
     const stored = {
@@ -1024,9 +1092,14 @@ function SaveViewDialog({
         />
         {canShare && (
           <fieldset className="flex flex-col gap-1">
-            <legend className="text-sm font-semibold text-gray-900">{t(locale, 'records.views.visibility')}</legend>
+            <legend className="text-sm font-semibold text-gray-900">
+              {t(locale, 'records.views.visibility')}
+            </legend>
             {(['private', 'roles'] as const).map((v) => (
-              <label key={v} className="inline-flex min-h-10 items-center gap-2 text-sm text-gray-900">
+              <label
+                key={v}
+                className="inline-flex min-h-10 items-center gap-2 text-sm text-gray-900"
+              >
                 <input
                   type="radio"
                   name={`${base}-visibility`}
@@ -1051,11 +1124,16 @@ function SaveViewDialog({
                     id={`${base}-role-${r}`}
                     label={t(locale, `role.${r}.name`)}
                     checked={roles.includes(r)}
-                    onChange={(on) => setRoles((prev) => (on ? [...prev, r] : prev.filter((x) => x !== r)))}
+                    onChange={(on) =>
+                      setRoles((prev) => (on ? [...prev, r] : prev.filter((x) => x !== r)))
+                    }
                   />
                 ))}
                 {errors.roles && (
-                  <p id={`${base}-roles-error`} className="text-sm text-status-critical-text sm:col-span-2">
+                  <p
+                    id={`${base}-roles-error`}
+                    className="text-sm text-status-critical-text sm:col-span-2"
+                  >
                     {errors.roles}
                   </p>
                 )}
@@ -1105,7 +1183,15 @@ function BulkEditDialog({
     const v = value.trim() === '' ? (f.nullable ? null : '') : value.trim();
     const parsed = bulkUpdateSchema(def).safeParse({ [field]: v });
     if (!parsed.success) {
-      setError(t(locale, f.kind === 'enum' || f.kind === 'uuid' ? 'records.validation.choose' : 'records.validation.required', { field: label }));
+      setError(
+        t(
+          locale,
+          f.kind === 'enum' || f.kind === 'uuid'
+            ? 'records.validation.choose'
+            : 'records.validation.required',
+          { field: label },
+        ),
+      );
       return;
     }
     setError(undefined);
@@ -1137,7 +1223,13 @@ function BulkEditDialog({
           </Alert>
         )}
         {f.kind === 'enum' ? (
-          <Select id={`${base}-v`} label={label} value={value} error={error} onChange={(e) => setValue(e.target.value)}>
+          <Select
+            id={`${base}-v`}
+            label={label}
+            value={value}
+            error={error}
+            onChange={(e) => setValue(e.target.value)}
+          >
             <option value="">{t(locale, 'records.form.choose')}</option>
             {(f.values ?? []).map((v) => (
               <option key={v} value={v}>
@@ -1156,7 +1248,13 @@ function BulkEditDialog({
             emptyLabel={t(locale, f.nullable ? 'records.form.none' : 'records.form.choose')}
           />
         ) : (
-          <Input id={`${base}-v`} label={label} value={value} error={error} onChange={(e) => setValue(e.target.value)} />
+          <Input
+            id={`${base}-v`}
+            label={label}
+            value={value}
+            error={error}
+            onChange={(e) => setValue(e.target.value)}
+          />
         )}
         <div className="flex flex-wrap justify-end gap-3">
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>
@@ -1239,7 +1337,12 @@ function BulkArchiveDialog({
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>
             {t(locale, 'records.cancel')}
           </Button>
-          <Button type="submit" variant="danger" loading={busy} loadingLabel={t(locale, 'records.form.saving')}>
+          <Button
+            type="submit"
+            variant="danger"
+            loading={busy}
+            loadingLabel={t(locale, 'records.form.saving')}
+          >
             {t(locale, 'records.archive.submit')}
           </Button>
         </div>
@@ -1247,4 +1350,3 @@ function BulkArchiveDialog({
     </Modal>
   );
 }
-

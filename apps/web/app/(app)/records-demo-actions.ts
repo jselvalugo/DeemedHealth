@@ -77,7 +77,9 @@ function bulkCount(body: unknown): number {
   return Array.isArray(items) ? Math.min(items.length, 500) : 0;
 }
 
-type StepUpResult = { ok: true; data: null } | { ok: false; status: number; code: 'invalid_code' | 'not_configured' | 'unauthenticated' };
+type StepUpResult =
+  | { ok: true; data: null }
+  | { ok: false; status: number; code: 'invalid_code' | 'not_configured' | 'unauthenticated' };
 
 async function confirmStepUp(): Promise<StepUpResult> {
   const jar = await cookies();

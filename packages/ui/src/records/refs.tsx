@@ -107,10 +107,7 @@ export function RefSelect({
   const [options, setOptions] = useState<Option[] | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
-    if (!isRecordTypeId(type)) {
-      setOptions(null);
-      return;
-    }
+    if (!isRecordTypeId(type)) return;
     const def = getRecordType(type);
     void ctx.client
       .list(type, {
@@ -137,7 +134,7 @@ export function RefSelect({
     };
   }, [ctx, type]);
 
-  if (options === null) {
+  if (options === null || !isRecordTypeId(type)) {
     return (
       <Input
         id={id}
@@ -165,7 +162,9 @@ export function RefSelect({
     >
       <option value="">{emptyLabel}</option>
       {value && !known && (
-        <option value={value}>{t(ctx.locale, 'records.value.shortId', { id: shortId(value) })}</option>
+        <option value={value}>
+          {t(ctx.locale, 'records.value.shortId', { id: shortId(value) })}
+        </option>
       )}
       {(options ?? []).map((o) => (
         <option key={o.id} value={o.id}>

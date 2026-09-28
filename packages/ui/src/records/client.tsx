@@ -7,7 +7,7 @@
  * provides two implementations: HTTP against apps/api (`/api/records/...`) and, in
  * non-production previews without a database, a synthetic in-memory adapter.
  */
-import { createContext, useContext, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import type {
   ApiErrorCode,
   BulkRequest,
@@ -146,10 +146,10 @@ export function RecordsProvider({
   navigate,
   children,
 }: Omit<RecordsContextValue, 'refTitles'> & { children: ReactNode }) {
-  const refTitles = useRef(new Map<string, Promise<string | null>>());
+  const [refTitles] = useState(() => new Map<string, Promise<string | null>>());
   const value = useMemo(
-    () => ({ client, locale, timeZone, Link, navigate, refTitles: refTitles.current }),
-    [client, locale, timeZone, Link, navigate],
+    () => ({ client, locale, timeZone, Link, navigate, refTitles }),
+    [client, locale, timeZone, Link, navigate, refTitles],
   );
   return <RecordsContext.Provider value={value}>{children}</RecordsContext.Provider>;
 }
