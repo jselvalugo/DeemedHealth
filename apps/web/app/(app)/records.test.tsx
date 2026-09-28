@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { getRecordType } from '@deemed/domain';
 import { RecordPage, RecordsProvider } from '@deemed/ui';
@@ -117,17 +117,20 @@ describe('reveal over HTTP (ADR-0007, ADR-0006 rule 5)', () => {
 
   it('sends If-Match and the CSRF token on changes', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(json(200, record));
-    let client: ReturnType<typeof httpRecordsClient> | null = null;
-    function Grab() {
-      client = httpRecordsClient(useApi());
+    const got: ReturnType<typeof httpRecordsClient>[] = [];
+    function Grab({ onClient }: { onClient: (c: ReturnType<typeof httpRecordsClient>) => void }) {
+      const api = useApi();
+      useEffect(() => {
+        onClient(httpRecordsClient(api));
+      }, [api, onClient]);
       return null;
     }
     render(
       <ApiProvider locale="en" csrfToken="csrf-1" fetchImpl={fetchImpl}>
-        <Grab />
+        <Grab onClient={(c) => got.push(c)} />
       </ApiProvider>,
     );
-    await client!.update('person', PERSON, 7, { preferredName: 'Pri' });
+    await got[0]!.update('person', PERSON, 7, { preferredName: 'Pri' });
     const init = fetchImpl.mock.calls[0]![1]!;
     expect(fetchImpl.mock.calls[0]![0]).toBe(`/api/records/person/${PERSON}`);
     expect(init.method).toBe('PATCH');
