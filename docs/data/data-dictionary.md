@@ -357,7 +357,7 @@ A saved list view (filters, sort, columns) for one record type; private or share
 | `name` | internal | View name; no personal data (ADR-0014 section 4.5) | at rest | no | shown |
 | `visibility` | internal | private or roles | at rest | no | shown |
 | `shared_roles` | internal | Role keys the view is shared with (visibility roles) | at rest | no | shown |
-| `query` | confidential | Filters, sort, and search of the view | at rest | no | shown |
+| `query` | PII | Filters, sort, and search text of the view (may hold a typed name) | at rest | no | shown |
 | `columns` | internal | Visible columns | at rest | no | shown |
 | `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
 | `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |

@@ -111,7 +111,10 @@ export function deniedEvent(
     ...(target?.siteId ? { siteId: target.siteId } : {}),
   };
   if (own && ownCategory && target && DENIABLE_CATEGORIES.includes(ownCategory)) {
-    return { category: ownCategory, action: own, ...common };
+    // Reveal events always carry a reason (ADR-0008 section 4); a refusal gets a fixed one,
+    // never the caller's text.
+    const reason = ownCategory === 'reveal' ? { reason: `refused: ${error.reason}` } : {};
+    return { category: ownCategory, action: own, ...common, ...reason };
   }
   return { category: 'auth', action: 'access.denied', ...common };
 }

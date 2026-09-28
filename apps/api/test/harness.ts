@@ -17,6 +17,7 @@ import type { RoleId } from '@deemed/domain';
 import pg from 'pg';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { buildApp } from '../src/app.js';
+import type { FieldCipher } from '../src/context.js';
 import { fixtureId, KIND } from '../../../packages/db/seed/fixtures.js';
 import { need } from '../../../packages/db/test/helpers.js';
 import { SoftwareAuthenticator } from './authenticator.js';
@@ -39,7 +40,9 @@ export interface TestApi {
  * (the config loader still refuses production until S6; buildApp itself does not), to
  * test production-only behavior such as what an MFA reset returns.
  */
-export async function startApi(options: { dhEnv?: string } = {}): Promise<TestApi> {
+export async function startApi(
+  options: { dhEnv?: string; fieldCipher?: FieldCipher } = {},
+): Promise<TestApi> {
   const c = need();
   // Seeded grants start at seed time (real clock); run the fake clock a little later.
   const clock = new FakeClock(new Date(Date.now() + 5 * 60_000));
@@ -59,6 +62,7 @@ export async function startApi(options: { dhEnv?: string } = {}): Promise<TestAp
     secureCookies: true,
     // Rate limits are tested on their own (src/rate-limit.test.ts).
     rateLimit: { globalPerMinute: 1_000_000, signinPerMinute: 1_000_000 },
+    ...(options.fieldCipher ? { fieldCipher: options.fieldCipher } : {}),
   });
   await app.ready();
   const admin = new pg.Client({ connectionString: c.adminUrl });
@@ -102,12 +106,13 @@ export class Client {
   constructor(readonly api: TestApi) {}
 
   async request(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PATCH',
     url: string,
     body?: unknown,
     headers: Record<string, string> = {},
   ): Promise<LightMyRequestResponse> {
     const cookie = [...this.jar].map(([k, v]) => `${k}=${v}`).join('; ');
+    const mutating = method !== 'GET';
     const res = await this.api.app.inject({
       method,
       url,
@@ -115,11 +120,11 @@ export class Client {
       headers: {
         'user-agent': 'vitest-browser',
         ...(cookie ? { cookie } : {}),
-        ...(method === 'POST' ? { origin: ORIGIN, 'content-type': 'application/json' } : {}),
-        ...(method === 'POST' && this.csrf ? { 'x-csrf-token': this.csrf } : {}),
+        ...(mutating ? { origin: ORIGIN, 'content-type': 'application/json' } : {}),
+        ...(mutating && this.csrf ? { 'x-csrf-token': this.csrf } : {}),
         ...headers,
       },
-      ...(method === 'POST' ? { payload: JSON.stringify(body ?? {}) } : {}),
+      ...(mutating ? { payload: JSON.stringify(body ?? {}) } : {}),
     });
     const set = res.headers['set-cookie'];
     for (const line of set === undefined ? [] : Array.isArray(set) ? set : [set]) {
@@ -139,6 +144,10 @@ export class Client {
 
   post(url: string, body?: unknown, headers?: Record<string, string>) {
     return this.request('POST', url, body, headers);
+  }
+
+  patch(url: string, body?: unknown, headers?: Record<string, string>) {
+    return this.request('PATCH', url, body, headers);
   }
 
   get sessionToken(): string | undefined {
@@ -173,14 +182,16 @@ let passwordHash: Promise<string> | undefined;
  */
 export async function createUser(
   api: TestApi,
-  tenant: 'xyz' | 'gulf',
+  tenant: 'xyz' | 'gulf' | { organizationId: string },
   grants: GrantSpec[],
 ): Promise<TestUser> {
   passwordHash ??= hashPassword(TEST_PASSWORD);
   const hash = await passwordHash;
-  const organizationId = api.tenants[tenant].organizationId;
+  const organizationId =
+    typeof tenant === 'string' ? api.tenants[tenant].organizationId : tenant.organizationId;
   const suffix = randomBytes(4).toString('hex');
-  const email = `test.${suffix}@${tenant}-chc.example`;
+  const domain = typeof tenant === 'string' ? `${tenant}-chc.example` : 'records-test.example';
+  const email = `test.${suffix}@${domain}`;
   const personId = randomUUID();
   const userAccountId = randomUUID();
   const setup = createDatabase({

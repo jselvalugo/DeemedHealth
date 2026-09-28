@@ -9,10 +9,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AuthService } from '@deemed/auth';
 import type { Database } from '@deemed/db';
-import { AUDIT_ACTIONS } from '@deemed/domain';
+import { AUDIT_ACTIONS, recordTypes } from '@deemed/domain';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from './app.js';
-import { ROUTES, ROUTE_IDS, requiredCases, type RouteSpec } from './manifest.js';
+import { ROUTE_IDS, requiredCases, routeSpec, type RouteSpec } from './manifest.js';
+import { RECORD_ROUTE_META, isRecordRouteId } from './records/manifest.js';
 
 const TEST_DIR = fileURLToPath(new URL('../test/', import.meta.url));
 
@@ -23,9 +24,12 @@ function testSources(): string {
     .join('\n');
 }
 
-/** The object literal passed to defineRouteTests('<id>', { ... }): its top-level keys. */
-function casesFor(source: string, id: string): string[] | null {
-  const marker = `defineRouteTests('${id}', {`;
+/**
+ * The object literal passed to defineRouteTests('<id>', { ... }) (or, for generated record
+ * routes, defineRecordActionTests('<action>', { ... })): its top-level keys.
+ */
+function casesFor(source: string, id: string, fn = 'defineRouteTests'): string[] | null {
+  const marker = `${fn}('${id}', {`;
   const start = source.indexOf(marker);
   if (start < 0) return null;
   let depth = 1;
@@ -63,7 +67,7 @@ describe('route manifest', () => {
     });
     await app.ready();
     for (const id of ROUTE_IDS) {
-      const spec: RouteSpec = ROUTES[id];
+      const spec: RouteSpec = routeSpec(id);
       expect(app.hasRoute({ method: spec.method, url: spec.url }), id).toBe(true);
     }
     const printed = app.printRoutes({ commonPrefix: false });
@@ -74,19 +78,44 @@ describe('route manifest', () => {
 
   it('names an audit action for every mutation, and only registered actions', () => {
     for (const id of ROUTE_IDS) {
-      const spec: RouteSpec = ROUTES[id];
+      const spec: RouteSpec = routeSpec(id);
       if (spec.audit) expect(Object.keys(AUDIT_ACTIONS), id).toContain(spec.audit.action);
       const signinStart = spec.access.kind === 'signin' && spec.audit === null;
       const optionsOnly = spec.url.endsWith('/options');
-      if (spec.method === 'POST' && !signinStart && !optionsOnly) {
+      const dryRun = spec.writesNothing !== undefined && spec.audit === null;
+      if (spec.method !== 'GET' && !signinStart && !optionsOnly && !dryRun) {
         expect(spec.audit, `${id} is a mutation without an audit action`).not.toBeNull();
+      }
+    }
+  });
+
+  it('serves no DELETE route: records are archived and restored, never deleted (ADR-0014)', () => {
+    for (const id of ROUTE_IDS) {
+      expect(['GET', 'POST', 'PATCH'], id).toContain(routeSpec(id).method);
+    }
+  });
+
+  it('generates list, get, and history routes for every record type, each behind its permission', () => {
+    const ids = new Set(ROUTE_IDS);
+    for (const def of recordTypes()) {
+      for (const action of ['list', 'get', 'history']) {
+        const id = `records.${def.id}.${action}` as const;
+        expect(ids.has(id), id).toBe(true);
+        expect(routeSpec(id).access).toMatchObject({
+          kind: 'permission',
+          permission: def.access.read,
+        });
+      }
+      for (const [id, meta] of Object.entries(RECORD_ROUTE_META)) {
+        if (meta.typeId !== def.id) continue;
+        expect(def.actions.includes(meta.action.split('.')[0] as never), id).toBe(true);
       }
     }
   });
 
   it('keeps every endpoint under /api and every non-public endpoint behind a session or permission', () => {
     for (const id of ROUTE_IDS) {
-      const spec: RouteSpec = ROUTES[id];
+      const spec: RouteSpec = routeSpec(id);
       expect(spec.url.startsWith('/api/'), id).toBe(true);
       if (spec.url.startsWith('/api/admin/')) expect(spec.access.kind, id).toBe('permission');
       if (
@@ -101,13 +130,13 @@ describe('route manifest', () => {
 
   it('makes every approve route (and every route that loads one record) check the record', () => {
     for (const id of ROUTE_IDS) {
-      const access = ROUTES[id].access as RouteSpec['access'];
+      const access = routeSpec(id).access;
       if (access.kind !== 'permission') continue;
       if (access.permission.endsWith(':approve')) {
         // The executive approval-area rule only runs when a record is authorized.
         expect(access.record, `${id}: approve routes need record: true`).toBe(true);
       }
-      if (ROUTES[id].url.includes('/:')) {
+      if (routeSpec(id).url.includes('/:')) {
         expect(access.record ?? id === 'admin.roles.list', `${id}: record route`).toBe(true);
       }
     }
@@ -117,9 +146,17 @@ describe('route manifest', () => {
     const source = testSources();
     const problems: string[] = [];
     for (const id of ROUTE_IDS) {
-      const cases = casesFor(source, id);
+      // Generated record routes share one suite per action, run for every record type.
+      const meta = isRecordRouteId(id) ? RECORD_ROUTE_META[id] : undefined;
+      const cases = meta
+        ? casesFor(source, meta.action, 'defineRecordActionTests')
+        : casesFor(source, id);
       if (!cases) {
-        problems.push(`${id}: no defineRouteTests('${id}', ...) in apps/api/test`);
+        problems.push(
+          meta
+            ? `${id}: no defineRecordActionTests('${meta.action}', ...) in apps/api/test`
+            : `${id}: no defineRouteTests('${id}', ...) in apps/api/test`,
+        );
         continue;
       }
       for (const required of requiredCases(id)) {

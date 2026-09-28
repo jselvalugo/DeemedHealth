@@ -403,7 +403,9 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       name: c('internal', 'View name; no personal data (ADR-0014 section 4.5)'),
       visibility: c('internal', 'private or roles'),
       shared_roles: c('internal', 'Role keys the view is shared with (visibility roles)'),
-      query: c('confidential', 'Filters, sort, and search of the view'),
+      query: c('PII', 'Filters, sort, and search text of the view (may hold a typed name)', {
+        freeText: true,
+      }),
       columns: c('internal', 'Visible columns'),
       row_version: rowVersion.row_version,
       ...rowMeta,

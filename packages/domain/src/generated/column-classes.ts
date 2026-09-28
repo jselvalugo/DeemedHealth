@@ -1578,13 +1578,7 @@ export const COLUMN_CLASSES: Readonly<Record<string, TableClasses>> = {
         display: 'shown',
         freeText: false,
       },
-      query: {
-        class: 'confidential',
-        encryption: null,
-        fipa: 'no',
-        display: 'shown',
-        freeText: false,
-      },
+      query: { class: 'PII', encryption: null, fipa: 'no', display: 'shown', freeText: true },
       columns: {
         class: 'internal',
         encryption: null,

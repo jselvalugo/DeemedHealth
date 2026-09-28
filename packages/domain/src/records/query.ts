@@ -303,7 +303,7 @@ export function parseListQuery(def: RecordTypeDef, raw: RawQuery): ParseResult<L
 export interface StoredQuery {
   filters: readonly { field: string; op: string; value: string | readonly string[] }[];
   sort: readonly { field: string; dir: 'asc' | 'desc' }[];
-  q?: string | null;
+  q?: string | null | undefined;
 }
 
 /** Validates a stored query against the type (saved views never filter restricted fields). */
