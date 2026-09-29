@@ -90,6 +90,19 @@ describe("entry conventions", () => {
     expect(check({ id: "BP-TEST", layer: "best_practice" })).toEqual([]);
     expect(paths({ layer: "best_practice" })).toContain("layer");
   });
+
+  it("labels: CMS-/MCD- is a payer rule resting on a payer source", () => {
+    const payer = {
+      id: "CMS-TEST-RULE",
+      layer: "payer_rule",
+      sources: [{ ...base.sources[0], key: "CMS-TEST" }, base.sources[0]],
+    };
+    expect(check(payer)).toEqual([]);
+    expect(check({ ...payer, id: "MCD-TEST-RULE", sources: [{ ...base.sources[0], key: "PL-119-21" }] })).toEqual([]);
+    expect(paths({ ...payer, sources: base.sources })).toContain("sources");
+    expect(paths({ ...payer, layer: "requirement" })).toContain("layer");
+    expect(paths({ layer: "payer_rule", sources: [{ ...base.sources[0], key: "CMS-TEST" }] })).toContain("layer");
+  });
 });
 
 describe("tenant parameters", () => {

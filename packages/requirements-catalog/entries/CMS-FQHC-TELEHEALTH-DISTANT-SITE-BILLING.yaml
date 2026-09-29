@@ -1,0 +1,61 @@
+# Rule shape: one-time document (on_change). Layer payer_rule: a Medicare rule, not an HRSA requirement.
+id: CMS-FQHC-TELEHEALTH-DISTANT-SITE-BILLING
+chapter: 16
+title: Bill Medicare distant-site telehealth with individual codes, not G2025
+statement: >-
+  From October 1, 2026, an FQHC bills Medicare for a distant-site telehealth
+  service with the CPT or HCPCS code for the service itself, a telehealth
+  modifier (95 for audio-video, 93 for audio-only), and the revenue code,
+  instead of the single code G2025. Service lines under the behavioral health
+  revenue code 0900 are reported to follow different rules. The health
+  center's billing and collections policies and telehealth procedures
+  (Compliance Manual Ch. 16) should match, and a policy change goes to the
+  board where the board approves billing policies (Ch. 19).
+layer: payer_rule
+sources:
+  - key: CMS-MM14468
+    locator: "MLN MM14468 / CR 14468 (whole article)"
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: CM
+    locator: "Chapter 16, Billing and Collections; Chapter 19, Board Authority"
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+notApplicable:
+  allowed: true
+  reason: The health center does not furnish distant-site telehealth services to Medicare patients.
+evidence:
+  - billing_collections_policy
+  - telehealth_billing_procedure
+  - board_approval_record
+cadence:
+  trigger: on_change
+  renewalMonths: null
+  leadDays: []
+parameters:
+  replacedHcpcs: G2025
+  modifiers:
+    audioVideo: "95"
+    audioOnly: "93"
+  excludedRevenueCodes: ["0900"]
+  claimsSystemsDate: "2026-10-05"
+  distantSitePaymentRate:
+    calendarYear: 2026
+    amount: "97.53"
+severity: high
+effective: { from: "2026-10-01", to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. Written 2026-09-29 from web-search summaries only: the
+  session network proxy blocked cms.gov, medicaid.gov, and the secondary sites,
+  so no official text was read. Source url, verifiedOn, and verifiedBy stay
+  null until someone opens the source. Every value in parameters is a planning
+  value to check. Money and multipliers are decimal strings, not floats.
+  Shape: one-time policy update (on_change), re-opened if CMS changes the
+  coding rule again. Weakest items: the $97.53 rate and the revenue code 0900
+  exclusion. CLAUDE.md row R1.

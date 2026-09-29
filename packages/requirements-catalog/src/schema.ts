@@ -126,8 +126,13 @@ export const Cadence = z.object({
   atRiskDays: z.number().int().nonnegative().optional(),
 });
 
-/** Layer: HRSA/statutory requirement vs. best practice vs. state (FL) requirement. Never label best practice as an HRSA requirement. */
-export const Layer = z.enum(["requirement", "best_practice", "state_requirement"]);
+/**
+ * Layer: HRSA/statutory requirement vs. best practice vs. state (FL) requirement vs. payer rule.
+ * Never label best practice as an HRSA requirement. `payer_rule` is a CMS (Medicare) or Medicaid
+ * rule that changes a health center's billing, payment, or patient eligibility; it is shown as a
+ * CMS or Medicaid rule, never as an HRSA requirement (CLAUDE.md, "Medicare and Medicaid rules").
+ */
+export const Layer = z.enum(["requirement", "best_practice", "state_requirement", "payer_rule"]);
 
 export const CatalogEntrySchema = z
   .object({

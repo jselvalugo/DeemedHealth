@@ -244,3 +244,66 @@ sources:
     jurisdiction: florida
     status: draft
     notes: "Only for public-agency health centers or co-applicants. Verification attempt 2026-09-27 (hrsa-regulatory-analyst agent): the official source could not be opened because the session network egress proxy blocked the domain (EGRESS_BLOCKED on ecfr.gov, uscode.house.gov, bphc.hrsa.gov, oig.hhs.gov, sam.gov, leg.state.fl.us, flsenate.gov, ahca.myflorida.com, flhealthsource.gov). Left draft; not verified from memory or search snippets."
+  # --- CMS (Medicare) and Medicaid payer rules (CLAUDE.md, "Medicare and Medicaid rules in effect") ---
+  # Added 2026-09-29. Candidate URLs in notes came from web-search results only; none was opened
+  # (EGRESS_BLOCKED on cms.gov and medicaid.gov). Copy a URL into `url` only after opening it.
+  - key: CMS-MM14468
+    title: "CMS MLN MM14468 (CR 14468), RHC and FQHC billing for distant-site telehealth services"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Candidate URL (search result, not opened): https://www.cms.gov/files/document/mm14468-rural-health-clinics-federally-qualified-health-centers-billing-distant-site-telehealth.pdf. Related transmittal candidate: https://www.cms.gov/files/document/r13776otn.pdf."
+  - key: CMS-FQHC-PPS-2026
+    title: "CMS transmittal, CY 2026 payment rate update to the FQHC PPS"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Candidate URL (search result, not opened): https://www.cms.gov/files/document/r13506bp.pdf. Register each year as CMS-FQHC-PPS-YYYY."
+  - key: CMS-PFS-2026
+    title: "CY 2026 Medicare Physician Fee Schedule final rule (CMS-1832-F)"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Candidate URL (search result, not opened): https://www.cms.gov/newsroom/fact-sheets/calendar-year-cy-2026-medicare-physician-fee-schedule-final-rule-cms-1832-f. Read the Federal Register text, not only the fact sheet. Register each year as CMS-PFS-YYYY."
+  - key: PL-119-21
+    title: "Pub. L. 119-21 (H.R. 1, 2025 budget reconciliation law), §71109 Alien Medicaid eligibility"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Read §71109 in the enrolled law (congress.gov or govinfo.gov)."
+  - key: MCD-SHO-26-001
+    title: "CMS State Health Official letter SHO #26-001, implementation of §71109"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: federal
+    status: draft
+    notes: "Candidate URL (search result, not opened): https://www.medicaid.gov/federal-policy-guidance/downloads/sho26001.pdf."
+  - key: FL-DCF-71109
+    title: "Florida DCF implementation notice for the §71109 Medicaid non-citizen eligibility change"
+    url: null
+    locator: null
+    version: null
+    verifiedOn: null
+    verifiedBy: null
+    jurisdiction: florida
+    status: draft
+    notes: "Known only from a secondary summary; the notice itself was not located. Find it on myflfamilies.com before relying on the Florida children's option."

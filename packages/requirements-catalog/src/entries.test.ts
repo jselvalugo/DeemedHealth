@@ -22,7 +22,7 @@ const registered = new Map(register.sources.map((s) => [s.key, s.status]));
 describe("draft catalog entries", () => {
   it("has a small starter set", () => {
     expect(files.length).toBeGreaterThanOrEqual(6);
-    expect(files.length).toBeLessThanOrEqual(12);
+    expect(files.length).toBeLessThanOrEqual(16);
   });
 
   it.each(files)("%s parses against CatalogEntrySchema", (file) => {
@@ -74,6 +74,8 @@ describe("draft catalog entries", () => {
     }
     expect(entries.some((e) => e.layer === "state_requirement")).toBe(true);
     expect(entries.some((e) => e.layer === "best_practice")).toBe(true);
+    for (const e of entries.filter((x) => x.layer === "payer_rule")) expect(e.id, e.id).toMatch(/^(CMS|MCD)-/);
+    expect(entries.some((e) => e.layer === "payer_rule")).toBe(true);
   });
 
   it("contains no SSN-shaped value", () => {

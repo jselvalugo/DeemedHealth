@@ -94,6 +94,10 @@ export function effectiveAtRiskDays(cadence: { leadDays: readonly number[]; atRi
   return Math.min(DEFAULT_AT_RISK_DAYS, largest);
 }
 
+/** Payer-rule ids and the source keys a payer rule must rest on (CLAUDE.md, "Medicare and Medicaid rules"). */
+const PAYER_ID = /^(CMS|MCD)-/;
+const PAYER_SOURCE = /^(CMS|MCD|PL)-/;
+
 export interface ConventionIssue {
   path: string;
   message: string;
@@ -133,6 +137,12 @@ export function checkEntryConventions(e: CatalogEntry): ConventionIssue[] {
     e.sources.forEach((s, i) => {
       if (s.key.startsWith("FL-")) add(`sources.${i}.key`, "an HRSA requirement cannot rest on a Florida source");
     });
+  }
+  // Payer rules (CMS or Medicaid) are never shown as HRSA requirements, and rest on a payer source.
+  const isPayerId = PAYER_ID.test(e.id);
+  if (isPayerId !== (e.layer === "payer_rule")) add("layer", "CMS-/MCD- ids and payer_rule go together");
+  if (e.layer === "payer_rule" && !e.sources.some((s) => PAYER_SOURCE.test(s.key))) {
+    add("sources", "a payer rule cites at least one CMS-*, MCD-*, or PL-* source");
   }
 
   // Cadence.
