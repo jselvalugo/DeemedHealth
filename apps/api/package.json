@@ -14,6 +14,7 @@
     "@deemed/auth": "workspace:*",
     "@deemed/db": "workspace:*",
     "@deemed/domain": "workspace:*",
+    "@deemed/readiness": "workspace:*",
     "@deemed/ui": "workspace:*",
     "@fastify/rate-limit": "^10.3.0",
     "@node-rs/argon2": "^2.2.1",
