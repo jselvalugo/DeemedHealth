@@ -2,7 +2,15 @@
 // no environment. The recompute job (packages/db readiness service) feeds it and stores
 // the results.
 export * from './types.js';
-export { INTERNAL_LABEL, REASON_TEMPLATES, reason, render, summarize } from './messages.js';
+export {
+  INTERNAL_LABEL,
+  LOCALIZED_PARAMS,
+  PARAM_LABELS_EN,
+  REASON_TEMPLATES,
+  reason,
+  render,
+  summarize,
+} from './messages.js';
 export {
   approvalTypeMatches,
   capacitySatisfies,

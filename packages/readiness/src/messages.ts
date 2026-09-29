@@ -68,6 +68,46 @@ export const INTERNAL_LABEL: Readonly<Record<Authority, string>> = {
     'Best practice, not an HRSA requirement. Internal readiness status, not an HRSA determination.',
 };
 
+/**
+ * Reason parameters whose values are codes, and the i18n key prefix that names each value
+ * in plain language (EN below and in packages/i18n; ES there). Unknown values fall back to
+ * `<prefix>.unknown`, so a raw code never reaches a person (F14).
+ */
+export const LOCALIZED_PARAMS: Readonly<Record<string, string>> = {
+  dimension: 'readiness.dimension',
+  required: 'readiness.capacity',
+  parameter: 'readiness.parameter',
+};
+
+/** English labels for those keys (equal to packages/i18n readiness.en.ts; a test checks). */
+export const PARAM_LABELS_EN: Readonly<Record<string, string>> = {
+  'readiness.dimension.awardTypes': 'award type',
+  'readiness.dimension.subPrograms': 'health center program',
+  'readiness.dimension.siteTypes': 'site type',
+  'readiness.dimension.staffTypes': 'staff type',
+  'readiness.dimension.unknown': 'scope',
+  'readiness.capacity.board': 'the governing board',
+  'readiness.capacity.board_or_committee_ratified':
+    'the governing board, or a committee with board ratification',
+  'readiness.capacity.designated': 'the person or body your procedures designate',
+  'readiness.capacity.unknown': 'the required approver',
+  'readiness.parameter.reprivilegingIntervalMonths': 're-privileging interval (months)',
+  'readiness.parameter.unknown': 'this health center setting',
+};
+
+function paramKeysOf(params: ReasonParams): Record<string, string> {
+  const keys: Record<string, string> = {};
+  for (const [name, prefix] of Object.entries(LOCALIZED_PARAMS)) {
+    const v = params[name];
+    if (typeof v !== 'string') continue;
+    const key = `${prefix}.${v}`;
+    keys[name] = Object.prototype.hasOwnProperty.call(PARAM_LABELS_EN, key)
+      ? key
+      : `${prefix}.unknown`;
+  }
+  return keys;
+}
+
 const PLACEHOLDER = /\{([a-zA-Z]+)\}/g;
 
 export function render(template: string, params: ReasonParams): string {
@@ -78,11 +118,15 @@ export function render(template: string, params: ReasonParams): string {
 }
 
 export function reason(code: ReasonCode, params: ReasonParams = {}): Reason {
+  const paramKeys = paramKeysOf(params);
+  const shown: Record<string, string | number | null> = { ...params };
+  for (const [name, key] of Object.entries(paramKeys)) shown[name] = PARAM_LABELS_EN[key] ?? null;
   return {
     code,
     messageKey: `readiness.reason.${code}`,
     params,
-    message: render(REASON_TEMPLATES[code], params),
+    paramKeys,
+    message: render(REASON_TEMPLATES[code], shown),
   };
 }
 

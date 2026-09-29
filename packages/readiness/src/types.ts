@@ -155,6 +155,11 @@ export interface Reason {
   /** i18n key for the UI (EN/ES in packages/i18n). */
   messageKey: `readiness.reason.${ReasonCode}`;
   params: ReasonParams;
+  /**
+   * i18n keys for parameter values that are codes (dimension, capacity, parameter name):
+   * the UI shows `t(paramKeys[name])`, never the raw code (F14).
+   */
+  paramKeys: Readonly<Record<string, string>>;
   /** Plain-English rendering, for logs, exports, and tests. */
   message: string;
 }

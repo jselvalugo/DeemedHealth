@@ -131,7 +131,11 @@ const ms = (v: string | null): Instant | null =>
 type Stored = {
   status: ReadinessStatus;
   next_due_on: string | null;
-  status_reasons: { code: string; params: Readonly<Record<string, string | number | null>> }[];
+  status_reasons: {
+    code: string;
+    params: Readonly<Record<string, string | number | null>>;
+    paramKeys: Readonly<Record<string, string>>;
+  }[];
   catalog_release_id: string | null;
   requirement_version_id: string | null;
   not_applicable_superseded_catalog_version: string | null;
@@ -140,7 +144,7 @@ type Stored = {
 const asRow = (s: Stored): Record<string, JsonValue> => s as unknown as Record<string, JsonValue>;
 
 function storedReasons(reasons: readonly Reason[]): Stored['status_reasons'] {
-  return reasons.map((r) => ({ code: r.code, params: r.params }));
+  return reasons.map((r) => ({ code: r.code, params: r.params, paramKeys: r.paramKeys }));
 }
 
 /** Evaluates every active instance of one tenant and stores the changes. */

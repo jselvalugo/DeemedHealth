@@ -10,6 +10,20 @@ export const readinessEs: Record<keyof typeof readinessEn, string> = {
   'readiness.status.not_applicable': 'No aplica',
   'readiness.status.not_assessed': 'Sin evaluar',
 
+  'readiness.dimension.awardTypes': 'tipo de subvención',
+  'readiness.dimension.subPrograms': 'programa del centro de salud',
+  'readiness.dimension.siteTypes': 'tipo de sitio',
+  'readiness.dimension.staffTypes': 'tipo de personal',
+  'readiness.dimension.unknown': 'alcance',
+  'readiness.capacity.board': 'la junta directiva',
+  'readiness.capacity.board_or_committee_ratified':
+    'la junta directiva, o un comité con ratificación de la junta',
+  'readiness.capacity.designated': 'la persona u órgano que designan sus procedimientos',
+  'readiness.capacity.unknown': 'la persona que debe aprobar',
+  'readiness.parameter.reprivilegingIntervalMonths':
+    'intervalo de reasignación de privilegios (meses)',
+  'readiness.parameter.unknown': 'este ajuste del centro de salud',
+
   'readiness.label.hrsa': 'Estado de preparación interno; no es una determinación de HRSA.',
   'readiness.label.florida':
     'Requisito de Florida. Estado de preparación interno; no es una determinación de HRSA ni del Estado de Florida.',

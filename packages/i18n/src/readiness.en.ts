@@ -10,6 +10,20 @@ export const readinessEn = {
   'readiness.status.not_applicable': 'Not applicable',
   'readiness.status.not_assessed': 'Not assessed',
 
+  // Values of coded reason parameters (F14): never show the raw code.
+  'readiness.dimension.awardTypes': 'award type',
+  'readiness.dimension.subPrograms': 'health center program',
+  'readiness.dimension.siteTypes': 'site type',
+  'readiness.dimension.staffTypes': 'staff type',
+  'readiness.dimension.unknown': 'scope',
+  'readiness.capacity.board': 'the governing board',
+  'readiness.capacity.board_or_committee_ratified':
+    'the governing board, or a committee with board ratification',
+  'readiness.capacity.designated': 'the person or body your procedures designate',
+  'readiness.capacity.unknown': 'the required approver',
+  'readiness.parameter.reprivilegingIntervalMonths': 're-privileging interval (months)',
+  'readiness.parameter.unknown': 'this health center setting',
+
   'readiness.label.hrsa': 'Internal readiness status, not an HRSA determination.',
   'readiness.label.florida':
     'Florida requirement. Internal readiness status, not a determination by HRSA or the State of Florida.',
