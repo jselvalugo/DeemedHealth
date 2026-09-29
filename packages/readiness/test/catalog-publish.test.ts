@@ -1,10 +1,11 @@
 /**
  * Catalog publish job and the production constraint (ADR-0003 rules 3, 8, 11; G1-8).
- * The shared test database is non-production; the production cases run inside a
- * transaction that marks the database production and is rolled back.
+ * The shared test database is non-production; the production cases run on scratch
+ * databases that are migrated, upgraded to production, and dropped.
  */
 import { createDatabase, migrate } from '@deemed/db';
 import { sql } from 'drizzle-orm';
+import type pg from 'pg';
 import { compileCatalog, loadCatalogSources } from '@deemed/requirements-catalog/compiler';
 import {
   ReadinessError,
@@ -16,6 +17,23 @@ import { FX_CAT_ENTRIES } from '@deemed/test-fixtures/catalog';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { attempt, connect, describeDb, expectPgError, need } from '../../db/test/helpers.js';
 import { SYSTEM, fxBundles, nextCatalogVersion, pgError, startWorld, type World } from './world.js';
+
+/**
+ * Drops a scratch database once its closed pools' connections have really gone (pool.end()
+ * resolves before the server sees the terminate); forcing it while one is still closing
+ * kills that connection with 57P01, which surfaces as an unhandled error.
+ */
+async function dropScratch(admin: pg.Client, name: string): Promise<void> {
+  for (let i = 0; i < 50; i += 1) {
+    const r = await admin.query(
+      `SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = $1`,
+      [name],
+    );
+    if (r.rows[0].n === 0) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+}
 
 describeDb('catalog publish job (app_platform)', () => {
   let w: World;
@@ -281,7 +299,7 @@ describeDb('catalog publish job (app_platform)', () => {
         await prod.close();
       }
     } finally {
-      await admin.query(`DROP DATABASE IF EXISTS ${scratch} WITH (FORCE)`);
+      await dropScratch(admin, scratch);
     }
   });
 
@@ -321,7 +339,7 @@ describeDb('catalog publish job (app_platform)', () => {
         await owner.end();
       }
     } finally {
-      await admin.query(`DROP DATABASE IF EXISTS ${scratch} WITH (FORCE)`);
+      await dropScratch(admin, scratch);
     }
   });
 });
