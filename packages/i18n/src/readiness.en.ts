@@ -48,14 +48,16 @@ export const readinessEn = {
   'readiness.reason.approval_rejected': 'The latest approval decision on file was a rejection.',
   'readiness.reason.approval_type_missing':
     'An approval on file does not say what it approved, so it does not count.',
-  'readiness.reason.valid_through': 'Valid through {date}.',
-  'readiness.reason.expires_today': 'Expires today ({date}); valid until midnight site time.',
+  'readiness.reason.valid_through': 'Expiration date on file: {date}.',
+  'readiness.reason.expires_today':
+    'Expiration date on file is today ({date}); counted as current until midnight site time.',
   'readiness.reason.expired': 'Expired on {date}.',
   'readiness.reason.due_on': 'Next due {date}.',
   'readiness.reason.due_today': 'Due today ({date}).',
   'readiness.reason.past_due': 'Was due {date}.',
   'readiness.reason.lead_tier': 'Within the {days}-day reminder window.',
-  'readiness.reason.period_satisfied': 'Done for the period {periodStart} to {periodEnd}.',
+  'readiness.reason.period_satisfied':
+    'A record is on file for the period {periodStart} to {periodEnd}.',
   'readiness.reason.period_pending': 'Due by {periodEnd} for the current period.',
   'readiness.reason.period_missed': 'Nothing on file for the period {periodStart} to {periodEnd}.',
   'readiness.reason.period_missed_in_lookback':

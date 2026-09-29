@@ -3,7 +3,7 @@
 import type { readinessEn } from './readiness.en.js';
 
 export const readinessEs: Record<keyof typeof readinessEn, string> = {
-  'readiness.status.met': 'Cumplido',
+  'readiness.status.met': 'Al día',
   'readiness.status.due_soon': 'En riesgo (vence pronto)',
   'readiness.status.overdue': 'No cumplido (vencido)',
   'readiness.status.missing': 'No cumplido (falta evidencia)',
@@ -39,7 +39,7 @@ export const readinessEs: Record<keyof typeof readinessEn, string> = {
     'Sin evaluar: la entrada del catálogo no tiene una regla que el sistema pueda evaluar.',
   'readiness.reason.threshold_not_evaluated':
     'Sin evaluar: este requisito tiene un umbral que el sistema todavía no evalúa.',
-  'readiness.reason.no_evidence': 'No hay evidencia válida registrada.',
+  'readiness.reason.no_evidence': 'No hay evidencia registrada que cuente para este requisito.',
   'readiness.reason.evidence_type_not_accepted':
     'La evidencia registrada no es de un tipo que este requisito acepte, así que no cuenta.',
   'readiness.reason.approval_capacity_insufficient':
@@ -47,15 +47,16 @@ export const readinessEs: Record<keyof typeof readinessEn, string> = {
   'readiness.reason.approval_rejected': 'La decisión de aprobación más reciente fue un rechazo.',
   'readiness.reason.approval_type_missing':
     'Una aprobación registrada no indica qué aprobó, así que no cuenta.',
-  'readiness.reason.valid_through': 'Vigente hasta el {date}.',
+  'readiness.reason.valid_through': 'Fecha de vencimiento registrada: {date}.',
   'readiness.reason.expires_today':
-    'Vence hoy ({date}); vigente hasta la medianoche, hora del sitio.',
+    'La fecha de vencimiento registrada es hoy ({date}); se considera vigente hasta la medianoche, hora del sitio.',
   'readiness.reason.expired': 'Venció el {date}.',
   'readiness.reason.due_on': 'Próximo vencimiento: {date}.',
   'readiness.reason.due_today': 'Vence hoy ({date}).',
-  'readiness.reason.past_due': 'Vencía el {date}.',
+  'readiness.reason.past_due': 'Debía completarse el {date}.',
   'readiness.reason.lead_tier': 'Dentro del aviso de {days} días.',
-  'readiness.reason.period_satisfied': 'Cumplido para el período del {periodStart} al {periodEnd}.',
+  'readiness.reason.period_satisfied':
+    'Hay un registro para el período del {periodStart} al {periodEnd}.',
   'readiness.reason.period_pending': 'Vence el {periodEnd} para el período actual.',
   'readiness.reason.period_missed':
     'No hay nada registrado para el período del {periodStart} al {periodEnd}.',

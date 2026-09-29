@@ -25,7 +25,7 @@ export const recordsUiEs: Record<keyof typeof recordsUiEn, string> = {
   'recordValue.user_account.status.active': 'Activa',
   'recordValue.user_account.status.suspended': 'Suspendida',
   'recordValue.user_account.status.deprovisioned': 'Eliminada',
-  'recordValue.requirement_instance.status.met': 'Cumplido',
+  'recordValue.requirement_instance.status.met': 'Al día',
   'recordValue.requirement_instance.status.due_soon': 'Vence pronto',
   'recordValue.requirement_instance.status.overdue': 'Vencido',
   'recordValue.requirement_instance.status.missing': 'Falta evidencia',
