@@ -140,6 +140,8 @@ export const CatalogEntrySchema = z
     effective: EffectiveRange,
     supersedes: z.array(RequirementId).default([]),
     status: Status,
+    /** Reviewer notes: verification state, open questions, counsel items. Never shown to customers as a source. */
+    notes: z.string().min(1).optional(),
   })
   .superRefine((e, ctx) => {
     if (e.status === "verified") {
@@ -171,4 +173,23 @@ export function productionEntries(entries: readonly CatalogEntry[], asOf?: strin
       e.status === "verified" &&
       (asOf === undefined || (e.effective.from <= asOf && (e.effective.to === null || asOf <= e.effective.to))),
   );
+}
+
+/**
+ * What the production bundle will hold, with a message the build prints.
+ * When no entry is verified the bundle is empty, and the message says so plainly.
+ */
+export function describeProductionBundle(
+  entries: readonly CatalogEntry[],
+  asOf?: string,
+): { entries: CatalogEntry[]; empty: boolean; message: string } {
+  const prod = productionEntries(entries, asOf);
+  const count = (s: Status) => entries.filter((e) => e.status === s).length;
+  const tally = `${count("draft")} draft, ${count("verified")} verified, ${count("retired")} retired`;
+  const message =
+    prod.length === 0
+      ? `Production catalog bundle is EMPTY: 0 of ${entries.length} entries are verified (${tally}). ` +
+        "Draft entries stay in the non-production bundle until hrsa-regulatory-analyst verifies their sources."
+      : `Production catalog bundle holds ${prod.length} of ${entries.length} entries (${tally}).`;
+  return { entries: prod, empty: prod.length === 0, message };
 }

@@ -1,0 +1,48 @@
+# Rule shapes: periodic cadence; board-approval-backed.
+id: CM-19-BUDGET-ANNUAL
+chapter: 19
+title: Board approves the annual budget
+statement: >-
+  Each year the governing board approves the health center's annual budget for
+  the whole project, including non-grant revenue. Staff cannot record this
+  approval on the board's behalf.
+layer: requirement
+sources:
+  - key: CM
+    locator: 'Chapter 19: Board Authority (approval of the annual budget; element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: CM
+    locator: 'Chapter 17: Budget (element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+notApplicable:
+  allowed: false
+evidence: [approved_annual_budget, board_meeting_minutes]
+cadence:
+  trigger: periodic
+  renewalMonths: 12
+  leadDays: [60, 30, 0]
+parameters:
+  cadenceBasis: since_last_completion
+  approval:
+    approvalTypeId: budget.annual
+    requiredCapacity: board
+severity: high
+effective: { from: 2018-08-20, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. Approval type B3 in approval-authority.md. The real due point is
+  "before the budget period starts", which differs by health center; 12 months
+  from the last approval is a first approximation. A later revision can anchor
+  on a tenant budget-period start. Look-Alike applicability is assumed; confirm.
