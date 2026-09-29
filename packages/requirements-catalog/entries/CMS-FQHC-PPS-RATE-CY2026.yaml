@@ -1,0 +1,54 @@
+# Rule shape: parameters only (cadence null). Layer payer_rule: a Medicare rate, not an HRSA requirement.
+id: CMS-FQHC-PPS-RATE-CY2026
+chapter: 17
+title: Medicare FQHC PPS rate for calendar year 2026
+statement: >-
+  For services from January 1 through December 31, 2026, the Medicare FQHC
+  prospective payment system national base rate is $207.72. It is multiplied
+  by 1.3416 for a new patient, an initial preventive physical examination, or
+  an annual wellness visit, and by the geographic adjustment factor for the
+  site's Medicare locality. Medicare pays 80% of the lesser of the health
+  center's charge or the adjusted rate. The suite uses these values only for
+  budget (Ch. 17) and fee-schedule (Ch. 16) context, never to price a claim.
+layer: payer_rule
+sources:
+  - key: CMS-FQHC-PPS-2026
+    locator: "CY 2026 FQHC PPS rate update (whole transmittal)"
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: CMS-PFS-2026
+    locator: "FQHC PPS section of the final rule"
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+notApplicable:
+  allowed: false
+evidence: []
+cadence: null
+parameters:
+  calendarYear: 2026
+  baseRate: "207.72"
+  priorYearBaseRate: "202.65"
+  qualifyingVisitMultiplier: "1.3416"
+  qualifyingVisits: [new_patient, ippe, awv]
+  awvHcpcs: [G0438, G0439]
+  geographicAdjustment: per_site_medicare_locality
+  medicarePaysPercent: "80"
+  rounding: round_to_cent_once_at_end  # CMS rounding method not yet confirmed
+severity: low
+effective: { from: "2026-01-01", to: "2026-12-31" }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. Written 2026-09-29 from web-search summaries only: the
+  session network proxy blocked cms.gov, medicaid.gov, and the secondary sites,
+  so no official text was read. Source url, verifiedOn, and verifiedBy stay
+  null until someone opens the source. Every value in parameters is a planning
+  value to check. Money and multipliers are decimal strings, not floats.
+  Shape: parameter-only entry (cadence null) for budget and fee-schedule
+  context; never used to price a claim (MR-D3). The next year is a new entry,
+  CMS-FQHC-PPS-RATE-CY2027, that supersedes this one. CMS's own rounding
+  method is not confirmed. CLAUDE.md row R3.

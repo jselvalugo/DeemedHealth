@@ -23,7 +23,8 @@ catalog: requirements are data, not code (CLAUDE.md principle 4).
   `siteTypes`, `staffTypes`, `jurisdiction`. An omitted list means "all".
 - `notApplicable: { allowed: true, reason }` only where the manual allows N/A; each
   health center's N/A decision also requires its own reason.
-- `layer` separates HRSA `requirement`, `best_practice`, and Florida `state_requirement`.
+- `layer` separates HRSA `requirement`, `best_practice`, Florida `state_requirement`, and
+  `payer_rule` (a CMS or Medicaid rule, shown as such and never as an HRSA requirement).
 - Dates are real `YYYY-MM-DD` calendar dates; `effective.to >= effective.from`;
   `retired` requires `effective.to`.
 
@@ -41,13 +42,15 @@ catalog: requirements are data, not code (CLAUDE.md principle 4).
 Other `parameters` keys (thresholds such as `minMembers`) stay free-form.
 ID prefixes: `CM-`/other federal keys for HRSA requirements, `FL-` for Florida
 state rules (`layer: state_requirement`, FL-* sources only, `chapter: null`),
-`BP-` for best practice (`layer: best_practice`).
+`BP-` for best practice (`layer: best_practice`), `CMS-`/`MCD-` for Medicare and
+Medicaid rules (`layer: payer_rule`, citing at least one `CMS-*`, `MCD-*`, or `PL-*` source).
 
 ## Status
 All sources are `draft`: none have been fetched and checked yet. The entries in
 `entries/` are **drafts** written 2026-09-29 without access to the official
 sources (the network proxy blocked them). None is verified, so the production
-bundle is empty (`describeProductionBundle()` says so).
+bundle is empty (`describeProductionBundle()` says so). The three `CMS-`/`MCD-`
+entries are the payer rules in CLAUDE.md rows R1–R3.
 
 ## Tests
 `pnpm --filter @deemed/requirements-catalog test` (vitest).
