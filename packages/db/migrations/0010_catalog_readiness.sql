@@ -837,6 +837,25 @@ CREATE INDEX readiness_snapshot_org_date_idx ON public.readiness_snapshot (organ
 
 CREATE TRIGGER readiness_snapshot_row_meta BEFORE INSERT ON public.readiness_snapshot
   FOR EACH ROW EXECUTE FUNCTION public.set_row_meta();
+-- S12: the catalog version always comes from the release row (never the caller), and a
+-- nightly snapshot is written only by the recompute job (a system actor).
+CREATE FUNCTION public.readiness_snapshot_guard() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF NEW.kind = 'nightly' AND current_setting('app.actor_type', true) IS DISTINCT FROM 'system' THEN
+    RAISE EXCEPTION 'nightly readiness snapshots are written only by the recompute job'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  SELECT r.catalog_version INTO NEW.catalog_version
+  FROM catalog.catalog_release r WHERE r.id = NEW.catalog_release_id;
+  RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER readiness_snapshot_guard BEFORE INSERT ON public.readiness_snapshot
+  FOR EACH ROW EXECUTE FUNCTION public.readiness_snapshot_guard();
 -- Snapshots are never recomputed silently (ADR-0003 rule 4): no role edits one.
 CREATE TRIGGER readiness_snapshot_immutable BEFORE UPDATE OR DELETE ON public.readiness_snapshot
   FOR EACH ROW EXECUTE FUNCTION catalog.forbid_mutation();

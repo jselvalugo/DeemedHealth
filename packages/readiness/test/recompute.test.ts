@@ -777,6 +777,28 @@ describeDb('readiness service and recompute job', () => {
     expect(after[0]).toEqual(first[0]);
     expect(await instance(w.a.instances.procedures)).toMatchObject({ status: 'not_assessed' });
     expect(await instance(w.a.instances.budget)).toMatchObject({ status: 'missing' });
+    // Only the recompute job writes nightly snapshots, and the version comes from the release (S12).
+    const forge = (actor: Actor, kind: string, day: string) =>
+      pgError(
+        w.tenant.withTenant(w.a.id, actor, (tx) =>
+          tx.execute(sql`INSERT INTO public.readiness_snapshot (organization_id, catalog_release_id, catalog_version,
+                           engine_version, as_of_date, kind, met, denominator, body)
+                         VALUES (${w.a.id}::uuid, ${v1Release}::uuid, '9.9.9', '1.0.0', ${day}::date, ${kind},
+                                 0, 0, '{}'::jsonb)`),
+        ),
+      );
+    expect(await forge(w.human(w.a), 'nightly', '2030-01-02')).toMatchObject({ code: '42501' });
+    await w.tenant.withTenant(w.a.id, w.human(w.a), (tx) =>
+      tx.execute(sql`INSERT INTO public.readiness_snapshot (organization_id, catalog_release_id, catalog_version,
+                       engine_version, as_of_date, kind, met, denominator, body)
+                     VALUES (${w.a.id}::uuid, ${v1Release}::uuid, '9.9.9', '1.0.0', DATE '2030-01-03', 'on_demand',
+                             0, 0, '{}'::jsonb)`),
+    );
+    const pinned = await w.admin.query(
+      `SELECT catalog_version FROM public.readiness_snapshot WHERE organization_id = $1 AND as_of_date = '2030-01-03'`,
+      [w.a.id],
+    );
+    expect(pinned.rows[0].catalog_version).toBe(v1);
     // A snapshot is never edited, whoever tries.
     await expectPgError(
       w.admin.query(`UPDATE public.readiness_snapshot SET met = 0 WHERE id = $1`, [first[0].id]),
