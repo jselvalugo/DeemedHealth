@@ -265,6 +265,11 @@ Components in `packages/ui/src/records/`, driven by the registry and the API's
   when allowed; results announced in a polite live region. Empty, loading, error, and
   no-permission states from design system §4.5. No virtualization until measured need
   (screen readers). Headless table logic may use TanStack Table (MIT, npm).
+  *List-level actions are session-scoped hints* (S4b security review): the list has no
+  per-record `allowedActions`, so New, the bulk bar, the archived filter, and sharing a
+  saved view are offered from the session's role permissions (`/api/me`) and only for
+  actions the type serves (`bulk` needs the type's `bulk` action). They never grant
+  anything: the API checks every request again, per record, and reports per-row results.
 - **`RecordPage`**: header with title, lifecycle status badge, owner, site, requirement
   chips (`CitationChip`), and allowed actions (edit, transition, archive or restore,
   request approval); detail sections from the definition; tabs for Evidence (attach,

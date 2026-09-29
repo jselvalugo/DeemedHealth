@@ -10,6 +10,7 @@ import {
   ChartColumn,
   ChartLine,
   CircleCheck,
+  CirclePlus,
   ClipboardCheck,
   ClipboardList,
   Clock,
@@ -26,6 +27,7 @@ import {
   HeartPulse,
   History,
   IdCard,
+  KeyRound,
   Inbox,
   Landmark,
   LayoutDashboard,
@@ -141,6 +143,8 @@ export const ICONS: Readonly<Record<LucideIconName, LucideIcon>> = {
   plug: Plug,
   'book-marked': BookMarked,
   'scroll-text': ScrollText,
+  'key-round': KeyRound,
+  'circle-plus': CirclePlus,
 };
 
 /** Design system §6: 1.75px stroke; 20px in navigation, 16px inline. Decorative by default. */

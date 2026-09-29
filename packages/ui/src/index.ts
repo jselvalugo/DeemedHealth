@@ -52,3 +52,55 @@ export { Header, initials, type HeaderProps } from './shell/Header.js';
 export { ModuleBar, type ModuleBarProps } from './shell/ModuleBar.js';
 export { ModuleLauncher, type ModuleLauncherProps } from './shell/ModuleLauncher.js';
 export type { LinkComponent, LinkLikeProps, ShellTenant, ShellUser } from './shell/types.js';
+
+export {
+  Checkbox,
+  CitationChip,
+  Drawer,
+  Modal,
+  Select,
+  Tabs,
+  Textarea,
+  type SelectProps,
+  type TabItem,
+  type TextareaProps,
+} from './components/controls.js';
+
+// Records (ADR-0014 section 3)
+export {
+  RECORD_NAV,
+  isUuid,
+  matchRecordRoute,
+  recordNav,
+  withRecordEntries,
+  type RecordNavEntry,
+  type RecordRouteMatch,
+} from './module-registry.js';
+export {
+  RecordsProvider,
+  listQuery,
+  useRecords,
+  type ArchivedMode,
+  type ListFilterInput,
+  type ListParams,
+  type RecordMutation,
+  type RecordsClient,
+  type RecordsContextValue,
+  type RecordsError,
+  type RecordsErrorCode,
+  type RecordsResult,
+} from './records/client.js';
+export {
+  enumLabelKeys,
+  fieldLabel,
+  formatValue,
+  listActionsFor,
+  recordTitle,
+  typeName,
+  typePlural,
+  type ListActions,
+} from './records/format.js';
+export { RecordForm, type RecordFormProps } from './records/RecordForm.js';
+export { HistoryTimeline, RecordPage, type RecordPageProps } from './records/RecordPage.js';
+export { RecordTable, type RecordTableProps } from './records/RecordTable.js';
+export { recordHref } from './records/refs.js';

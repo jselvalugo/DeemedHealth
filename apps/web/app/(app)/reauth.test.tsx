@@ -93,6 +93,54 @@ describe('re-authentication dialog (ADR-0006 rule 5)', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('shares one dialog between concurrent requests and retries them all (finding L6)', async () => {
+    const user = userEvent.setup();
+    const byUrl = (url: string) =>
+      url === '/api/auth/reauth/totp'
+        ? json(200, { reauthenticatedAt: 'now', validForSeconds: 300 })
+        : null;
+    let first = 0;
+    const fetchImpl = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      const reauth = byUrl(url);
+      if (reauth) return reauth;
+      // Each of the two requests is refused once, then succeeds.
+      first++;
+      return first <= 2 ? reauthRequired() : json(200, { id: url });
+    });
+    function Two() {
+      const api = useApi();
+      const [results, setResults] = useState<string[]>([]);
+      return (
+        <main>
+          <button
+            type="button"
+            onClick={async () => {
+              const all = await Promise.all([api.post('/api/a'), api.post('/api/b')]);
+              setResults(all.map((r) => (r.ok ? 'ok' : r.code)));
+            }}
+          >
+            Both
+          </button>
+          <p>{results.join(',')}</p>
+        </main>
+      );
+    }
+    render(
+      <ApiProvider locale="en" csrfToken="csrf-1" fetchImpl={fetchImpl}>
+        <Two />
+      </ApiProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Both' }));
+    await screen.findByRole('dialog', { name: 'Confirm it’s you' });
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await user.type(screen.getByLabelText('Code from your authenticator app'), '123456');
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    await screen.findByText('ok,ok');
+    const reauthCalls = fetchImpl.mock.calls.filter(([u]) => String(u) === '/api/auth/reauth/totp');
+    expect(reauthCalls).toHaveLength(1);
+  });
+
   it('shows a wrong code without closing', async () => {
     const user = userEvent.setup();
     const fetchImpl = vi

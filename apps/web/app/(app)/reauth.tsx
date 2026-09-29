@@ -1,10 +1,12 @@
 'use client';
 
 /**
- * Re-authentication (ADR-0006 rule 5). Pages call the API through `useApi().post()`.
+ * Re-authentication (ADR-0006 rule 5). Pages call the API through `useApi()`.
  * When the API answers 401 `reauth_required`, a dialog asks for a passkey or an
  * authenticator code, calls /api/auth/reauth/*, and then retries the original request
- * once. Cancelling returns the original error.
+ * once. Cancelling returns the original error. `withStepUp` wraps any call that can
+ * answer `reauth_required` (the records demo adapter uses it too, with its own
+ * step-up adapter; see `stepUp`).
  */
 import { startAuthentication } from '@simplewebauthn/browser';
 import { KeyRound } from 'lucide-react';
@@ -12,17 +14,40 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { t, type Locale } from '@deemed/i18n';
-import { Alert, Button, Card, Input } from '@deemed/ui';
-import { apiPost, type BrowserResult } from '../../lib/api-browser';
+import { Alert, Button, Input, Modal } from '@deemed/ui';
+import {
+  apiPost,
+  apiRequest,
+  type BrowserResult,
+  type RequestOptions,
+} from '../../lib/api-browser';
 import { compactCode, validateTotp } from '../../lib/auth-validate';
 
-type Api = { post<T = unknown>(path: string, body?: unknown): Promise<BrowserResult<T>> };
+export type Api = {
+  post<T = unknown>(path: string, body?: unknown): Promise<BrowserResult<T>>;
+  request<T = unknown>(
+    method: 'GET' | 'POST' | 'PATCH',
+    path: string,
+    options?: RequestOptions,
+  ): Promise<BrowserResult<T>>;
+  /** Runs a call; on `reauth_required` asks for step-up once and retries once. */
+  withStepUp<T>(call: () => Promise<BrowserResult<T>>): Promise<BrowserResult<T>>;
+};
+
+/**
+ * How the dialog confirms it's you. Defaults to apps/api (`/api/auth/reauth/*`); the
+ * non-production demo passes its own (a server action that accepts the demo code).
+ */
+export type StepUpAdapter = {
+  totp(code: string): Promise<BrowserResult<unknown>>;
+  passkey(): Promise<BrowserResult<unknown>>;
+};
 
 const ApiContext = createContext<Api | null>(null);
 
@@ -37,39 +62,55 @@ export function ApiProvider({
   csrfToken,
   children,
   fetchImpl,
+  stepUp,
 }: {
   locale: Locale;
   csrfToken: string | undefined;
   children: ReactNode;
   /** Tests inject a fake fetch. */
   fetchImpl?: typeof fetch;
+  stepUp?: StepUpAdapter | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const pending = useRef<((ok: boolean) => void) | null>(null);
-
-  const askForReauth = useCallback(
-    () =>
-      new Promise<boolean>((resolve) => {
-        pending.current = resolve;
-        setOpen(true);
-      }),
-    [],
+  // One dialog and one answer for every request that needs step-up at the same time:
+  // concurrent callers share the pending promise, and `finish` resolves all of them.
+  const pending = useRef<{ promise: Promise<boolean>; resolve: (ok: boolean) => void } | null>(
+    null,
   );
 
-  const finish = useCallback((ok: boolean) => {
-    setOpen(false);
-    pending.current?.(ok);
-    pending.current = null;
+  const askForReauth = useCallback(() => {
+    if (pending.current) return pending.current.promise;
+    let resolve: (ok: boolean) => void = () => {};
+    const promise = new Promise<boolean>((r) => {
+      resolve = r;
+    });
+    pending.current = { promise, resolve };
+    setOpen(true);
+    return promise;
   }, []);
 
-  const api: Api = {
-    async post<T>(path: string, body?: unknown) {
-      const first = await apiPost<T>(path, body, csrfToken, fetchImpl);
+  const finish = useCallback((ok: boolean) => {
+    const current = pending.current;
+    pending.current = null;
+    setOpen(false);
+    current?.resolve(ok);
+  }, []);
+
+  const api = useMemo<Api>(() => {
+    async function withStepUp<T>(call: () => Promise<BrowserResult<T>>) {
+      const first = await call();
       if (first.ok || first.code !== 'reauth_required') return first;
       if (!(await askForReauth())) return first;
-      return apiPost<T>(path, body, csrfToken, fetchImpl);
-    },
-  };
+      return call();
+    }
+    return {
+      withStepUp,
+      post: <T,>(path: string, body?: unknown) =>
+        withStepUp(() => apiPost<T>(path, body, csrfToken, fetchImpl)),
+      request: <T,>(method: 'GET' | 'POST' | 'PATCH', path: string, options?: RequestOptions) =>
+        withStepUp(() => apiRequest<T>(method, path, options, csrfToken, fetchImpl)),
+    };
+  }, [askForReauth, csrfToken, fetchImpl]);
 
   return (
     <ApiContext.Provider value={api}>
@@ -79,6 +120,7 @@ export function ApiProvider({
           locale={locale}
           csrfToken={csrfToken}
           fetchImpl={fetchImpl}
+          stepUp={stepUp}
           onDone={() => finish(true)}
           onCancel={() => finish(false)}
         />
@@ -93,25 +135,20 @@ export function ReauthDialog({
   onDone,
   onCancel,
   fetchImpl,
+  stepUp,
 }: {
   locale: Locale;
   csrfToken: string | undefined;
   onDone: () => void;
   onCancel: () => void;
   fetchImpl?: typeof fetch | undefined;
+  stepUp?: StepUpAdapter | undefined;
 }) {
   const tr = (k: Parameters<typeof t>[1]) => t(locale, k);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
 
   async function withCode(e: React.FormEvent) {
     e.preventDefault();
@@ -122,7 +159,9 @@ export function ReauthDialog({
       return;
     }
     setBusy(true);
-    const res = await apiPost('/api/auth/reauth/totp', { code: value }, csrfToken, fetchImpl);
+    const res = stepUp
+      ? await stepUp.totp(value)
+      : await apiPost('/api/auth/reauth/totp', { code: value }, csrfToken, fetchImpl);
     setBusy(false);
     if (res.ok) onDone();
     else setError(tr(res.code === 'invalid_code' ? 'mfa.code.invalid' : 'apiError.internal'));
@@ -130,6 +169,13 @@ export function ReauthDialog({
 
   async function withPasskey() {
     setBusy(true);
+    if (stepUp) {
+      const res = await stepUp.passkey();
+      setBusy(false);
+      if (res.ok) onDone();
+      else setError(tr('apiError.invalid_code'));
+      return;
+    }
     const options = await apiPost<Parameters<typeof startAuthentication>[0]['optionsJSON']>(
       '/api/auth/reauth/passkey/options',
       {},
@@ -155,57 +201,56 @@ export function ReauthDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
-      <Card
-        className="w-full max-w-md p-6"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="reauth-title"
-        aria-describedby="reauth-body"
+    // A Radix dialog (focus trap, Esc, aria-modal): it also stacks above another open
+    // dialog, such as the reveal dialog that asked for the step-up.
+    <Modal
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onCancel();
+      }}
+      title={tr('reauth.title')}
+      description={tr('reauth.body')}
+      closeLabel={tr('records.close')}
+      onOpenAutoFocus={(e) => {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }}
+    >
+      {error && (
+        <Alert tone="critical" title={tr('signIn.error.title')}>
+          {error}
+        </Alert>
+      )}
+      <Button
+        type="button"
+        fullWidth
+        icon={<KeyRound aria-hidden="true" size={20} strokeWidth={1.75} />}
+        onClick={withPasskey}
+        disabled={busy}
       >
-        <h2 id="reauth-title" className="text-lg font-semibold text-navy-900">
-          {tr('reauth.title')}
-        </h2>
-        <p id="reauth-body" className="mt-2 text-sm text-gray-700">
-          {tr('reauth.body')}
-        </p>
-        {error && (
-          <Alert tone="critical" title={tr('signIn.error.title')} className="mt-4">
-            {error}
-          </Alert>
-        )}
-        <Button
-          type="button"
-          fullWidth
-          className="mt-4"
-          icon={<KeyRound aria-hidden="true" size={20} strokeWidth={1.75} />}
-          onClick={withPasskey}
-          disabled={busy}
-        >
-          {tr('reauth.passkey')}
-        </Button>
-        <form onSubmit={withCode} noValidate className="mt-4 flex flex-col gap-4">
-          <Input
-            ref={inputRef}
-            id="reauth-code"
-            name="code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            label={tr('reauth.code.label')}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-          <div className="flex gap-2">
-            <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
-              {tr('reauth.cancel')}
-            </Button>
-            <Button type="submit" fullWidth loading={busy} loadingLabel={tr('mfa.verifying')}>
-              {tr('reauth.submit')}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+        {tr('reauth.passkey')}
+      </Button>
+      <form onSubmit={withCode} noValidate className="flex flex-col gap-4">
+        <Input
+          ref={inputRef}
+          id="reauth-code"
+          name="code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          label={tr('reauth.code.label')}
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
+            {tr('reauth.cancel')}
+          </Button>
+          <Button type="submit" fullWidth loading={busy} loadingLabel={tr('mfa.verifying')}>
+            {tr('reauth.submit')}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
