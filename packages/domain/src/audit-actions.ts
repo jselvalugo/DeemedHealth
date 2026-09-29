@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RECORD_AUDIT_ACTIONS } from './generated/record-audit-actions.js';
 
 /**
  * Audit action registry (ADR-0008 §4). `category` is a closed enum; `action` is a
@@ -46,8 +47,12 @@ export const DENIABLE_CATEGORIES: readonly AuditCategory[] = [
 
 type Entry = { category: AuditCategory; description: string };
 
-/** Skeleton: shared-entity and platform actions. Module actions are added as modules ship. */
-export const AUDIT_ACTIONS = {
+/**
+ * Hand-written actions: shared-entity and platform actions. Module actions are added as
+ * modules ship. Record-type actions not listed here are generated from the record type
+ * registry (`generated/record-audit-actions.ts`, ADR-0014 section 2.9).
+ */
+export const BASE_AUDIT_ACTIONS = {
   // auth
   'session.login': { category: 'auth', description: 'Signed in' },
   'session.login_failed': { category: 'auth', description: 'Sign-in failed' },
@@ -57,9 +62,33 @@ export const AUDIT_ACTIONS = {
   'mfa.enrolled': { category: 'auth', description: 'MFA factor enrolled' },
   'mfa.challenge': { category: 'auth', description: 'MFA challenge answered' },
   'mfa.reset': { category: 'auth', description: 'MFA reset by an administrator' },
+  'mfa.enrollment_issued': {
+    category: 'auth',
+    description: 'Single-use MFA enrollment token issued',
+  },
   'scim.user_provisioned': { category: 'auth', description: 'User provisioned via SCIM' },
   'scim.user_deprovisioned': { category: 'auth', description: 'User deprovisioned via SCIM' },
   'breakglass.activated': { category: 'auth', description: 'Break-glass account used' },
+  'session.revoked': {
+    category: 'auth',
+    description: 'Session revoked (sign-out elsewhere, MFA reset, deprovisioning)',
+  },
+  'session.rotated': {
+    category: 'auth',
+    description: 'Session token rotated after a privilege change',
+  },
+  'account.locked': {
+    category: 'auth',
+    description: 'Sign-in temporarily locked after repeated failures',
+  },
+  'access.denied': {
+    category: 'auth',
+    description: 'Request denied by the authorization policy (read or navigation)',
+  },
+  'access.view': {
+    category: 'auth',
+    description: 'Record viewed by a role whose every view is logged (auditor)',
+  },
 
   // mutation (shared entities)
   'organization.update': { category: 'mutation', description: 'Organization settings changed' },
@@ -71,6 +100,10 @@ export const AUDIT_ACTIONS = {
   'person.archive': { category: 'mutation', description: 'Person archived' },
   'user_account.create': { category: 'mutation', description: 'User account created' },
   'user_account.deactivate': { category: 'mutation', description: 'User account deactivated' },
+  'requirement_instance.create': {
+    category: 'mutation',
+    description: 'Requirement applied to a subject',
+  },
   'requirement_instance.update': {
     category: 'mutation',
     description: 'Requirement instance status or owner changed',
@@ -89,6 +122,8 @@ export const AUDIT_ACTIONS = {
   'task.complete': { category: 'mutation', description: 'Task completed' },
   'workflow_run.start': { category: 'mutation', description: 'Workflow started' },
   'import.commit': { category: 'mutation', description: 'Import run committed (summary event)' },
+  'saved_view.create': { category: 'mutation', description: 'Saved list view created' },
+  'saved_view.update': { category: 'mutation', description: 'Saved list view changed' },
 
   // reveal
   'person.reveal_dob': { category: 'reveal', description: 'Date of birth shown in clear text' },
@@ -121,6 +156,10 @@ export const AUDIT_ACTIONS = {
     description: 'Time-boxed auditor access granted',
   },
   'auditor_access.expired': { category: 'permission', description: 'Auditor access expired' },
+  'saved_view.share': {
+    category: 'permission',
+    description: 'Saved list view shared with roles',
+  },
 
   // integration
   'screening_run.complete': {
@@ -145,6 +184,20 @@ export const AUDIT_ACTIONS = {
   'legal_hold.release': { category: 'system', description: 'Legal hold released' },
   'key.rotated': { category: 'system', description: 'Encryption key rotated' },
   'catalog_release.applied': { category: 'system', description: 'Catalog release applied' },
+  'organization.provision': {
+    category: 'system',
+    description: 'Tenant provisioned by the platform',
+  },
+  'seed.load': {
+    category: 'system',
+    description: 'Synthetic seed data loaded (non-production only)',
+  },
+} as const satisfies Record<string, Entry>;
+
+/** Every registered action: the base list plus the generated record-type actions. */
+export const AUDIT_ACTIONS = {
+  ...BASE_AUDIT_ACTIONS,
+  ...RECORD_AUDIT_ACTIONS,
 } as const satisfies Record<string, Entry>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

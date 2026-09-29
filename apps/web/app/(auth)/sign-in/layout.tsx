@@ -1,8 +1,13 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { t } from '@deemed/i18n';
 import { LanguageToggle } from '../../language-toggle';
 import { getLocale } from '../../../lib/session';
+
+// Also as a meta tag, so the policy holds wherever the page is served (the headers in
+// lib/security-headers.ts send the same).
+export const metadata: Metadata = { referrer: 'no-referrer' };
 
 /** White canvas, logo, and language switch for every sign-in step. */
 export default async function SignInLayout({ children }: { children: ReactNode }) {

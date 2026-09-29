@@ -10,11 +10,13 @@
  * silently skipping.
  */
 import { randomBytes } from 'node:crypto';
+import { hash } from '@node-rs/argon2';
 import pg from 'pg';
 import type { TestProject } from 'vitest/node';
 import { migrate } from '../src/migrate.js';
 import { GULF_FIXTURE, XYZ_FIXTURE } from '../seed/fixtures.js';
 import { runSeed } from '../seed/seed.js';
+import { seedAuthIsolationRows } from './auth-fixtures.js';
 import './context.js';
 import { acquirePostgres, withDatabase } from './pg-harness.js';
 
@@ -53,12 +55,19 @@ export default async function setup({ provide }: TestProject) {
     }
     await client.end();
 
+    // Synthetic persona password for the sign-in tests (non-production seed option).
+    const personaPassword = `persona-${randomBytes(9).toString('base64url')}`;
     const [xyz, gulf] = await runSeed({
       connectionString: adminUrl,
       dhEnv: 'local',
       fixtures: [XYZ_FIXTURE, GULF_FIXTURE],
+      personaPasswordHash: await hash(personaPassword),
     });
     if (!xyz || !gulf) throw new Error('seed returned no tenants');
+    await seedAuthIsolationRows(adminUrl, [
+      { organizationId: xyz.organizationId, userAccountId: xyz.userIds.provider1 as string },
+      { organizationId: gulf.organizationId, userAccountId: gulf.userIds.provider1 as string },
+    ]);
 
     provide('db', {
       available: true,
@@ -67,6 +76,7 @@ export default async function setup({ provide }: TestProject) {
       appUserUrl: withDatabase(acquired.adminUrl, dbName, { name: 'app_user', password }),
       platformUrl: withDatabase(acquired.adminUrl, dbName, { name: 'app_platform', password }),
       ownerUrl: withDatabase(acquired.adminUrl, dbName, { name: 'app_owner', password }),
+      personaPassword,
       tenants: {
         xyz: {
           organizationId: xyz.organizationId,

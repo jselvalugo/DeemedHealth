@@ -6,8 +6,8 @@
  * Every tenant table has organization_id NOT NULL and forced RLS (ADR-0002, ADR-0011).
  * No SSN column exists anywhere (decision D1).
  */
-import { boolean, date, interval, pgTable, text, uuid } from 'drizzle-orm/pg-core';
-import { bytea, rowMeta, timestamptz } from './columns.js';
+import { boolean, date, integer, interval, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import { archiveMeta, bytea, rowMeta, timestamptz } from './columns.js';
 
 export const AWARD_TYPES = ['section330', 'lookalike'] as const;
 export type AwardType = (typeof AWARD_TYPES)[number];
@@ -63,6 +63,7 @@ export const organization = pgTable('organization', {
   isTestRecord: boolean('is_test_record').notNull().default(false),
   ...rowMeta(),
   archivedAt: timestamptz('archived_at'),
+  ...archiveMeta(),
 });
 
 export const site = pgTable('site', {
@@ -86,6 +87,7 @@ export const site = pgTable('site', {
   isTestRecord: boolean('is_test_record').notNull().default(false),
   ...rowMeta(),
   archivedAt: timestamptz('archived_at'),
+  ...archiveMeta(),
 });
 
 export const person = pgTable('person', {
@@ -107,6 +109,7 @@ export const person = pgTable('person', {
   isTestRecord: boolean('is_test_record').notNull().default(false),
   ...rowMeta(),
   archivedAt: timestamptz('archived_at'),
+  ...archiveMeta(),
 });
 
 export const userAccount = pgTable('user_account', {
@@ -124,6 +127,7 @@ export const userAccount = pgTable('user_account', {
   isTestRecord: boolean('is_test_record').notNull().default(false),
   ...rowMeta(),
   archivedAt: timestamptz('archived_at'),
+  ...archiveMeta(),
 });
 
 /** Global reference data (no organization_id); read-only to app_user. */
@@ -155,6 +159,19 @@ export const roleAssignment = pgTable('role_assignment', {
   revokedBy: uuid('revoked_by'),
   revokeReason: text('revoke_reason'),
   ...rowMeta(),
+  /** Executive grants only: the approval area (public.approval_area). */
+  approvalArea: text('approval_area'),
+  rowVersion: integer('row_version').notNull().default(1),
+});
+
+/** Global reference data: executive approval areas (confirmed, decision D16). */
+export const approvalArea = pgTable('approval_area', {
+  key: text('key').primaryKey(),
+  modules: text('modules').array().notNull(),
+  descriptionEn: text('description_en').notNull(),
+  status: text('status', { enum: ['proposed', 'confirmed'] })
+    .notNull()
+    .default('proposed'),
 });
 
 export const requirementInstance = pgTable('requirement_instance', {
@@ -174,6 +191,7 @@ export const requirementInstance = pgTable('requirement_instance', {
   statusComputedAt: timestamptz('status_computed_at'),
   ...rowMeta(),
   archivedAt: timestamptz('archived_at'),
+  ...archiveMeta(),
 });
 
 export const task = pgTable('task', {
@@ -190,6 +208,7 @@ export const task = pgTable('task', {
   completedAt: timestamptz('completed_at'),
   ...rowMeta(),
   archivedAt: timestamptz('archived_at'),
+  ...archiveMeta(),
 });
 
 /** Insert-only for app_user. Recorded by the approving human in their own session. */
@@ -208,4 +227,24 @@ export const approval = pgTable('approval', {
   requirementIds: text('requirement_ids').array().notNull().default([]),
   decidedAt: timestamptz('decided_at').notNull().defaultNow(),
   ...rowMeta(),
+});
+
+export const SAVED_VIEW_VISIBILITIES = ['private', 'roles'] as const;
+
+/** A list view for one record type (ADR-0014 section 6); never widens access. */
+export const savedView = pgTable('saved_view', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id')
+    .notNull()
+    .references(() => organization.id),
+  recordType: text('record_type').notNull(),
+  ownerUserAccountId: uuid('owner_user_account_id').notNull(),
+  name: text('name').notNull(),
+  visibility: text('visibility', { enum: SAVED_VIEW_VISIBILITIES }).notNull().default('private'),
+  sharedRoles: text('shared_roles').array().notNull().default([]),
+  query: jsonb('query').notNull().default({}),
+  columns: text('columns').array().notNull().default([]),
+  rowVersion: integer('row_version').notNull().default(1),
+  ...rowMeta(),
+  archivedAt: timestamptz('archived_at'),
 });

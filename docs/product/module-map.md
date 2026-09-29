@@ -27,7 +27,36 @@ Status: `MVP` = first release, `Next` = second release, `Planned` = shown in
 | 13 | **Learning** | `graduation-cap` | Required trainings, assignments, and completion evidence by role. | Catalog `/learning` · Assignments `/learning/assignments` · Completions `/learning/completions` | Ch. 5, 21 | Next |
 | 14 | **Tasks & Workflows** | `list-checks` | Every action item across modules, with owners, due dates, and approvals. | My tasks `/tasks` · Team queue `/tasks/team` · Workflows `/tasks/workflows` · Approvals `/tasks/approvals` | All | MVP |
 | 15 | **Self-Service** | `user-round-check` | Staff and board members update their own documents, attestations, and trainings. | My profile `/me` · My documents `/me/documents` · My attestations `/me/attestations` | Ch. 5, 13 | Next |
-| 16 | **Administration** | `settings` | Users, roles, sites, integrations, audit log, and health center settings. | Users & roles `/admin/users` · Organization & sites `/admin/org` · Integrations `/admin/integrations` · Requirements catalog `/admin/catalog` · Audit log `/admin/audit` · Support access `/admin/support-access` | — | MVP |
+| 16 | **Administration** | `settings` | Users, roles, sites, integrations, audit log, and health center settings. | Users & roles `/admin/users` · People `/admin/people` · Organization & sites `/admin/org` · Integrations `/admin/integrations` · Requirements catalog `/admin/catalog` · Audit log `/admin/audit` · Support access `/admin/support-access` | — | MVP |
+
+**People** (`/admin/people`, added in S4b and proposed for product owner confirmation) lists
+the `person` record type: every human the health center tracks (staff, providers, board
+members, contractor contacts), with or without a sign-in account. It sits next to Users &
+roles because accounts and role grants hang off a person.
+
+## Record types
+
+Added in Phase 1 slice S4b (ADR-0014 section 3). Every registered record type
+(`packages/domain/src/records/registry.ts`) has a list route and a record route. The record
+route's `:id` is a UUID, so it never collides with a page route. Where a page above is the
+list of a record type, the page names the type (`recordType` on the registry's
+`PageEntry`) and its route is the list route. A list without its own page is hosted by
+the page named in the "Page" column; it appears in the launcher and command palette under
+its module, but not as a module bar tab. The launcher also offers "New <record>" for
+types the user's role can create (`<list route>?new=1` opens the create drawer).
+`RECORD_NAV` in `packages/ui/module-registry.ts` is generated from the domain registry,
+and a test fails when it disagrees with this table.
+
+| Record type | Module | Page | List route | Record route | Read permission | Create | Status |
+|---|---|---|---|---|---|---|---|
+| `site` | Administration | Organization & sites | `/admin/org` | `/admin/org/:id` | `admin:read` | `admin:write` | S4b |
+| `person` | Administration | People | `/admin/people` | `/admin/people/:id` | `admin:read` | `admin:write` | S4b (page proposed) |
+| `user_account` | Administration | Users & roles | `/admin/users` | `/admin/users/:id` | `admin:read` | — (S7 account actions) | S4b |
+| `role_assignment` | Administration | Users & roles | `/admin/role-assignments` | `/admin/role-assignments/:id` | `admin:read` | — (step-up grant and revoke) | S4b |
+| `requirement_instance` | HRSA Readiness | Requirements | `/readiness` | `/readiness/:id` | `readiness:read` | `readiness:write` | S4b |
+
+Read-only types from ADR-0014 section 4 (`requirement`, `audit_event`) and `task` join this
+table when they are registered (S5, S7).
 
 **Support access** (`/admin/support-access`, permission `admin.support_access.approve`,
 default Compliance officer) is where a customer administrator approves or denies Loogo Labs
@@ -87,6 +116,7 @@ opened from any page, plus a "Deemed briefs" card on the Command Center. See
 | Finance | Finance & Grants, Contracts, Scope (read), Tasks |
 | Staff / provider | Self-Service, Learning, My tasks |
 | Auditor (time-boxed) | Read-only, the evidence library, and exports. Every view is logged |
+| Health center administrator | Administration: users & roles, organization & sites, integrations, support access. No compliance module data (decision D15) |
 
 All roles can be limited to specific sites.
 

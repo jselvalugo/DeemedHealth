@@ -1,10 +1,8 @@
-// Placeholder for @deemed/api. Real code arrives in Phase 1 (see ADR-0001).
-import { DB_ROLES, type Permission } from '@deemed/domain';
-
-export const packageName = '@deemed/api';
-
-/** The API connects only as the runtime role (ADR-0011). */
-export const runtimeDbRole = DB_ROLES.runtime;
-
-/** Route manifest entries (S3) name the permission they require. */
-export type RoutePermission = Permission;
+// @deemed/api: the Fastify API (ADR-0001, ADR-0010 section 1).
+export { buildApp, type BuildAppOptions } from './app.js';
+export { createApi } from './create.js';
+export { ConfigError, loadApiConfig, type ApiConfig } from './config.js';
+export { createFetchHandler, type FetchHandlerOptions } from './adapters/fetch.js';
+export { createApiHandler, type RequestHandler } from './entry.js';
+export { ROUTES, ROUTE_IDS, requiredCases, type RouteId, type RouteSpec } from './manifest.js';
+export type { AppServices, RequestContext } from './context.js';

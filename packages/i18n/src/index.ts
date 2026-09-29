@@ -3,12 +3,16 @@ import { en } from './en.js';
 import { es } from './es.js';
 import { modulesEn } from './modules.en.js';
 import { modulesEs } from './modules.es.js';
+import { recordsEn } from './records.en.js';
+import { recordsEs } from './records.es.js';
+import { recordsUiEn } from './records-ui.en.js';
+import { recordsUiEs } from './records-ui.es.js';
 
 export const LOCALES = ['en', 'es'] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = 'en';
 
-const enAll = { ...en, ...modulesEn };
+const enAll = { ...en, ...modulesEn, ...recordsEn, ...recordsUiEn };
 
 export type MessageKey = keyof typeof enAll;
 /** Alias used by the module registry (docs/product/module-map.md "Registry entry shape"). */
@@ -16,7 +20,7 @@ export type I18nKey = MessageKey;
 
 export const messages: Record<Locale, Record<MessageKey, string>> = {
   en: enAll,
-  es: { ...es, ...modulesEs },
+  es: { ...es, ...modulesEs, ...recordsEs, ...recordsUiEs },
 };
 
 export type MessageVars = Readonly<Record<string, string | number>>;

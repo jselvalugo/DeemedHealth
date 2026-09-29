@@ -17,6 +17,14 @@ Logo: `assets/brand/deemed-health-logo.png`. Tagline: "FQHC Compliance Software"
 > Status: pre-build. This repository currently holds the agent definitions and
 > the specs they work from. No application code exists yet.
 
+> **Market requirements.** Build toward `docs/compliance/market-requirements.md`
+> (MR-1 to MR-7). If any of them cannot be met under the current scope,
+> principles, or ADRs, stop that part of the work and notify the product owner
+> as its §4 describes. Never work around it silently.
+> Decided 2026-09-27 (MR-D0): Deemed Health stays compliance software. No ONC
+> certification, no UDS computed from patient-level data, and no Medicaid PPS
+> billing. Build the compliance side of each requirement only.
+
 ## Product principles
 
 1. **Readiness is continuous.** Every HRSA requirement maps to evidence, an
@@ -47,6 +55,7 @@ Logo: `assets/brand/deemed-health-logo.png`. Tagline: "FQHC Compliance Software"
 | `docs/product/implementation-roadmap.md` | Build phases and the security/compliance gates each one must pass before real data is allowed |
 | `docs/compliance/hrsa-requirements-framework.md` | HRSA requirements mapped to modules, evidence, and cadences |
 | `docs/compliance/florida.md` | Florida operating profile: state sources, privacy and breach rules, time zones |
+| `docs/compliance/market-requirements.md` | What Florida FQHCs expect (ONC, HIPAA, OSV, UDS, Medicaid PPS, Florida rules), what is on plan, and what is blocked |
 | `docs/adr/` | Architecture Decision Records (`NNNN-title.md`) |
 | `assets/brand/` | Logo and brand assets |
 

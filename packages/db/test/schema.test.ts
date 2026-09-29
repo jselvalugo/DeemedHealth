@@ -148,7 +148,7 @@ describeDb('schema against the database', () => {
     expect(isValidNpi(orgRow.rows[0].npi)).toBe(true);
 
     const sites = await admin.query<{ time_zone: string; n: string }>(
-      `SELECT time_zone, count(*) AS n FROM public.site WHERE organization_id = $1 AND state = 'FL' AND is_test_record GROUP BY 1 ORDER BY 1`,
+      `SELECT time_zone, count(*) AS n FROM public.site WHERE organization_id = $1 AND state = 'FL' AND is_test_record GROUP BY 1 ORDER BY time_zone COLLATE "C"`,
       [org],
     );
     expect(sites.rows).toEqual([
@@ -164,8 +164,11 @@ describeDb('schema against the database', () => {
     );
     expect(notTest.rowCount).toBe(0);
 
+    // The seeded tenants' people (other test files provision their own synthetic tenants,
+    // whose people carry other test NPIs, in the same database).
     const npis = await admin.query<{ npi: string }>(
-      `SELECT npi FROM public.person WHERE npi IS NOT NULL`,
+      `SELECT npi FROM public.person WHERE npi IS NOT NULL AND organization_id = ANY($1::uuid[])`,
+      [[org, c.tenants.gulf.organizationId]],
     );
     expect(npis.rowCount).toBeGreaterThanOrEqual(2);
     for (const { npi } of npis.rows) {

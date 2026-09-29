@@ -70,6 +70,7 @@ export const es: Record<keyof typeof en, string> = {
   'release.next': 'Próxima versión',
   'release.planned': 'Planificado',
 
+  'role.org_admin.name': 'Administrador del centro de salud',
   'role.executive.name': 'Ejecutivo',
   'role.compliance_officer.name': 'Oficial de cumplimiento',
   'role.credentialing_coordinator.name': 'Coordinador de credenciales',
@@ -186,4 +187,63 @@ export const es: Record<keyof typeof en, string> = {
   'recovery.password.body':
     'Si su centro de salud usa inicio de sesión único, restablézcala con su equipo de TI. Si no, su administrador puede enviarle un enlace para restablecerla.',
   'recovery.back': 'Volver a iniciar sesión',
+  // Configuración del segundo paso al iniciar sesión por primera vez
+  'mfa.setup.title': 'Configure la verificación en dos pasos',
+  'mfa.setup.body':
+    'Su centro de salud exige un segundo paso cada vez que inicia sesión. Elija uno ahora; no puede omitir este paso.',
+  'mfa.setup.passkey': 'Crear una llave de acceso',
+  'mfa.setup.passkeyHint': 'Recomendado. Usa Touch ID, Windows Hello o una llave de seguridad.',
+  'mfa.setup.totp': 'Usar una aplicación de autenticación',
+  'mfa.setup.secret.label': 'Clave de configuración para su aplicación de autenticación',
+  'mfa.setup.secret.hint':
+    'En su aplicación de autenticación, agregue una cuenta e ingrese esta clave. Luego escriba el código de 6 dígitos que aparece.',
+  'mfa.setup.token.label': 'Código de configuración de su administrador',
+  'mfa.setup.token.hint':
+    'Su administrador se lo envía cuando crea su cuenta o restablece sus métodos de inicio de sesión.',
+  'mfa.setup.submit': 'Terminar la configuración',
+
+  // Diálogo de nueva autenticación
+  'reauth.title': 'Confirme que es usted',
+  'reauth.body':
+    'Esta acción requiere una verificación reciente. Confirme con su llave de acceso o con un código de su aplicación de autenticación.',
+  'reauth.passkey': 'Confirmar con una llave de acceso',
+  'reauth.code.label': 'Código de su aplicación de autenticación',
+  'reauth.submit': 'Confirmar',
+  'reauth.cancel': 'Cancelar',
+
+  'recovery.unavailable':
+    'Los códigos de recuperación aún no están disponibles. Pida al administrador de su centro de salud que restablezca sus métodos de inicio de sesión.',
+
+  // Errores de la API
+  'apiError.bad_request':
+    'Falta información o no tiene el formato correcto. Revise el formulario e intente de nuevo.',
+  'apiError.unauthenticated': 'Su sesión está cerrada. Inicie sesión para continuar.',
+  'apiError.session_expired': 'Su sesión terminó. Inicie sesión de nuevo para continuar.',
+  'apiError.reauth_required': 'Confirme que es usted para continuar.',
+  'apiError.mfa_required': 'Complete el segundo paso de inicio de sesión para continuar.',
+  'apiError.mfa_enrollment_required': 'Configure la verificación en dos pasos para continuar.',
+  'apiError.invalid_credentials': 'El correo y la contraseña no coinciden con nuestros registros.',
+  'apiError.invalid_code':
+    'Ese código no funcionó. Ingrese el código más reciente de su aplicación.',
+  'apiError.too_many_attempts': 'Demasiados intentos. Espere unos minutos e intente de nuevo.',
+  'apiError.organization_required': 'Elija el centro de salud al que desea ingresar.',
+  'apiError.forbidden': 'Su función no permite esta acción.',
+  'apiError.not_found': 'No encontramos ese registro.',
+  'apiError.conflict':
+    'Este registro cambió o ya se actualizó. Vuelva a cargar e intente de nuevo.',
+  'apiError.version_conflict':
+    'Otra persona cambió este registro mientras usted lo editaba. Revise sus cambios y vuelva a aplicar los suyos.',
+  'apiError.precondition_required':
+    'No pudimos saber qué versión de este registro editó. Vuelva a cargarlo e intente de nuevo.',
+  'apiError.csrf_failed':
+    'No pudimos confirmar que esta solicitud viene de Deemed Health. Vuelva a cargar la página e intente de nuevo.',
+  'apiError.payload_too_large':
+    'Es demasiado grande para enviarlo. Pruebe con un archivo más pequeño o menos texto.',
+  'apiError.unsupported': 'Esta opción no está disponible para su cuenta.',
+  'apiError.not_configured':
+    'Este entorno aún no está conectado a su base de datos. Intente más tarde.',
+  'apiError.enrollment_token_invalid':
+    'Ese código de configuración no funcionó. Puede haber vencido o ya se usó. Pida uno nuevo al administrador de su centro de salud.',
+  'apiError.internal':
+    'Algo salió mal de nuestro lado. Intente de nuevo. Si sigue ocurriendo, comuníquese con soporte e indique el número de referencia.',
 };

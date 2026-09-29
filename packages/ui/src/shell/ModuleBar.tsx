@@ -79,7 +79,8 @@ export function ModuleBar({
   LinkComponent: A,
   onOpenLauncher,
 }: ModuleBarProps) {
-  const pages = module?.pages ?? [];
+  // Launcher-only entries (record lists, "New …") are never module bar tabs.
+  const pages = (module?.pages ?? []).filter((p) => !p.launcherOnly);
   const { listRef, measureRef, visible } = useVisibleCount(pages.length);
   const shown = pages.slice(0, visible);
   const overflow = pages.slice(visible);

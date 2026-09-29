@@ -3,7 +3,7 @@
 <!-- Generated from packages/db/src/data-dictionary.ts by `pnpm --filter @deemed/db dictionary`. Do not edit by hand. -->
 
 Owner: `data-architect`. Classes follow `docs/security/data-classification.md`.
-Every column of every table in the `public`, `audit`, and `platform` schemas is listed;
+Every column of every table in the `public`, `audit`, `auth`, and `platform` schemas is listed;
 the `@deemed/db` tests fail when a column is missing here. No SSN column exists (decision D1).
 
 Scope: **tenant** = `organization_id` (or `organization.id`) with forced RLS;
@@ -34,6 +34,9 @@ The health center (tenant). Florida only (D4). Scope: tenant. Owner: `data-archi
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
 | `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
 | `archived_at` | internal | Soft-delete time; archived rows are hidden, never hard-deleted | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+| `archived_by` | internal | user_account that archived the row; always the transaction actor (set_row_meta) | at rest | no | shown |
+| `archive_reason` | PII | Why the row was archived (free text) | at rest | no | shown |
 
 ## `public.site`
 
@@ -60,6 +63,9 @@ A health center site; links to Form 5B. Scope: tenant. Owner: `data-architect`.
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
 | `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
 | `archived_at` | internal | Soft-delete time; archived rows are hidden, never hard-deleted | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+| `archived_by` | internal | user_account that archived the row; always the transaction actor (set_row_meta) | at rest | no | shown |
+| `archive_reason` | PII | Why the row was archived (free text) | at rest | no | shown |
 
 ## `public.person`
 
@@ -83,6 +89,9 @@ One row per human: staff, provider, board member, contractor contact, auditor. N
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
 | `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
 | `archived_at` | internal | Soft-delete time; archived rows are hidden, never hard-deleted | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+| `archived_by` | internal | user_account that archived the row; always the transaction actor (set_row_meta) | at rest | no | shown |
+| `archive_reason` | PII | Why the row was archived (free text) | at rest | no | shown |
 
 ## `public.user_account`
 
@@ -105,6 +114,9 @@ Sign-in identity for a person (ADR-0006). Scope: tenant. Owner: `data-architect`
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
 | `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
 | `archived_at` | internal | Soft-delete time; archived rows are hidden, never hard-deleted | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+| `archived_by` | internal | user_account that archived the row; always the transaction actor (set_row_meta) | at rest | no | shown |
+| `archive_reason` | PII | Why the row was archived (free text) | at rest | no | shown |
 
 ## `public.role`
 
@@ -133,14 +145,131 @@ Role granted to a user, optionally limited to a site and optionally expiring. Sc
 | `site_id` | internal | Site scope; NULL means all sites | at rest | no | shown |
 | `valid_from` | internal | Start of the grant | at rest | no | shown |
 | `expires_at` | internal | End of the grant; required for auditors (max 30 days) | at rest | no | shown |
-| `grant_reason` | confidential | Why the role was granted | at rest | no | shown |
+| `grant_reason` | PII | Why the role was granted (free text) | at rest | no | shown |
 | `revoked_at` | internal | When the grant was revoked | at rest | no | shown |
 | `revoked_by` | internal | Who revoked it (NULL for a service actor) | at rest | no | shown |
-| `revoke_reason` | confidential | Why the grant was revoked | at rest | no | shown |
+| `revoke_reason` | PII | Why the grant was revoked (free text) | at rest | no | shown |
 | `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
 | `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
 | `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+| `approval_area` | internal | Executive grants only: approval area (public.approval_area) | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+
+## `public.approval_area`
+
+Executive approval areas: which modules an executive grant may approve. Confirmed by the product owner (D16). Scope: global. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `key` | internal | Area key | at rest | no | shown |
+| `modules` | internal | Module ids the area covers | at rest | no | shown |
+| `description_en` | internal | Description (English) | at rest | no | shown |
+| `status` | internal | confirmed (or proposed for a new area awaiting sign-off) | at rest | no | shown |
+
+## `auth.local_credential`
+
+Local account password (ADR-0006 rule 2). Argon2id hash only. Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Credential id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account the password belongs to | at rest | no | shown |
+| `password_hash` | confidential | Argon2id PHC string; never plaintext | at rest | no | hidden |
+| `password_set_at` | internal | When the password was set | at rest | no | shown |
+| `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
+| `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
+| `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
+| `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+
+## `auth.auth_factor`
+
+MFA factor: passkey (WebAuthn) or TOTP. No SMS or email codes (ADR-0006 rule 3). Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Factor id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account the factor belongs to | at rest | no | shown |
+| `kind` | internal | totp or passkey | at rest | no | shown |
+| `label` | internal | Name shown to the user (e.g. "Authenticator app") | at rest | no | shown |
+| `totp_secret_enc` | PII | TOTP secret, AES-256-GCM envelope | field | to_verify | hidden |
+| `totp_last_step` | internal | Last accepted TOTP time step (replay guard) | at rest | no | shown |
+| `webauthn_credential_id` | internal | Passkey credential id (base64url) | at rest | no | shown |
+| `webauthn_public_key` | internal | Passkey COSE public key | at rest | no | shown |
+| `webauthn_counter` | internal | Passkey signature counter | at rest | no | shown |
+| `webauthn_transports` | internal | Passkey transports hint | at rest | no | shown |
+| `verified_at` | internal | When the factor was proven during enrollment | at rest | no | shown |
+| `last_used_at` | internal | Last successful use | at rest | no | shown |
+| `revoked_at` | internal | When the factor was revoked (MFA reset) | at rest | no | shown |
+| `revoke_reason` | internal | Why the factor was revoked (code, e.g. mfa_reset) | at rest | no | shown |
+| `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
+| `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
+| `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
+| `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+
+## `auth.login_attempt`
+
+A sign-in between the password and the second factor (10 minutes at most). Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Attempt id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account signing in | at rest | no | shown |
+| `token_hash` | confidential | SHA-256 of the pending sign-in cookie | at rest | no | hidden |
+| `created_at` | internal | Start of the attempt | at rest | no | shown |
+| `expires_at` | internal | End of the attempt | at rest | no | shown |
+| `password_verified_at` | internal | When the password was verified | at rest | no | shown |
+| `webauthn_challenge` | internal | Outstanding WebAuthn challenge | at rest | no | shown |
+| `failed_mfa_count` | internal | Wrong second-factor answers in this attempt | at rest | no | shown |
+| `consumed_at` | internal | When the attempt became a session | at rest | no | shown |
+| `ip_address` | PII | Client IP address | at rest | no | masked |
+| `user_agent` | internal | Client user agent | at rest | no | shown |
+
+## `auth.enrollment_token`
+
+Single-use, expiring token that allows enrolling a first MFA factor; issued by invitation or MFA reset and delivered out of band. Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Token id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account the token lets enroll | at rest | no | shown |
+| `token_hash` | confidential | SHA-256 of the token | at rest | no | hidden |
+| `purpose` | internal | invite or mfa_reset | at rest | no | shown |
+| `created_at` | internal | When the token was issued | at rest | no | shown |
+| `expires_at` | internal | When it stops working (at most 7 days) | at rest | no | shown |
+| `consumed_at` | internal | When it was used to enroll | at rest | no | shown |
+| `revoked_at` | internal | When it was revoked (superseded or MFA reset) | at rest | no | shown |
+| `issued_by` | internal | user_account that issued it (NULL for the platform) | at rest | no | shown |
+
+## `auth.session`
+
+Server-side session (ADR-0006 rule 4): 15-minute idle, 12-hour absolute, one tenant, MFA required. Scope: tenant. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Session id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Signed-in account | at rest | no | shown |
+| `token_hash` | confidential | SHA-256 of the session cookie | at rest | no | hidden |
+| `issued_at` | internal | Sign-in time | at rest | no | shown |
+| `last_seen_at` | internal | Last request (idle timeout) | at rest | no | shown |
+| `absolute_expires_at` | internal | Absolute end (at most 12 hours) | at rest | no | shown |
+| `idle_timeout_seconds` | internal | Idle timeout (at most 900 seconds) | at rest | no | shown |
+| `mfa_method` | internal | Second factor used at sign-in | at rest | no | shown |
+| `mfa_factor_id` | internal | Factor used at sign-in | at rest | no | shown |
+| `mfa_at` | internal | When the second factor was verified | at rest | no | shown |
+| `reauth_at` | internal | Last step-up (re-authentication) | at rest | no | shown |
+| `reauth_challenge` | internal | Outstanding WebAuthn challenge for a passkey step-up | at rest | no | shown |
+| `rotate_required` | internal | Token must rotate on the next request (privilege change) | at rest | no | shown |
+| `rotated_at` | internal | Last token rotation | at rest | no | shown |
+| `revoked_at` | internal | When the session ended | at rest | no | shown |
+| `revoke_reason` | internal | logout, idle, absolute, mfa_reset, deprovisioned, admin | at rest | no | shown |
+| `ip_address` | PII | Client IP address at sign-in | at rest | no | masked |
+| `user_agent` | internal | Client user agent at sign-in | at rest | no | shown |
 
 ## `public.requirement_instance`
 
@@ -157,7 +286,7 @@ A catalog requirement applied to an organization, site, or person. Scope: tenant
 | `site_id` | internal | Site the instance belongs to, if any | at rest | no | shown |
 | `owner_person_id` | internal | Accountable person | at rest | no | shown |
 | `status` | internal | met, due_soon, overdue, missing, not_applicable | at rest | no | shown |
-| `not_applicable_reason` | confidential | Required reason when status is not_applicable | at rest | no | shown |
+| `not_applicable_reason` | PII | Required reason when status is not_applicable (free text) | at rest | no | shown |
 | `next_due_on` | internal | Next due date (site or organization time zone) | at rest | no | shown |
 | `status_computed_at` | internal | When the readiness engine last computed the status | at rest | no | shown |
 | `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
@@ -165,6 +294,9 @@ A catalog requirement applied to an organization, site, or person. Scope: tenant
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
 | `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
 | `archived_at` | internal | Soft-delete time; archived rows are hidden, never hard-deleted | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+| `archived_by` | internal | user_account that archived the row; always the transaction actor (set_row_meta) | at rest | no | shown |
+| `archive_reason` | PII | Why the row was archived (free text) | at rest | no | shown |
 
 ## `public.task`
 
@@ -186,6 +318,9 @@ Work item, usually generated by a requirement instance. Scope: tenant. Owner: `d
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
 | `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
 | `archived_at` | internal | Soft-delete time; archived rows are hidden, never hard-deleted | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+| `archived_by` | internal | user_account that archived the row; always the transaction actor (set_row_meta) | at rest | no | shown |
+| `archive_reason` | PII | Why the row was archived (free text) | at rest | no | shown |
 
 ## `public.approval`
 
@@ -201,13 +336,35 @@ A human approval or rejection. Insert-only; AI never approves. Scope: tenant. Ow
 | `approver_person_id` | internal | Approving person | at rest | no | shown |
 | `approver_user_account_id` | internal | Approving user account; must be the transaction actor | at rest | no | shown |
 | `decision` | internal | approved or rejected | at rest | no | shown |
-| `comment` | confidential | Approver comment | at rest | no | shown |
+| `comment` | PII | Approver comment (free text) | at rest | no | shown |
 | `requirement_ids` | public | Catalog requirementIds the decision supports | at rest | no | shown |
 | `decided_at` | internal | Decision time (UTC) | at rest | no | shown |
 | `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
 | `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
 | `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
 | `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+
+## `public.saved_view`
+
+A saved list view (filters, sort, columns) for one record type; private or shared with roles. Never widens access. Scope: tenant. Owner: `data-architect`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Saved view id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `record_type` | internal | Record type id from the registry | at rest | no | shown |
+| `owner_user_account_id` | internal | user_account that owns the view | at rest | no | shown |
+| `name` | internal | View name; no personal data (ADR-0014 section 4.5) | at rest | no | shown |
+| `visibility` | internal | private or roles | at rest | no | shown |
+| `shared_roles` | internal | Role keys the view is shared with (visibility roles) | at rest | no | shown |
+| `query` | PII | Filters, sort, and search text of the view (may hold a typed name) | at rest | no | shown |
+| `columns` | internal | Visible columns | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+| `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
+| `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
+| `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
+| `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+| `archived_at` | internal | When the view was removed | at rest | no | shown |
 
 ## `audit.action_registry`
 
@@ -275,3 +432,28 @@ Cross-tenant registry for platform jobs; no runtime role reads it directly. Scop
 | `is_test_record` | internal | Synthetic tenant | at rest | no | shown |
 | `provisioned_at` | internal | When the tenant was provisioned | at rest | no | shown |
 | `provisioned_by` | internal | Platform actor label or database user that provisioned it | at rest | no | shown |
+
+## `platform.login_directory`
+
+Login email to tenant for sign-in; read only through auth.resolve_login (ids only). Scope: platform. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `user_account_id` | internal | Account | at rest | no | shown |
+| `email_lower` | PII | Login email, lower case | at rest | to_verify | hidden |
+| `is_active` | internal | Account can sign in | at rest | no | shown |
+| `updated_at` | internal | Last sync from user_account | at rest | no | shown |
+
+## `platform.auth_throttle`
+
+Sign-in throttle and lockout state per account or IP prefix, keyed by a SHA-256 digest. Scope: platform. Owner: `security-privacy-officer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `key_hash` | internal | SHA-256 of "account:<email>" or "ip:<prefix>" | at rest | no | shown |
+| `scope` | internal | account or ip | at rest | no | shown |
+| `failures` | internal | Failures in the current window | at rest | no | shown |
+| `window_started_at` | internal | Start of the counting window | at rest | no | shown |
+| `locked_until` | internal | Locked until this time | at rest | no | shown |
+| `updated_at` | internal | Last change | at rest | no | shown |

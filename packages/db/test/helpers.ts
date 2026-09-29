@@ -94,11 +94,11 @@ export interface TenantTable {
 }
 
 /** Schemas whose tables belong to the application (tenant, global, and platform tables). */
-export const APP_SCHEMAS = ['public', 'audit', 'platform'] as const;
+export const APP_SCHEMAS = ['public', 'audit', 'auth', 'platform'] as const;
 
 /**
  * Tenant tables discovered from pg_catalog: every ordinary or partitioned (not partition)
- * table in public/audit with an organization_id column, plus public.organization.
+ * table in public/audit/auth with an organization_id column, plus public.organization.
  */
 export async function discoverTenantTables(client: pg.Client): Promise<TenantTable[]> {
   const { rows } = await client.query<{ schema: string; table: string; key: string }>(`
@@ -106,7 +106,7 @@ export async function discoverTenantTables(client: pg.Client): Promise<TenantTab
            CASE WHEN n.nspname = 'public' AND c.relname = 'organization' THEN 'id' ELSE 'organization_id' END AS key
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname IN ('public', 'audit')
+    WHERE n.nspname IN ('public', 'audit', 'auth')
       AND c.relkind IN ('r', 'p')
       AND NOT c.relispartition
       AND (EXISTS (SELECT 1 FROM pg_attribute a

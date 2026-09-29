@@ -29,6 +29,7 @@ export const KIND = {
   requirementInstance: 6,
   task: 7,
   approval: 8,
+  savedView: 9,
 } as const;
 
 export interface FixtureRoleGrant {
@@ -87,6 +88,22 @@ export interface FixtureApproval {
   test: true;
 }
 
+/** A saved list view (ADR-0014 section 6); `query` uses the record API's list query. */
+export interface FixtureSavedView {
+  key: string;
+  recordType: string;
+  /** Person key of the owner; must have an account. */
+  owner: string;
+  name: string;
+  visibility: 'private' | 'roles';
+  sharedRoles?: readonly string[];
+  query: {
+    filters: readonly { field: string; op: string; value: string | readonly string[] }[];
+    sort: readonly { field: string; dir: 'asc' | 'desc' }[];
+  };
+  test: true;
+}
+
 export interface TenantFixture {
   fixtureId: string;
   /** 8 hex digits used as the prefix of every record id. */
@@ -97,6 +114,7 @@ export interface TenantFixture {
   requirementInstances: readonly FixtureRequirementInstance[];
   tasks: readonly FixtureTask[];
   approvals: readonly FixtureApproval[];
+  savedViews: readonly FixtureSavedView[];
   /** Identity provider issuer for the fixture's demo accounts. */
   idpIssuer: string;
   emailDomain: string;
@@ -328,6 +346,21 @@ export const XYZ_FIXTURE: TenantFixture = {
       test: true,
     },
   ],
+  savedViews: [
+    {
+      key: 'central-sites',
+      recordType: 'site',
+      owner: 'compliance',
+      name: 'Central time zone sites',
+      visibility: 'roles',
+      sharedRoles: ['compliance_officer', 'org_admin'],
+      query: {
+        filters: [{ field: 'timeZone', op: 'eq', value: 'America/Chicago' }],
+        sort: [{ field: 'name', dir: 'asc' }],
+      },
+      test: true,
+    },
+  ],
 };
 
 /**
@@ -417,6 +450,17 @@ export const GULF_FIXTURE: TenantFixture = {
       approver: 'compliance',
       decision: 'approved',
       requirementIds: ['CM-05-C&P-LIP-LICENSURE'],
+      test: true,
+    },
+  ],
+  savedViews: [
+    {
+      key: 'overdue',
+      recordType: 'requirement_instance',
+      owner: 'compliance',
+      name: 'Overdue requirements',
+      visibility: 'private',
+      query: { filters: [{ field: 'status', op: 'eq', value: 'overdue' }], sort: [] },
       test: true,
     },
   ],

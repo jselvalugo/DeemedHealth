@@ -8,6 +8,11 @@
     "types": []
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test-utils.ts"],
-  "references": [{ "path": "../domain" }, { "path": "../i18n" }]
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/test-utils.ts",
+    "src/records/test-client.ts"
+  ],
+  "references": [{ "path": "../dates" }, { "path": "../domain" }, { "path": "../i18n" }]
 }

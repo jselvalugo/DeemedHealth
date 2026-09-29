@@ -129,6 +129,7 @@ export const modulesEs: Record<keyof typeof modulesEn, string> = {
   'module.admin.description':
     'Usuarios, roles, sitios, integraciones, registro de auditoría y configuración del centro de salud.',
   'page.admin.users': 'Usuarios y roles',
+  'page.admin.people': 'Personas',
   'page.admin.org': 'Organización y sitios',
   'page.admin.integrations': 'Integraciones',
   'page.admin.catalog': 'Catálogo de requisitos',

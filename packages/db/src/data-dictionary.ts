@@ -20,6 +20,11 @@ export interface ColumnEntry {
   fipa?: 'yes' | 'no' | 'to_verify';
   /** UI and API default. Masked/hidden fields need an audited reveal. */
   display?: 'shown' | 'masked' | 'hidden';
+  /**
+   * Free text people type (reasons, comments). It may hold anything, so it is PII and
+   * the audit diff keeps only its length and a per-tenant HMAC (ADR-0008 section 5).
+   */
+  freeText?: boolean;
 }
 
 export interface TableEntry {
@@ -42,8 +47,20 @@ const rowMeta = {
   updated_at: c('internal', 'When the row last changed (UTC), set by the database'),
   updated_by: c('internal', 'user_account that last changed the row'),
 };
+const rowVersion = {
+  row_version: c(
+    'internal',
+    'Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta)',
+  ),
+};
 const archived = {
   archived_at: c('internal', 'Soft-delete time; archived rows are hidden, never hard-deleted'),
+  ...rowVersion,
+  archived_by: c(
+    'internal',
+    'user_account that archived the row; always the transaction actor (set_row_meta)',
+  ),
+  archive_reason: c('PII', 'Why the row was archived (free text)', { freeText: true }),
 };
 const tenantKey = {
   organization_id: c('internal', 'Tenant (organization) that owns the row; RLS key'),
@@ -182,11 +199,132 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       site_id: c('internal', 'Site scope; NULL means all sites'),
       valid_from: c('internal', 'Start of the grant'),
       expires_at: c('internal', 'End of the grant; required for auditors (max 30 days)'),
-      grant_reason: c('confidential', 'Why the role was granted'),
+      grant_reason: c('PII', 'Why the role was granted (free text)', { freeText: true }),
       revoked_at: c('internal', 'When the grant was revoked'),
       revoked_by: c('internal', 'Who revoked it (NULL for a service actor)'),
-      revoke_reason: c('confidential', 'Why the grant was revoked'),
+      revoke_reason: c('PII', 'Why the grant was revoked (free text)', { freeText: true }),
       ...rowMeta,
+      approval_area: c('internal', 'Executive grants only: approval area (public.approval_area)'),
+      ...rowVersion,
+    },
+  },
+  'public.approval_area': {
+    description:
+      'Executive approval areas: which modules an executive grant may approve. Confirmed by the product owner (D16).',
+    scope: 'global',
+    owner: 'security-privacy-officer',
+    columns: {
+      key: c('internal', 'Area key'),
+      modules: c('internal', 'Module ids the area covers'),
+      description_en: c('internal', 'Description (English)'),
+      status: c('internal', 'confirmed (or proposed for a new area awaiting sign-off)'),
+    },
+  },
+  'auth.local_credential': {
+    description: 'Local account password (ADR-0006 rule 2). Argon2id hash only.',
+    scope: 'tenant',
+    owner: 'security-privacy-officer',
+    columns: {
+      id: c('internal', 'Credential id'),
+      ...tenantKey,
+      user_account_id: c('internal', 'Account the password belongs to'),
+      password_hash: c('confidential', 'Argon2id PHC string; never plaintext', {
+        display: 'hidden',
+      }),
+      password_set_at: c('internal', 'When the password was set'),
+      ...rowMeta,
+    },
+  },
+  'auth.auth_factor': {
+    description: 'MFA factor: passkey (WebAuthn) or TOTP. No SMS or email codes (ADR-0006 rule 3).',
+    scope: 'tenant',
+    owner: 'security-privacy-officer',
+    columns: {
+      id: c('internal', 'Factor id'),
+      ...tenantKey,
+      user_account_id: c('internal', 'Account the factor belongs to'),
+      kind: c('internal', 'totp or passkey'),
+      label: c('internal', 'Name shown to the user (e.g. "Authenticator app")'),
+      // Class PII: with the login email it is an account credential (FIPA 501.171 to verify).
+      totp_secret_enc: c('PII', 'TOTP secret, AES-256-GCM envelope', {
+        encryption: 'field',
+        fipa: 'to_verify',
+        display: 'hidden',
+      }),
+      totp_last_step: c('internal', 'Last accepted TOTP time step (replay guard)'),
+      webauthn_credential_id: c('internal', 'Passkey credential id (base64url)'),
+      webauthn_public_key: c('internal', 'Passkey COSE public key'),
+      webauthn_counter: c('internal', 'Passkey signature counter'),
+      webauthn_transports: c('internal', 'Passkey transports hint'),
+      verified_at: c('internal', 'When the factor was proven during enrollment'),
+      last_used_at: c('internal', 'Last successful use'),
+      revoked_at: c('internal', 'When the factor was revoked (MFA reset)'),
+      revoke_reason: c('internal', 'Why the factor was revoked (code, e.g. mfa_reset)'),
+      ...rowMeta,
+    },
+  },
+  'auth.login_attempt': {
+    description: 'A sign-in between the password and the second factor (10 minutes at most).',
+    scope: 'tenant',
+    owner: 'security-privacy-officer',
+    columns: {
+      id: c('internal', 'Attempt id'),
+      ...tenantKey,
+      user_account_id: c('internal', 'Account signing in'),
+      token_hash: c('confidential', 'SHA-256 of the pending sign-in cookie', { display: 'hidden' }),
+      created_at: c('internal', 'Start of the attempt'),
+      expires_at: c('internal', 'End of the attempt'),
+      password_verified_at: c('internal', 'When the password was verified'),
+      webauthn_challenge: c('internal', 'Outstanding WebAuthn challenge'),
+      failed_mfa_count: c('internal', 'Wrong second-factor answers in this attempt'),
+      consumed_at: c('internal', 'When the attempt became a session'),
+      ip_address: c('PII', 'Client IP address', { fipa: 'no', display: 'masked' }),
+      user_agent: c('internal', 'Client user agent'),
+    },
+  },
+  'auth.enrollment_token': {
+    description:
+      'Single-use, expiring token that allows enrolling a first MFA factor; issued by invitation or MFA reset and delivered out of band.',
+    scope: 'tenant',
+    owner: 'security-privacy-officer',
+    columns: {
+      id: c('internal', 'Token id'),
+      ...tenantKey,
+      user_account_id: c('internal', 'Account the token lets enroll'),
+      token_hash: c('confidential', 'SHA-256 of the token', { display: 'hidden' }),
+      purpose: c('internal', 'invite or mfa_reset'),
+      created_at: c('internal', 'When the token was issued'),
+      expires_at: c('internal', 'When it stops working (at most 7 days)'),
+      consumed_at: c('internal', 'When it was used to enroll'),
+      revoked_at: c('internal', 'When it was revoked (superseded or MFA reset)'),
+      issued_by: c('internal', 'user_account that issued it (NULL for the platform)'),
+    },
+  },
+  'auth.session': {
+    description:
+      'Server-side session (ADR-0006 rule 4): 15-minute idle, 12-hour absolute, one tenant, MFA required.',
+    scope: 'tenant',
+    owner: 'security-privacy-officer',
+    columns: {
+      id: c('internal', 'Session id'),
+      ...tenantKey,
+      user_account_id: c('internal', 'Signed-in account'),
+      token_hash: c('confidential', 'SHA-256 of the session cookie', { display: 'hidden' }),
+      issued_at: c('internal', 'Sign-in time'),
+      last_seen_at: c('internal', 'Last request (idle timeout)'),
+      absolute_expires_at: c('internal', 'Absolute end (at most 12 hours)'),
+      idle_timeout_seconds: c('internal', 'Idle timeout (at most 900 seconds)'),
+      mfa_method: c('internal', 'Second factor used at sign-in'),
+      mfa_factor_id: c('internal', 'Factor used at sign-in'),
+      mfa_at: c('internal', 'When the second factor was verified'),
+      reauth_at: c('internal', 'Last step-up (re-authentication)'),
+      reauth_challenge: c('internal', 'Outstanding WebAuthn challenge for a passkey step-up'),
+      rotate_required: c('internal', 'Token must rotate on the next request (privilege change)'),
+      rotated_at: c('internal', 'Last token rotation'),
+      revoked_at: c('internal', 'When the session ended'),
+      revoke_reason: c('internal', 'logout, idle, absolute, mfa_reset, deprovisioned, admin'),
+      ip_address: c('PII', 'Client IP address at sign-in', { fipa: 'no', display: 'masked' }),
+      user_agent: c('internal', 'Client user agent at sign-in'),
     },
   },
   'public.requirement_instance': {
@@ -206,7 +344,9 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       site_id: c('internal', 'Site the instance belongs to, if any'),
       owner_person_id: c('internal', 'Accountable person'),
       status: c('internal', 'met, due_soon, overdue, missing, not_applicable'),
-      not_applicable_reason: c('confidential', 'Required reason when status is not_applicable'),
+      not_applicable_reason: c('PII', 'Required reason when status is not_applicable (free text)', {
+        freeText: true,
+      }),
       next_due_on: c('internal', 'Next due date (site or organization time zone)'),
       status_computed_at: c('internal', 'When the readiness engine last computed the status'),
       ...rowMeta,
@@ -247,10 +387,32 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
         'Approving user account; must be the transaction actor',
       ),
       decision: c('internal', 'approved or rejected'),
-      comment: c('confidential', 'Approver comment'),
+      comment: c('PII', 'Approver comment (free text)', { freeText: true }),
       requirement_ids: c('public', 'Catalog requirementIds the decision supports'),
       decided_at: c('internal', 'Decision time (UTC)'),
       ...rowMeta,
+    },
+  },
+  'public.saved_view': {
+    description:
+      'A saved list view (filters, sort, columns) for one record type; private or shared with roles. Never widens access.',
+    scope: 'tenant',
+    owner: 'data-architect',
+    columns: {
+      id: c('internal', 'Saved view id'),
+      ...tenantKey,
+      record_type: c('internal', 'Record type id from the registry'),
+      owner_user_account_id: c('internal', 'user_account that owns the view'),
+      name: c('internal', 'View name; no personal data (ADR-0014 section 4.5)'),
+      visibility: c('internal', 'private or roles'),
+      shared_roles: c('internal', 'Role keys the view is shared with (visibility roles)'),
+      query: c('PII', 'Filters, sort, and search text of the view (may hold a typed name)', {
+        freeText: true,
+      }),
+      columns: c('internal', 'Visible columns'),
+      row_version: rowVersion.row_version,
+      ...rowMeta,
+      archived_at: c('internal', 'When the view was removed'),
     },
   },
   'audit.action_registry': {
@@ -323,6 +485,33 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       provisioned_by: c('internal', 'Platform actor label or database user that provisioned it'),
     },
   },
+  'platform.login_directory': {
+    description:
+      'Login email to tenant for sign-in; read only through auth.resolve_login (ids only).',
+    scope: 'platform',
+    owner: 'security-privacy-officer',
+    columns: {
+      ...tenantKey,
+      user_account_id: c('internal', 'Account'),
+      email_lower: c('PII', 'Login email, lower case', { fipa: 'to_verify', display: 'hidden' }),
+      is_active: c('internal', 'Account can sign in'),
+      updated_at: c('internal', 'Last sync from user_account'),
+    },
+  },
+  'platform.auth_throttle': {
+    description:
+      'Sign-in throttle and lockout state per account or IP prefix, keyed by a SHA-256 digest.',
+    scope: 'platform',
+    owner: 'security-privacy-officer',
+    columns: {
+      key_hash: c('internal', 'SHA-256 of "account:<email>" or "ip:<prefix>"'),
+      scope: c('internal', 'account or ip'),
+      failures: c('internal', 'Failures in the current window'),
+      window_started_at: c('internal', 'Start of the counting window'),
+      locked_until: c('internal', 'Locked until this time'),
+      updated_at: c('internal', 'Last change'),
+    },
+  },
 };
 
 /** Markdown rendering of the dictionary for docs/data/data-dictionary.md. */
@@ -333,7 +522,7 @@ export function renderDataDictionaryMarkdown(): string {
     '<!-- Generated from packages/db/src/data-dictionary.ts by `pnpm --filter @deemed/db dictionary`. Do not edit by hand. -->',
     '',
     'Owner: `data-architect`. Classes follow `docs/security/data-classification.md`.',
-    'Every column of every table in the `public`, `audit`, and `platform` schemas is listed;',
+    'Every column of every table in the `public`, `audit`, `auth`, and `platform` schemas is listed;',
     'the `@deemed/db` tests fail when a column is missing here. No SSN column exists (decision D1).',
     '',
     'Scope: **tenant** = `organization_id` (or `organization.id`) with forced RLS;',

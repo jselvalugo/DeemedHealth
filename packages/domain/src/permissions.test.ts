@@ -105,8 +105,13 @@ describe('permissions', () => {
     expect(ROLES.find((r) => r.id === 'auditor')?.maxAccessDays).toBe(30);
   });
 
-  it('no role other than the compliance officer can write Administration', () => {
+  it('only the compliance officer and the health center administrator (D15) write Administration', () => {
     const writers = ROLES.filter((r) => roleAllows([r.id], 'admin:write')).map((r) => r.id);
-    expect(writers).toEqual(['compliance_officer']);
+    expect(writers).toEqual(['compliance_officer', 'org_admin']);
+  });
+
+  it('gives the health center administrator no compliance module (D15)', () => {
+    const orgAdmin = ROLES.find((r) => r.id === 'org_admin')!;
+    expect([...new Set(orgAdmin.permissions.map((p) => p.split(':')[0]))]).toEqual(['admin']);
   });
 });

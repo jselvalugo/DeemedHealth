@@ -1,0 +1,20 @@
+{
+  "name": "@deemed/auth",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sessions, local accounts, mandatory MFA (passkeys, TOTP), step-up, throttling (ADR-0006, ADR-0010 section 6).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@deemed/db": "workspace:*",
+    "@deemed/domain": "workspace:*",
+    "@node-rs/argon2": "^2.2.1",
+    "@simplewebauthn/server": "^13.3.3",
+    "drizzle-orm": "^0.45.3",
+    "otpauth": "^9.5.2"
+  }
+}

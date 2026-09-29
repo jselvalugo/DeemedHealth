@@ -2,5 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "rootDir": "src", "outDir": "dist" },
   "include": ["src"],
-  "references": [{ "path": "../../packages/domain" }]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/db" },
+    { "path": "../../packages/auth" },
+    { "path": "../../packages/ui" }
+  ]
 }

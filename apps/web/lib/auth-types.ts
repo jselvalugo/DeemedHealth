@@ -12,6 +12,8 @@ export type AuthErrorCode =
   | 'code_invalid'
   | 'recovery_required'
   | 'recovery_invalid'
+  | 'recovery_unavailable'
+  | 'enrollment_invalid'
   | 'expired'
   | 'unexpected';
 
@@ -37,6 +39,8 @@ export const ERROR_MESSAGES: Record<AuthErrorCode, MessageKey> = {
   code_invalid: 'mfa.code.invalid',
   recovery_required: 'recovery.code.required',
   recovery_invalid: 'recovery.code.invalid',
+  recovery_unavailable: 'recovery.unavailable',
+  enrollment_invalid: 'apiError.enrollment_token_invalid',
   expired: 'mfa.expired.body',
   unexpected: 'signIn.error.unexpected',
 };

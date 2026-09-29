@@ -16,7 +16,9 @@
     "test": "vitest run",
     "migrate": "tsx --tsconfig tsconfig.test.json scripts/migrate.ts",
     "seed": "tsx --tsconfig tsconfig.test.json seed/run.ts",
-    "dictionary": "tsx --tsconfig tsconfig.test.json scripts/data-dictionary.ts"
+    "seed:enroll": "tsx --tsconfig tsconfig.test.json seed/enroll.ts",
+    "dictionary": "tsx --tsconfig tsconfig.test.json scripts/data-dictionary.ts",
+    "generate": "tsx --tsconfig tsconfig.test.json scripts/generate-domain.ts"
   },
   "dependencies": {
     "@deemed/domain": "workspace:*",
@@ -25,6 +27,7 @@
   },
   "devDependencies": {
     "@deemed/test-fixtures": "workspace:*",
+    "@node-rs/argon2": "^2.2.1",
     "@types/pg": "^8.23.1",
     "tsx": "^4.23.15"
   }

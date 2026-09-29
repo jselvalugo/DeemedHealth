@@ -8,7 +8,9 @@
  *
  * - DH_ENV=production: every action returns { status: 'not_implemented' }. Nobody
  *   can sign in, and no demo code path is reachable.
- * - Any other DH_ENV: synthetic demo users from auth-demo.ts can sign in so the
+ * - Outside the stub mode (authMode(): a non-production DH_ENV with no
+ *   DATABASE_URL) every action also returns "not implemented"; apps/api is used.
+ * - In the stub mode: synthetic demo users from auth-demo.ts can sign in so the
  *   shell can be reviewed. auth-demo.ts throws if it is ever called in production.
  */
 import { cookies } from 'next/headers';
@@ -24,13 +26,20 @@ import {
   validateEmail,
   validateTotp,
 } from './auth-demo';
+import { authMode } from './auth-mode';
 import type { AuthFormState } from './auth-types';
-import { PENDING_COOKIE, SESSION_COOKIE, cookieOptions } from './session-cookies';
+import {
+  DEMO_SESSION_SCOPED_COOKIES,
+  PENDING_COOKIE,
+  SESSION_COOKIE,
+  cookieOptions,
+} from './session-cookies';
 
 const NOT_IMPLEMENTED: AuthFormState = { status: 'not_implemented' };
 
+/** The stub answers only where authMode() selects it (non-production, no database). */
 function inProduction(): boolean {
-  return isProduction(process.env.DH_ENV);
+  return isProduction(process.env.DH_ENV) || authMode() !== 'stub';
 }
 
 function field(form: FormData, name: string): string {
@@ -45,6 +54,8 @@ async function setPending(userId: string) {
 async function startSession(userId: string) {
   const jar = await cookies();
   jar.delete(PENDING_COOKIE);
+  // A new session starts clean: no records journal or step-up from a previous user.
+  for (const name of DEMO_SESSION_SCOPED_COOKIES) jar.delete(name);
   jar.set(SESSION_COOKIE, userId, cookieOptions(12 * 60 * 60)); // ADR-0006 §4 absolute 12h
 }
 
@@ -134,5 +145,6 @@ export async function signOut(): Promise<void> {
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
   jar.delete(PENDING_COOKIE);
+  for (const name of DEMO_SESSION_SCOPED_COOKIES) jar.delete(name);
   redirect('/sign-in?reason=signed-out');
 }
