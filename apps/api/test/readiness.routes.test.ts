@@ -5,9 +5,9 @@
  * this file against a freshly published FX-CAT catalog release.
  */
 import { publishCatalogBundle } from '@deemed/readiness/service';
-import { createDatabase } from '@deemed/db';
-import { afterAll, beforeAll, beforeEach, expect } from 'vitest';
-import { ctx, need } from '../../../packages/db/test/helpers.js';
+import { assertCatalogChannel, createDatabase } from '@deemed/db';
+import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
+import { ctx, describeDb, need } from '../../../packages/db/test/helpers.js';
 import { SYSTEM, fxBundles, nextCatalogVersion } from '../../../packages/readiness/test/world.js';
 import {
   auditFor,
@@ -411,4 +411,23 @@ defineRouteTests('readiness.parameter.set', {
     expect(unknown.statusCode).toBe(400);
     expect(await paramOf(org)).toBe(12);
   },
+});
+
+describeDb('catalog channel guard at the API (S4)', () => {
+  it('answers 503 not_configured to signed-in requests when DH_ENV and the database disagree', async () => {
+    const guarded = await startApi({
+      ensureCatalogChannel: async () => {
+        await assertCatalogChannel(guarded.database, 'production');
+      },
+    });
+    try {
+      const user = await createUser(guarded, 'xyz', [{ roleId: 'compliance_officer' }]);
+      const client = await signIn(guarded, user);
+      const res = await client.get('/api/me');
+      expect(res.statusCode).toBe(503);
+      expect(res.json().error.code).toBe('not_configured');
+    } finally {
+      await guarded.close();
+    }
+  });
 });

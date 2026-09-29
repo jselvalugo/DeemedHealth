@@ -58,6 +58,11 @@ export interface AppServices {
   allowedOrigins: readonly string[];
   secureCookies: boolean;
   fieldCipher?: FieldCipher;
+  /**
+   * S4: resolves when DH_ENV agrees with the database's catalog channel; rejects with
+   * CatalogChannelMismatchError when it does not. Checked before any signed-in request.
+   */
+  ensureCatalogChannel?: () => Promise<void>;
 }
 
 export interface Helpers {

@@ -136,9 +136,11 @@ describeDb('catalog publish job (app_platform)', () => {
     }
     const owner = await connect(need().ownerUrl);
     try {
+      // (The one-way upgrade to production is tested on scratch databases below; the shared
+      // test database must stay non-production.)
       await expectPgError(
-        owner.query(`SELECT catalog.set_database_channel('production', 'x')`),
-        '23514',
+        owner.query(`SELECT catalog.set_database_channel('staging', 'x')`),
+        '22023',
       );
       const same = await owner.query(
         `SELECT catalog.set_database_channel('non_production', 'x') AS c`,
@@ -162,7 +164,13 @@ describeDb('catalog publish job (app_platform)', () => {
     const url = new URL(need().adminUrl);
     url.pathname = `/${scratch}`;
     try {
+      // Born non-production, then upgraded one way by the owner while nothing unverified is
+      // loaded (S4); it can never go back.
+      await migrate({ connectionString: url.toString(), catalogChannel: 'non_production' });
       await migrate({ connectionString: url.toString(), catalogChannel: 'production' });
+      await expect(
+        migrate({ connectionString: url.toString(), catalogChannel: 'non_production' }),
+      ).rejects.toThrow(/cannot become non_production/);
       const prod = createDatabase({
         connectionString: url.toString(),
         assumeRole: 'app_platform',
@@ -271,6 +279,46 @@ describeDb('catalog publish job (app_platform)', () => {
       } finally {
         await ownerDb.end();
         await prod.close();
+      }
+    } finally {
+      await admin.query(`DROP DATABASE IF EXISTS ${scratch} WITH (FORCE)`);
+    }
+  });
+
+  it('refuses to upgrade a database to production while it holds non-verified entries (S4)', async () => {
+    const admin = w.admin;
+    const scratch = `dh_up_${Math.random().toString(16).slice(2, 10)}`;
+    await admin.query(`CREATE DATABASE ${scratch}`);
+    const url = new URL(need().adminUrl);
+    url.pathname = `/${scratch}`;
+    try {
+      await migrate({ connectionString: url.toString(), catalogChannel: 'non_production' });
+      const plat = createDatabase({
+        connectionString: url.toString(),
+        assumeRole: 'app_platform',
+        max: 1,
+      });
+      try {
+        await runCatalogPublishJob({
+          platform: plat,
+          bundles: {
+            non_production: fxBundles('1.0.0', [{ ...FX_CAT_ENTRIES.license, status: 'draft' }])
+              .nonProduction,
+          },
+        });
+      } finally {
+        await plat.close();
+      }
+      await expect(
+        migrate({ connectionString: url.toString(), catalogChannel: 'production' }),
+      ).rejects.toThrow(/non-verified catalog entries/);
+      // Nor can anyone edit the profile directly.
+      const owner = await connect(url.toString());
+      try {
+        await owner.query('SET ROLE app_owner');
+        await expectPgError(owner.query(`DELETE FROM catalog.database_profile`), '42501');
+      } finally {
+        await owner.end();
       }
     } finally {
       await admin.query(`DROP DATABASE IF EXISTS ${scratch} WITH (FORCE)`);

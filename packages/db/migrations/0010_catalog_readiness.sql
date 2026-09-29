@@ -3,7 +3,8 @@
 --
 -- Catalog (schema catalog, global, read-only to tenants):
 --   * catalog.database_profile says whether this database is production or non-production.
---     It is set once, by the migration job (app_owner), and never changes. With no profile,
+--     The migration job (app_owner) sets it; it can only move from non_production to
+--     production, and only while every loaded entry is verified. With no profile,
 --     nothing can be published (fail closed).
 --   * catalog.catalog_release, catalog.requirement, catalog.requirement_version hold the
 --     published bundles, keyed by catalog_version. Released rows are immutable: a trigger
@@ -130,8 +131,28 @@ CREATE TRIGGER requirement_version_immutable BEFORE UPDATE OR DELETE ON catalog.
   FOR EACH ROW EXECUTE FUNCTION catalog.forbid_mutation();
 CREATE TRIGGER requirement_version_no_truncate BEFORE TRUNCATE ON catalog.requirement_version
   FOR EACH STATEMENT EXECUTE FUNCTION catalog.forbid_mutation();
-CREATE TRIGGER database_profile_immutable BEFORE UPDATE OR DELETE ON catalog.database_profile
-  FOR EACH ROW EXECUTE FUNCTION catalog.forbid_mutation();
+-- The profile never goes back, and moves forward only from non_production to production
+-- while no non-verified requirement version exists (S4); nothing else about it changes.
+CREATE FUNCTION catalog.database_profile_guard() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.channel = 'non_production' AND NEW.channel = 'production'
+     AND NEW.singleton = OLD.singleton THEN
+    IF EXISTS (SELECT 1 FROM catalog.requirement_version WHERE status <> 'verified') THEN
+      RAISE EXCEPTION 'this database holds non-verified catalog entries and cannot become production'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'the catalog channel of a database only moves from non_production to production'
+    USING ERRCODE = 'insufficient_privilege';
+END
+$$;
+
+CREATE TRIGGER database_profile_guard BEFORE UPDATE OR DELETE ON catalog.database_profile
+  FOR EACH ROW EXECUTE FUNCTION catalog.database_profile_guard();
 CREATE TRIGGER database_profile_no_truncate BEFORE TRUNCATE ON catalog.database_profile
   FOR EACH STATEMENT EXECUTE FUNCTION catalog.forbid_mutation();
 
@@ -194,6 +215,12 @@ BEGIN
   IF v_current IS NULL THEN
     INSERT INTO catalog.database_profile (channel, set_by) VALUES (p_channel, coalesce(nullif(btrim(p_set_by), ''), 'migration job'));
     RETURN p_channel;
+  END IF;
+  IF v_current = 'non_production' AND p_channel = 'production' THEN
+    -- One-way upgrade (S4), refused while any non-verified entry is loaded (profile guard).
+    UPDATE catalog.database_profile SET channel = 'production', set_at = now(),
+           set_by = coalesce(nullif(btrim(p_set_by), ''), 'migration job');
+    RETURN 'production';
   END IF;
   IF v_current <> p_channel THEN
     RAISE EXCEPTION 'this database is % and cannot become %', v_current, p_channel USING ERRCODE = 'check_violation';
