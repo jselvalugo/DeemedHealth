@@ -459,15 +459,20 @@ CREATE FUNCTION platform.enqueue_job(
   p_singleton_key   text    DEFAULT NULL,
   p_actor_label     text    DEFAULT NULL,
   p_run_after       timestamptz DEFAULT NULL,
-  p_max_attempts    integer DEFAULT NULL
+  p_max_attempts    integer DEFAULT NULL,
+  p_delay_seconds   integer DEFAULT NULL
 ) RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
-  RETURN platform.insert_job(p_organization_id, p_queue, p_payload, p_singleton_key, p_run_after, p_max_attempts,
-                             p_actor_label, false);
+  -- p_delay_seconds (S6): a fan-out spreads its tenants' jobs over a window on the
+  -- database clock, so a release or the nightly sweep does not start every tenant at once.
+  RETURN platform.insert_job(p_organization_id, p_queue, p_payload, p_singleton_key,
+                             coalesce(p_run_after,
+                                      now() + make_interval(secs => greatest(0, least(p_delay_seconds, 86400)))),
+                             p_max_attempts, p_actor_label, false);
 END
 $$;
 
@@ -573,11 +578,11 @@ $$;
 
 REVOKE ALL ON FUNCTION platform.insert_job(uuid, text, jsonb, text, timestamptz, integer, text, boolean),
   public.enqueue_job(text, jsonb, text, timestamptz, integer),
-  platform.enqueue_job(uuid, text, jsonb, text, text, timestamptz, integer),
+  platform.enqueue_job(uuid, text, jsonb, text, text, timestamptz, integer, integer),
   platform.claim_jobs(text[], integer, integer), platform.complete_job(uuid, integer),
   platform.fail_job(uuid, integer, text, integer), platform.purge_finished_jobs(interval) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.enqueue_job(text, jsonb, text, timestamptz, integer) TO app_user;
-GRANT EXECUTE ON FUNCTION platform.enqueue_job(uuid, text, jsonb, text, text, timestamptz, integer),
+GRANT EXECUTE ON FUNCTION platform.enqueue_job(uuid, text, jsonb, text, text, timestamptz, integer, integer),
   platform.claim_jobs(text[], integer, integer), platform.complete_job(uuid, integer),
   platform.fail_job(uuid, integer, text, integer), platform.purge_finished_jobs(interval) TO app_platform;
 

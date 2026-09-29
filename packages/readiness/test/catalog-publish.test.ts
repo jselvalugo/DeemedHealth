@@ -4,10 +4,12 @@
  * databases that are migrated, upgraded to production, and dropped.
  */
 import { createDatabase, migrate } from '@deemed/db';
+import { spreadDelaySeconds } from '@deemed/jobs';
 import { sql } from 'drizzle-orm';
 import type pg from 'pg';
 import { compileCatalog, loadCatalogSources } from '@deemed/requirements-catalog/compiler';
 import {
+  RELEASE_SPREAD_SECONDS,
   ReadinessError,
   publishCatalogBundle,
   runCatalogPublishJob,
@@ -57,8 +59,17 @@ describeDb('catalog publish job (app_platform)', () => {
       created: true,
     });
     expect(first.entryCount).toBe(Object.keys(FX_CAT_ENTRIES).length);
-    // A new release fans out one recompute per active tenant.
+    // A new release fans out one recompute per active tenant, spread over the window (S6).
     expect(first.recomputesEnqueued).toBeGreaterThanOrEqual(2);
+    const fanout = await w.admin.query(
+      `SELECT organization_id::text AS org, extract(epoch FROM run_after - created_at)::int AS delay
+       FROM platform.job WHERE queue = 'readiness.recompute' AND payload ->> 'catalogVersion' = $1`,
+      [version],
+    );
+    expect(fanout.rows).toHaveLength(first.recomputesEnqueued);
+    for (const r of fanout.rows) {
+      expect(r.delay).toBe(spreadDelaySeconds(r.org, RELEASE_SPREAD_SECONDS));
+    }
     const rows = await w.admin.query(
       `SELECT rv.requirement_id, rv.status, rv.channel, r.content_hash
        FROM catalog.requirement_version rv JOIN catalog.catalog_release r ON r.id = rv.catalog_release_id

@@ -17,6 +17,7 @@
  * reviewed SQL functions (migration 0010) that fit the role model (app_user enqueues,
  * app_platform drains, no runtime DDL); swapping in a pg-boss adapter is S5's decision.
  */
+import { createHash } from 'node:crypto';
 import { type Actor, type Database, type Tx } from '@deemed/db';
 import { sql } from 'drizzle-orm';
 
@@ -35,6 +36,23 @@ export interface SendOptions {
   actorLabel?: string;
   runAfter?: Date;
   maxAttempts?: number;
+  /**
+   * Platform jobs only: run this many seconds after the enqueueing transaction, on the
+   * database clock (see `spreadDelaySeconds`). Ignored when `runAfter` is set.
+   */
+  delaySeconds?: number;
+}
+
+/**
+ * A stable delay in [0, windowSeconds] for one key (a tenant id): a fan-out spreads its
+ * jobs over the window instead of starting every tenant at the same instant (S6). The
+ * same key always gets the same delay, so a tenant's nightly run lands at a steady time.
+ */
+export function spreadDelaySeconds(key: string, windowSeconds: number): number {
+  const window = Math.max(0, Math.floor(windowSeconds));
+  if (window === 0) return 0;
+  const digest = createHash('sha256').update(key).digest();
+  return digest.readUInt32BE(0) % (window + 1);
 }
 
 function assertQueue(queue: string): void {
@@ -77,7 +95,8 @@ export async function sendPlatformJob(
       p_singleton_key   => ${options.singletonKey ?? null}::text,
       p_actor_label     => ${options.actorLabel ?? null}::text,
       p_run_after       => ${options.runAfter?.toISOString() ?? null}::timestamptz,
-      p_max_attempts    => ${options.maxAttempts ?? null}::integer
+      p_max_attempts    => ${options.maxAttempts ?? null}::integer,
+      p_delay_seconds   => ${options.delaySeconds ?? null}::integer
     )::text AS id`);
   const id = r.rows[0]?.id;
   if (!id) throw new Error('platform.enqueue_job returned no id');

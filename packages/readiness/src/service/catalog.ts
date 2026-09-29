@@ -9,7 +9,7 @@
  */
 import type { Actor, Database, Tx } from '@deemed/db';
 import { listTenants } from '@deemed/db';
-import { sendPlatformJob } from '@deemed/jobs';
+import { sendPlatformJob, spreadDelaySeconds } from '@deemed/jobs';
 import { CatalogEntrySchema, type CatalogEntry } from '@deemed/requirements-catalog';
 import {
   bundleContentHash,
@@ -89,6 +89,9 @@ export async function publishCatalogBundle(
   };
 }
 
+/** A new release spreads its per-tenant recomputes over 5 minutes (S6). */
+export const RELEASE_SPREAD_SECONDS = 300;
+
 const PUBLISH_ACTOR: Actor = { type: 'system', label: 'catalog publish job' };
 
 /**
@@ -99,7 +102,10 @@ export async function runCatalogPublishJob(options: {
   platform: Database;
   bundles: Partial<Record<BundleChannel, CatalogBundle>>;
   publishedBy?: string;
+  /** Spread the per-tenant recomputes over this many seconds (default 300, S6). */
+  spreadSeconds?: number;
 }): Promise<PublishResult & { recomputesEnqueued: number }> {
+  const spread = options.spreadSeconds ?? RELEASE_SPREAD_SECONDS;
   return options.platform.withPlatform(PUBLISH_ACTOR, async (tx) => {
     const channel = await databaseChannel(tx);
     if (channel === null) throw new ReadinessError('bundle_channel_mismatch', ['database_profile']);
@@ -118,6 +124,7 @@ export async function runCatalogPublishJob(options: {
           singletonKey: RECOMPUTE_QUEUE,
           actorLabel: 'readiness recompute (catalog release)',
           payload: { catalogVersion: result.catalogVersion },
+          delaySeconds: spreadDelaySeconds(t.organizationId, spread),
         });
         recomputesEnqueued += 1;
       }

@@ -25,7 +25,14 @@ import {
   type TransactionContext,
   type Tx,
 } from '@deemed/db';
-import { JobError, sendJob, sendPlatformJob, type ClaimedJob, type JobHandler } from '@deemed/jobs';
+import {
+  JobError,
+  sendJob,
+  sendPlatformJob,
+  spreadDelaySeconds,
+  type ClaimedJob,
+  type JobHandler,
+} from '@deemed/jobs';
 import type { JsonValue } from '@deemed/domain';
 import { canonicalJson } from '@deemed/requirements-catalog/compiler';
 import { sql } from 'drizzle-orm';
@@ -51,13 +58,21 @@ export async function enqueueRecompute(tx: Tx, cause: string): Promise<string> {
   return sendJob(tx, RECOMPUTE_QUEUE, { singletonKey: RECOMPUTE_QUEUE, payload: { cause } });
 }
 
+/** The nightly sweep spreads tenants over 15 minutes (S6). */
+export const NIGHTLY_SPREAD_SECONDS = 900;
+
 /**
  * Nightly sweep (inside withPlatform as app_platform): one recompute per active tenant
  * that also stores the day's snapshot. The singleton key names the tenant's local date,
  * and the snapshot is unique per tenant, release, date, and kind, so running the sweep
  * twice stores nothing twice.
  */
-export async function enqueueNightlySweep(tx: Tx, asOf: Instant): Promise<number> {
+export async function enqueueNightlySweep(
+  tx: Tx,
+  asOf: Instant,
+  options: { spreadSeconds?: number } = {},
+): Promise<number> {
+  const spread = options.spreadSeconds ?? NIGHTLY_SPREAD_SECONDS;
   let n = 0;
   for (const t of await listTenants(tx)) {
     if (t.status !== 'active') continue;
@@ -66,6 +81,7 @@ export async function enqueueNightlySweep(tx: Tx, asOf: Instant): Promise<number
       singletonKey: `readiness.nightly.${day}`,
       actorLabel: 'readiness nightly sweep',
       payload: { snapshot: 'nightly', asOfDate: day },
+      delaySeconds: spreadDelaySeconds(t.organizationId, spread),
     });
     n += 1;
   }

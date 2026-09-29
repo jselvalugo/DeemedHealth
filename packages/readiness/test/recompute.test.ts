@@ -6,8 +6,9 @@
  */
 import { fixedClock, parseInstant } from '@deemed/dates';
 import type { Actor, TransactionContext, Tx } from '@deemed/db';
-import { drain } from '@deemed/jobs';
+import { drain, spreadDelaySeconds } from '@deemed/jobs';
 import {
+  NIGHTLY_SPREAD_SECONDS,
   RECOMPUTE_QUEUE,
   ReadinessError,
   clearNotApplicable,
@@ -741,7 +742,9 @@ describeDb('readiness service and recompute job', () => {
 
   it('stores one nightly snapshot per tenant and day, pinned to its catalog version; a new version never rewrites it (FX-CAT-SNAPSHOT, FX-CAT-CHANGE)', async () => {
     const sweep = () =>
-      w.platform.withPlatform(SYSTEM, (tx) => enqueueNightlySweep(tx, parseInstant(TODAY)));
+      w.platform.withPlatform(SYSTEM, (tx) =>
+        enqueueNightlySweep(tx, parseInstant(TODAY), { spreadSeconds: 0 }),
+      );
     expect(await sweep()).toBeGreaterThanOrEqual(2);
     await drainAt(TODAY);
     await sweep();
@@ -803,6 +806,30 @@ describeDb('readiness service and recompute job', () => {
     await expectPgError(
       w.admin.query(`UPDATE public.readiness_snapshot SET met = 0 WHERE id = $1`, [first[0].id]),
       '42501',
+    );
+  });
+
+  it('spreads the nightly sweep over its window, one stable delay per tenant (S6)', async () => {
+    const day = '2031-01-15T15:00:00Z';
+    await w.platform.withPlatform(SYSTEM, (tx) => enqueueNightlySweep(tx, parseInstant(day)));
+    const rows = (
+      await w.admin.query(
+        `SELECT organization_id::text AS org, extract(epoch FROM run_after - created_at)::int AS delay
+         FROM platform.job WHERE queue = $1 AND singleton_key = 'readiness.nightly.2031-01-15'
+           AND organization_id = ANY($2::uuid[])`,
+        [RECOMPUTE_QUEUE, [w.a.id, w.b.id]],
+      )
+    ).rows;
+    expect(rows).toHaveLength(2);
+    for (const r of rows) {
+      expect(r.delay).toBe(spreadDelaySeconds(r.org, NIGHTLY_SPREAD_SECONDS));
+      expect(r.delay).toBeLessThanOrEqual(NIGHTLY_SPREAD_SECONDS);
+    }
+    // Keep these future jobs out of other files' drains.
+    await w.admin.query(
+      `UPDATE platform.job SET state = 'superseded', finished_at = now()
+       WHERE queue = $1 AND singleton_key = 'readiness.nightly.2031-01-15' AND state = 'queued'`,
+      [RECOMPUTE_QUEUE],
     );
   });
 

@@ -5,7 +5,14 @@
  */
 import { randomUUID } from 'node:crypto';
 import { createDatabase, provisionOrganization, type Actor, type Database } from '@deemed/db';
-import { JobError, drain, sendJob, sendPlatformJob, type ClaimedJob } from '@deemed/jobs';
+import {
+  JobError,
+  drain,
+  sendJob,
+  sendPlatformJob,
+  spreadDelaySeconds,
+  type ClaimedJob,
+} from '@deemed/jobs';
 import { sql, type SQL } from 'drizzle-orm';
 import type pg from 'pg';
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -373,5 +380,30 @@ describeDb('job queue and drain()', () => {
     // The current attempt completes.
     expect(await call(sql`SELECT platform.complete_job(${id}::uuid, 2) AS r`)).toBe(true);
     expect((await jobs(Q)).find((j) => j.id === id)).toMatchObject({ state: 'completed' });
+  });
+
+  it('spreads fan-out jobs: a stable per-key delay inside the window, applied on the database clock (S6)', async () => {
+    const keys = Array.from({ length: 50 }, () => randomUUID());
+    const delays = keys.map((k) => spreadDelaySeconds(k, 300));
+    expect(delays.every((d) => Number.isInteger(d) && d >= 0 && d <= 300)).toBe(true);
+    expect(new Set(delays).size).toBeGreaterThan(10);
+    expect(keys.map((k) => spreadDelaySeconds(k, 300))).toEqual(delays);
+    expect(spreadDelaySeconds(keys[0]!, 0)).toBe(0);
+    expect(spreadDelaySeconds(keys[0]!, -5)).toBe(0);
+
+    const id = await platform.withPlatform(SYSTEM, (tx) =>
+      sendPlatformJob(tx, org, Q, { payload: { n: 90 }, delaySeconds: 120 }),
+    );
+    const row = (
+      await admin.query(
+        `SELECT extract(epoch FROM run_after - created_at)::int AS delay FROM platform.job WHERE id = $1`,
+        [id],
+      )
+    ).rows[0];
+    expect(row.delay).toBe(120);
+    // Not yet due: a drain now leaves it queued.
+    await drain({ platform, handlers: { [Q]: async () => undefined } });
+    expect((await jobs(Q)).find((j) => j.id === id)).toMatchObject({ state: 'queued' });
+    await admin.query(`DELETE FROM platform.job WHERE id = $1`, [id]);
   });
 });
