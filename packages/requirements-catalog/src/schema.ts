@@ -118,6 +118,12 @@ export const Cadence = z.object({
   trigger: z.string().min(1),
   renewalMonths: z.number().int().positive().nullable(),
   leadDays: z.array(z.number().int().nonnegative()).default([]),
+  /**
+   * Days before the due date at which the item turns "at risk" (S4, F6). Omitted: 30, or
+   * the largest lead day when that is smaller. Must not exceed the largest lead day. Lead
+   * days still drive reminders; this drives status.
+   */
+  atRiskDays: z.number().int().nonnegative().optional(),
 });
 
 /** Layer: HRSA/statutory requirement vs. best practice vs. state (FL) requirement. Never label best practice as an HRSA requirement. */

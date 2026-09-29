@@ -40,24 +40,39 @@ describe('expiration with lead days (TEST-05-LICENSE, 90/60/30/0)', () => {
     expect(r.summary).toContain('not an HRSA determination');
   });
 
-  it('turns due_soon on each lead day and names the tier', () => {
-    // The 90-day reminder date is Apr 1: the item turns due_soon that day.
+  it('turns due_soon at atRiskDays (default 30); lead days only drive the reminder tier (F6)', () => {
+    // The 90- and 60-day reminders fire, but the license is still met.
     expect(run('2027-03-31T16:00:00Z')).toMatchObject({
       status: 'met',
       leadTier: null,
       daysUntilDue: 91,
     });
     expect(run('2027-04-01T16:00:00Z')).toMatchObject({
-      status: 'due_soon',
+      status: 'met',
       leadTier: 90,
       daysUntilDue: 90,
     });
-    expect(run('2027-04-02T16:00:00Z')).toMatchObject({ status: 'due_soon', leadTier: 90 });
-    expect(run('2027-05-01T16:00:00Z')).toMatchObject({ status: 'due_soon', leadTier: 60 });
-    expect(run('2027-05-31T16:00:00Z')).toMatchObject({ status: 'due_soon', leadTier: 30 });
+    expect(run('2027-05-01T16:00:00Z')).toMatchObject({ status: 'met', leadTier: 60 });
+    expect(run('2027-05-30T16:00:00Z')).toMatchObject({ status: 'met', daysUntilDue: 31 });
+    expect(run('2027-05-31T16:00:00Z')).toMatchObject({
+      status: 'due_soon',
+      leadTier: 30,
+      daysUntilDue: 30,
+    });
     const today = run('2027-06-30T16:00:00Z');
     expect(today).toMatchObject({ status: 'due_soon', leadTier: 0, daysUntilDue: 0 });
     expect(codes(today)).toEqual(['expires_today']);
+    // An explicit atRiskDays moves the status threshold, not the reminders.
+    const early = fxEntry('license', {
+      cadence: {
+        trigger: 'on_hire_and_expiration',
+        renewalMonths: null,
+        leadDays: [90, 60, 30, 0],
+        atRiskDays: 60,
+      },
+    });
+    const r = evaluate(input(early, '2027-05-01T16:00:00Z', { facts: [expiring('2027-06-30')] }));
+    expect(r).toMatchObject({ status: 'due_soon', leadTier: 60 });
   });
 
   it('expires at local midnight: Eastern first, Central one hour later (FX-DATE-TZ-E, FX-DATE-TZ-C)', () => {
@@ -85,11 +100,14 @@ describe('expiration with lead days (TEST-05-LICENSE, 90/60/30/0)', () => {
 
   it('handles a leap-day expiration and its lead days (FX-DATE-FEB29)', () => {
     const f = [expiring('2028-02-29')];
-    // 90 days before 2028-02-29 is 2027-12-01.
-    expect(run('2027-11-30T15:00:00Z', f)).toMatchObject({ status: 'met', daysUntilDue: 91 });
-    expect(run('2027-12-01T15:00:00Z', f)).toMatchObject({ status: 'due_soon', leadTier: 90 });
-    // 30 days before a leap day is Jan 30.
-    expect(run('2028-01-30T15:00:00Z', f)).toMatchObject({ leadTier: 30, daysUntilDue: 30 });
+    // 90 days before 2028-02-29 is 2027-12-01; 30 days before is 2028-01-30.
+    expect(run('2027-12-01T15:00:00Z', f)).toMatchObject({ status: 'met', leadTier: 90 });
+    expect(run('2028-01-29T15:00:00Z', f)).toMatchObject({ status: 'met', daysUntilDue: 31 });
+    expect(run('2028-01-30T15:00:00Z', f)).toMatchObject({
+      status: 'due_soon',
+      leadTier: 30,
+      daysUntilDue: 30,
+    });
     expect(run('2028-02-29T15:00:00Z', f)).toMatchObject({ status: 'due_soon', leadTier: 0 });
     expect(run('2028-03-01T15:00:00Z', f).status).toBe('overdue');
   });

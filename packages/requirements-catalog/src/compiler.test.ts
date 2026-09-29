@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalJson } from './canonical.js';
 import { compileCatalog, compareCatalogVersions, type CatalogSources } from './compiler.js';
+import { effectiveAtRiskDays } from './conventions.js';
 import { loadCatalogSources } from './loader.js';
 
 // Synthetic register and entries (TEST- ids). Not real catalog content.
@@ -188,6 +189,26 @@ describe('validation (ADR-0003 rule 11)', () => {
     expect(byId('FL-456-X')).toEqual(expect.arrayContaining(['convention', 'fl_label']));
     expect(byId('TEST-05-NOAWARD')).toContain('convention');
     expect(byId('TEST-05-PERIODIC')).toContain('convention');
+  });
+
+  it('rejects cadence.atRiskDays beyond the largest lead day, and defaults it to 30 capped there (F6)', () => {
+    const cadence = (atRiskDays?: number) => ({
+      trigger: 'on_expiration',
+      renewalMonths: null,
+      leadDays: [60, 30, 0],
+      ...(atRiskDays === undefined ? {} : { atRiskDays }),
+    });
+    const bad = compileCatalog(src(entry('TEST-05-RISK', { cadence: cadence(90) })), {
+      catalogVersion: '1.0.0',
+    });
+    expect(bad.diagnostics.map((d) => d.message).join(' ')).toMatch(/atRiskDays/);
+    const ok = compileCatalog(src(entry('TEST-05-RISK', { cadence: cadence(45) })), {
+      catalogVersion: '1.0.0',
+    });
+    expect(ok.ok, ok.summary.join('\n')).toBe(true);
+    expect(effectiveAtRiskDays({ leadDays: [90, 60, 30, 0] })).toBe(30);
+    expect(effectiveAtRiskDays({ leadDays: [14, 7] })).toBe(14);
+    expect(effectiveAtRiskDays({ leadDays: [90], atRiskDays: 45 })).toBe(45);
   });
 
   it('accepts a well-labeled Florida entry', () => {

@@ -29,7 +29,11 @@ import {
   nextDueFromLastVerification,
   toZonedDate,
 } from '@deemed/dates';
-import { ENGINE_PARAMETER_KEYS, type CatalogEntry } from '@deemed/requirements-catalog';
+import {
+  ENGINE_PARAMETER_KEYS,
+  effectiveAtRiskDays,
+  type CatalogEntry,
+} from '@deemed/requirements-catalog';
 import { reason, summarize } from './messages.js';
 import {
   approvalTypeMatches,
@@ -172,7 +176,11 @@ function completions(
   return ok;
 }
 
-/** met / due_soon / overdue from a due date and the catalog's lead days. */
+/**
+ * met / due_soon / overdue from a due date. Status turns due_soon at the catalog's
+ * atRiskDays (F6); lead days drive reminders and the lead tier only. On time through the
+ * due date, overdue from local midnight after it.
+ */
 function dueOutcome(
   input: EvaluationInput,
   asOfDate: CalendarDate,
@@ -180,7 +188,10 @@ function dueOutcome(
   leadDays: readonly number[],
   kind: 'expiration' | 'due',
 ): Omit<RuleOutcome, 'intervalMonths'> {
-  const atRiskDays = leadDays.length > 0 ? Math.max(...leadDays) : 0;
+  const atRiskDays = effectiveAtRiskDays({
+    leadDays,
+    atRiskDays: input.entry.cadence?.atRiskDays,
+  });
   const due = evaluateDueAt(dueOn, input.asOf, input.timeZone, { atRiskDays });
   const leadTier = leadDays.length > 0 ? currentLeadTier(dueOn, leadDays, asOfDate) : null;
   const reasons: Reason[] = [];
