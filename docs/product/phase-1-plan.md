@@ -66,7 +66,7 @@ identity: `UserAccount`, `AuthFactor`, `Session`, `IdpConnection`, `ScimToken`,
 | --- | --- | --- |
 | Auth (outside the shell) | Sign in `/sign-in` · Set up MFA `/sign-in/mfa/setup` · Verify MFA `/sign-in/mfa` · Recovery `/sign-in/recovery` · Sign in with your organization `/sign-in/sso` · Signed out `/sign-in?reason=signed-out` · Session expired `/sign-in?reason=expired` · Re-authentication dialog (modal on any page) | S1 (UI), S3 (wired) |
 | Shell | Header, module bar, launcher / command palette, PREVIEW banner, language toggle, user menu, no-permission page, not-found, error | S1 |
-| Command Center | Overview `/` as the signed-in landing: designed empty state until Phase 2 | S1 |
+| Command Center | Overview `/`, Today's priorities `/priorities`, Readiness briefs `/briefs`, Calendar `/calendar`, computed from the viewer's `requirement_instance` records (module map, "Command Center pages"); pulled forward from Phase 2, and the Phase 2 row and G2 still apply | S1, then S4b follow-up |
 | Administration | Users & roles `/admin/users` · Organization & sites `/admin/org` · Requirements catalog `/admin/catalog` · Audit log `/admin/audit` · Integrations `/admin/integrations` (empty state until Phase 2) | S7 |
 | Administration | Support access `/admin/support-access` (approve, deny, revoke, history) | S7b |
 | Records (every module) | Record list `/<module>/<slug>` and record page `/<module>/<slug>/<id>` for each registered record type (ADR-0014 §3); first types: sites, users and role assignments, requirements (read-only), audit events (read-only) | S4b |

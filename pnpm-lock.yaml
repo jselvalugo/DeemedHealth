@@ -120,6 +120,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@deemed/dates':
+        specifier: workspace:*
+        version: link:../../packages/dates
       '@deemed/domain':
         specifier: workspace:*
         version: link:../../packages/domain

@@ -34,6 +34,23 @@ the `person` record type: every human the health center tracks (staff, providers
 members, contractor contacts), with or without a sign-in account. It sits next to Users &
 roles because accounts and role grants hang off a person.
 
+## Command Center pages
+
+The four Command Center pages read one source today: the `requirement_instance` records
+the viewer may read, through the same records API as HRSA Readiness › Requirements
+(`GET /api/records/requirement_instance`), so permissions, site scope, and auditing are
+the API's. A role without `readiness:read` sees a "Readiness isn't part of your role"
+state. Statuses come from the readiness engine; the pages never recompute a status from
+dates. Every page says "internal readiness" and "not an HRSA determination" (roadmap
+Phase 2, Command Center row). The math is in `apps/web/lib/command-center/summary.ts`.
+
+| Page | Shows |
+|---|---|
+| Overview `/` | Internal readiness score as met ÷ applicable (not applicable excluded) with its denominator, requirements by status, top five priorities, due in the next 30 days, readiness by site, "Deemed briefs" card, "What changed" (waits for readiness snapshots) |
+| Today's priorities `/priorities` | Everything not met, in working order: overdue, due within 7 days, missing evidence, then the rest of due soon |
+| Readiness briefs `/briefs` | A computed brief (score, counts, sites with overdue or missing items, due in 30 days), printable. Not written by AI: AI-drafted briefs come with the Deemed Assistant (Phase 6) |
+| Calendar `/calendar` | Month grid (Sunday first) of due dates in the health center's time zone, with the same items as a list for small screens and screen readers |
+
 ## Record types
 
 Added in Phase 1 slice S4b (ADR-0014 section 3). Every registered record type

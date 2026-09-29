@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsc -b ../../packages/domain ../../packages/i18n ../../packages/ui && next dev",
-    "build": "tsc -b ../../packages/domain ../../packages/i18n ../../packages/ui && next build",
+    "dev": "tsc -b ../../packages/dates ../../packages/domain ../../packages/i18n ../../packages/ui && next dev",
+    "build": "tsc -b ../../packages/dates ../../packages/domain ../../packages/i18n ../../packages/ui && next build",
     "start": "next start",
-    "typecheck": "tsc -b ../../packages/domain ../../packages/i18n ../../packages/ui && next typegen && tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc -b ../../packages/dates ../../packages/domain ../../packages/i18n ../../packages/ui && next typegen && tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@deemed/dates": "workspace:*",
     "@deemed/domain": "workspace:*",
     "@deemed/i18n": "workspace:*",
     "@deemed/ui": "workspace:*",

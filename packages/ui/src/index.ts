@@ -91,11 +91,16 @@ export {
   type RecordsResult,
 } from './records/client.js';
 export {
+  LOCALE_TAGS,
+  enumLabel,
   enumLabelKeys,
   fieldLabel,
+  formatDate,
+  formatInstant,
   formatValue,
   listActionsFor,
   recordTitle,
+  statusTone,
   typeName,
   typePlural,
   type ListActions,
@@ -103,4 +108,4 @@ export {
 export { RecordForm, type RecordFormProps } from './records/RecordForm.js';
 export { HistoryTimeline, RecordPage, type RecordPageProps } from './records/RecordPage.js';
 export { RecordTable, type RecordTableProps } from './records/RecordTable.js';
-export { recordHref } from './records/refs.js';
+export { RefText, RefValue, recordHref } from './records/refs.js';

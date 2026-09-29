@@ -14,6 +14,10 @@ import {
 } from '@deemed/ui';
 import { modulesFromNavigation } from '../../../lib/navigation';
 import { getCurrentUser, getLocale, getNavigation } from '../../../lib/session';
+import { CommandCenterBriefs } from '../_command-center/briefs';
+import { CommandCenterCalendar } from '../_command-center/calendar';
+import { CommandCenterOverview } from '../_command-center/overview';
+import { CommandCenterPriorities } from '../_command-center/priorities';
 import { RecordListScreen, RecordScreen } from '../records-view';
 import { ModulePlaceholder, NoPermissionView } from '../views';
 
@@ -50,10 +54,19 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return { title: `${name} · ${t(locale, found.module.name)}` };
 }
 
+/** Command Center pages (module map #1), by registry page id. */
+const COMMAND_CENTER = {
+  overview: CommandCenterOverview,
+  priorities: CommandCenterPriorities,
+  briefs: CommandCenterBriefs,
+  calendar: CommandCenterCalendar,
+} as const;
+
 /**
  * Every page in the module registry (docs/product/module-map.md) resolves here. Record
- * list and record routes render the records components; other pages show the module
- * placeholder until their module ships. Unknown routes 404; routes the user's roles do
+ * list and record routes render the records components; Command Center pages render
+ * their readiness views; other pages show the module placeholder until their module
+ * ships. Unknown routes 404; routes the user's roles do
  * not include show the "no permission" state at the same URL.
  */
 export default async function RegistryPage({ params, searchParams }: Params) {
@@ -117,6 +130,29 @@ export default async function RegistryPage({ params, searchParams }: Params) {
         title={t(locale, found.page.name)}
         siblings={siblings}
         locale={locale}
+      />
+    );
+  }
+
+  if (found.module.id === 'command-center' && found.page.id in COMMAND_CENTER) {
+    const Screen = COMMAND_CENTER[found.page.id as keyof typeof COMMAND_CENTER];
+    const isHome = found.page.route === '/';
+    const requirements = findRoute('/readiness');
+    const canOpenRequirements = allowedModules
+      ? allowedModules.some((m) => m.pages.some((p) => p.route === '/readiness'))
+      : Boolean(requirements && canViewPage(requirements.page, user.permissions));
+    return (
+      <Screen
+        locale={locale}
+        eyebrow={t(locale, 'placeholder.eyebrow', { module: moduleName, tenant: user.tenant.name })}
+        title={
+          isHome
+            ? t(locale, 'home.greeting', { name: user.name.split(' ')[0] ?? user.name })
+            : pageName
+        }
+        display={isHome}
+        canReadReadiness={user.permissions.has('readiness:read')}
+        requirementsHref={canOpenRequirements ? '/readiness' : null}
       />
     );
   }
