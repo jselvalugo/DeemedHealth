@@ -226,6 +226,14 @@ defineRouteTests('readiness.instance.clear_not_applicable', {
     expect(events.map((e) => [e.action, e.outcome])).toEqual([
       ['requirement_instance.clear_not_applicable', 'success'],
     ]);
+    // No raw reason text in the audit row (S1).
+    const raw = await api.admin.query(
+      `SELECT reason, diff::text AS diff, metadata::text AS metadata FROM audit.audit_event
+       WHERE request_id = $1`,
+      [res.headers['x-request-id']],
+    );
+    expect(raw.rows[0].reason).toBeNull();
+    expect(JSON.stringify(raw.rows)).not.toContain('now prescribes');
     expect(await row(inst.deaS1)).toMatchObject({ not_applicable_reason: null });
     // Nothing left to clear.
     const again = await clients.co.post(

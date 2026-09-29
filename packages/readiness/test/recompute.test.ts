@@ -523,7 +523,10 @@ describeDb('readiness service and recompute job', () => {
       }),
     );
     const [cleared] = await audit(w.a, 'requirement_instance.clear_not_applicable');
-    expect(cleared).toMatchObject({ actor_type: 'user', reason: 'Synthetic: now prescribes' });
+    // The words stay out of the log: only the redacted diff records the change (S1).
+    expect(cleared).toMatchObject({ actor_type: 'user', reason: null });
+    expect(cleared.diff.fields.not_applicable_reason.before).toMatchObject({ redacted: true });
+    expect(JSON.stringify(cleared)).not.toContain('now prescribes');
     await drainAt(TODAY);
     // No DEA evidence on file: the engine now says missing.
     expect(await instance(w.a.instances.deaE)).toMatchObject({

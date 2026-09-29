@@ -164,7 +164,6 @@ export async function clearNotApplicable(
     targetId: instance.id,
     requirementIds: [instance.requirementId],
     ...(instance.siteId ? { siteId: instance.siteId } : {}),
-    reason,
     diff: redactedDiff(
       'public.requirement_instance',
       { status: instance.status, not_applicable_reason: instance.notApplicableReason },
