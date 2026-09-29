@@ -723,7 +723,7 @@ describeDb('readiness service and recompute job', () => {
       (
         await w.admin.query(
           `SELECT id::text, catalog_version, as_of_date::text, kind, met, denominator, body
-           FROM public.readiness_snapshot WHERE organization_id = $1 ORDER BY catalog_version, as_of_date`,
+           FROM public.readiness_snapshot WHERE organization_id = $1 ORDER BY string_to_array(catalog_version, '.')::int[], as_of_date`,
           [w.a.id],
         )
       ).rows;
@@ -754,6 +754,52 @@ describeDb('readiness service and recompute job', () => {
     await expectPgError(
       w.admin.query(`UPDATE public.readiness_snapshot SET met = 0 WHERE id = $1`, [first[0].id]),
       '42501',
+    );
+  });
+
+  it('never creates an instance outside appliesTo in the latest release (F16)', async () => {
+    const all = Object.values(FX_CAT_ENTRIES) as Record<string, unknown>[];
+    latest = await nextCatalogVersion(w.admin);
+    await w.platform.withPlatform(SYSTEM, (tx) =>
+      publishCatalogBundle(
+        tx,
+        fxBundles(
+          latest,
+          all.map((e) =>
+            e.id === 'TEST-05-PROCEDURES'
+              ? { ...e, appliesTo: { awardTypes: ['lookalike'] } }
+              : e.id === 'TEST-19-MEETINGS'
+                ? { ...e, appliesTo: { awardTypes: ['section330'], subPrograms: ['MHC'] } }
+                : e.id === 'TEST-19-BUDGET'
+                  ? { ...e, appliesTo: { awardTypes: ['section330'], siteTypes: ['mobile'] } }
+                  : e,
+          ),
+        ).nonProduction,
+        'readiness test',
+      ),
+    );
+    const insert = (requirementId: string, siteId: string | null) =>
+      pgError(
+        w.tenant.withTenant(w.a.id, SYSTEM, (tx) =>
+          tx.execute(sql`INSERT INTO public.requirement_instance (organization_id, requirement_id, subject_type, subject_id, site_id)
+                         VALUES (${w.a.id}::uuid, ${requirementId}, ${siteId ? 'site' : 'organization'},
+                                 ${siteId ?? w.a.id}::uuid, ${siteId}::uuid)`),
+        ),
+      );
+    // Section 330 CHC tenant: Look-Alike only, MHC only, and mobile-site-only are refused.
+    expect(await insert('TEST-05-PROCEDURES', null)).toMatchObject({ code: '23514' });
+    expect(await insert('TEST-19-MEETINGS', null)).toMatchObject({ code: '23514' });
+    expect(await insert('TEST-19-BUDGET', w.a.siteE)).toMatchObject({ code: '23514' });
+    // In scope, or not in the release at all, it is created.
+    await w.tenant.withTenant(w.a.id, SYSTEM, (tx) =>
+      tx.execute(sql`INSERT INTO public.requirement_instance (organization_id, requirement_id, subject_type, subject_id)
+                     VALUES (${w.a.id}::uuid, 'TEST-05-LICENSE', 'organization', ${w.a.id}::uuid),
+                            (${w.a.id}::uuid, 'TEST-99-NOT-RELEASED', 'organization', ${w.a.id}::uuid)`),
+    );
+    // Leave an unrestricted release as the latest for the next test file.
+    latest = await nextCatalogVersion(w.admin);
+    await w.platform.withPlatform(SYSTEM, (tx) =>
+      publishCatalogBundle(tx, fxBundles(latest).nonProduction, 'readiness test'),
     );
   });
 });

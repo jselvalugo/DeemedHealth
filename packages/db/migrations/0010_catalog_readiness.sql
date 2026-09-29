@@ -540,6 +540,55 @@ CREATE TRIGGER requirement_instance_na_guard BEFORE INSERT OR UPDATE ON public.r
 
 CREATE INDEX requirement_instance_org_release_idx ON public.requirement_instance (organization_id, catalog_release_id);
 
+-- F16: an instance is never created (or moved) outside its requirement's appliesTo in the
+-- latest catalog release: award type, sub-program, and site type are checked here (staff
+-- types have no data yet). An out-of-scope requirement therefore never shows up as an
+-- instance that looks like a human "not applicable". Runs AFTER the row passes RLS.
+CREATE FUNCTION public.requirement_instance_applicability_check() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_applies jsonb;
+  v_award   text;
+  v_subs    text[];
+  v_site    text;
+BEGIN
+  SELECT rv.entry -> 'appliesTo' INTO v_applies
+  FROM catalog.requirement_version rv
+  WHERE rv.requirement_id = NEW.requirement_id
+    AND rv.catalog_release_id = (
+      SELECT r.id FROM catalog.catalog_release r
+      ORDER BY string_to_array(r.catalog_version, '.')::int[] DESC LIMIT 1);
+  IF v_applies IS NULL THEN
+    RETURN NULL;  -- not in the latest release: the engine reports not_assessed
+  END IF;
+  SELECT o.award_type, o.sub_programs INTO v_award, v_subs
+  FROM public.organization o WHERE o.id = NEW.organization_id;
+  IF v_applies ? 'awardTypes' AND NOT (v_applies -> 'awardTypes') ? v_award THEN
+    RAISE EXCEPTION 'requirement % does not apply to this award type', NEW.requirement_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF v_applies ? 'subPrograms' AND NOT (v_applies -> 'subPrograms') ?| coalesce(v_subs, '{}') THEN
+    RAISE EXCEPTION 'requirement % does not apply to this health center''s programs', NEW.requirement_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF v_applies ? 'siteTypes' THEN
+    SELECT s.site_type INTO v_site FROM public.site s
+    WHERE s.organization_id = NEW.organization_id AND s.id = NEW.site_id;
+    IF v_site IS NULL OR NOT (v_applies -> 'siteTypes') ? v_site THEN
+      RAISE EXCEPTION 'requirement % does not apply to this site type', NEW.requirement_id
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NULL;
+END
+$$;
+
+CREATE TRIGGER requirement_instance_applicability_check
+  AFTER INSERT OR UPDATE OF requirement_id, site_id ON public.requirement_instance
+  FOR EACH ROW EXECUTE FUNCTION public.requirement_instance_applicability_check();
+
 -- ---------------------------------------------------------------------------
 -- tenant_parameter
 -- ---------------------------------------------------------------------------

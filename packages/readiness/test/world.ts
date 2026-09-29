@@ -129,6 +129,14 @@ export async function startWorld(): Promise<World> {
   const admin = await connect(c.adminUrl);
   const tenant = createDatabase({ connectionString: c.appUserUrl, max: 3 });
   const platform = createDatabase({ connectionString: c.platformUrl, max: 2 });
+  // Releases are global and the latest one decides applicability (F16): start from the
+  // plain FX-CAT entries whatever another file published last.
+  const version = await nextCatalogVersion(admin);
+  await platform.withPlatform(SYSTEM, (tx) =>
+    tx.execute(
+      sql`SELECT catalog.publish_release(${JSON.stringify(fxBundles(version).nonProduction)}::jsonb, 'readiness test world')`,
+    ),
+  );
   const tag = randomUUID().slice(0, 6);
   const a = await makeOrg(platform, tenant, `${tag} A`);
   const b = await makeOrg(platform, tenant, `${tag} B`);
