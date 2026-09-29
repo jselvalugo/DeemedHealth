@@ -34,6 +34,7 @@ const GLOBAL_TABLES = [
 const PLATFORM_TABLES = [
   'platform.auth_throttle',
   'platform.job',
+  'platform.job_kind',
   'platform.login_directory',
   'platform.tenant',
 ];

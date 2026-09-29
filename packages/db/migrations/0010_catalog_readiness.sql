@@ -347,20 +347,69 @@ CREATE INDEX job_ready_idx ON platform.job (queue, run_after) WHERE state IN ('q
 -- RLS on with no policy: only the owner (through the definer functions) sees rows.
 ALTER TABLE platform.job ENABLE ROW LEVEL SECURITY;
 
+-- Job kinds (security review S5): what may be enqueued, by whom, with which payload keys
+-- (scalar values only), the fixed actor label, the attempt limit, and the per-tenant cap on
+-- queued jobs. Reference data owned by migrations; no runtime role writes it.
+CREATE TABLE platform.job_kind (
+  queue                  text     NOT NULL PRIMARY KEY CHECK (queue ~ '^[a-z][a-z0-9_]*([.][a-z][a-z0-9_]*)+$'),
+  tenant_enqueueable     boolean  NOT NULL,
+  actor_label            text     NOT NULL CHECK (length(btrim(actor_label)) BETWEEN 1 AND 200),
+  max_attempts           integer  NOT NULL CHECK (max_attempts BETWEEN 1 AND 25),
+  tenant_payload_keys    text[]   NOT NULL DEFAULT '{}',
+  platform_payload_keys  text[]   NOT NULL DEFAULT '{}',
+  max_queued_per_tenant  integer  NOT NULL CHECK (max_queued_per_tenant BETWEEN 1 AND 1000)
+);
+ALTER TABLE platform.job_kind ENABLE ROW LEVEL SECURITY;
+
+INSERT INTO platform.job_kind (queue, tenant_enqueueable, actor_label, max_attempts, tenant_payload_keys,
+                               platform_payload_keys, max_queued_per_tenant) VALUES
+  ('readiness.recompute', true, 'readiness recompute', 5, ARRAY['cause'],
+   ARRAY['cause', 'snapshot', 'asOfDate', 'catalogVersion'], 20);
+
 CREATE FUNCTION platform.insert_job(
   p_organization_id uuid, p_queue text, p_payload jsonb, p_singleton_key text,
-  p_run_after timestamptz, p_max_attempts integer, p_actor_label text
+  p_run_after timestamptz, p_max_attempts integer, p_actor_label text, p_from_tenant boolean
 ) RETURNS uuid
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
-  v_id uuid;
+  v_kind    platform.job_kind;
+  v_payload jsonb := coalesce(p_payload, '{}'::jsonb);
+  v_allowed text[];
+  v_key     text;
+  v_id      uuid;
+  v_queued  integer;
 BEGIN
+  SELECT * INTO v_kind FROM platform.job_kind k WHERE k.queue = p_queue;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'unknown job kind %', p_queue USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  IF p_from_tenant AND NOT v_kind.tenant_enqueueable THEN
+    RAISE EXCEPTION 'job kind % is not enqueued by tenants', p_queue USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF jsonb_typeof(v_payload) <> 'object' THEN
+    RAISE EXCEPTION 'job payload must be an object' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  v_allowed := CASE WHEN p_from_tenant THEN v_kind.tenant_payload_keys ELSE v_kind.platform_payload_keys END;
+  FOR v_key IN SELECT jsonb_object_keys(v_payload) LOOP
+    -- A tenant never requests a snapshot (those come from the nightly sweep only).
+    IF (p_from_tenant AND v_key = 'snapshot') OR NOT v_key = ANY (v_allowed)
+       OR jsonb_typeof(v_payload -> v_key) NOT IN ('string', 'number', 'boolean', 'null') THEN
+      RAISE EXCEPTION 'job payload key % is not allowed for %', v_key, p_queue USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+  END LOOP;
+  IF p_run_after IS NOT NULL AND p_run_after < now() THEN
+    RAISE EXCEPTION 'run_after must not be in the past' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
   INSERT INTO platform.job (queue, organization_id, actor_label, request_id, payload, singleton_key, run_after, max_attempts)
-  VALUES (p_queue, p_organization_id, coalesce(nullif(btrim(p_actor_label), ''), 'job'),
-          nullif(current_setting('app.request_id', true), '')::uuid, coalesce(p_payload, '{}'::jsonb),
-          p_singleton_key, coalesce(p_run_after, now()), coalesce(p_max_attempts, 5))
+  VALUES (p_queue, p_organization_id,
+          CASE WHEN p_from_tenant THEN v_kind.actor_label
+               ELSE coalesce(nullif(btrim(p_actor_label), ''), v_kind.actor_label) END,
+          nullif(current_setting('app.request_id', true), '')::uuid, v_payload,
+          p_singleton_key, coalesce(p_run_after, now()),
+          least(coalesce(p_max_attempts, v_kind.max_attempts), v_kind.max_attempts))
   ON CONFLICT (queue, organization_id, singleton_key) WHERE state = 'queued' AND singleton_key IS NOT NULL
   DO NOTHING
   RETURNING id INTO v_id;
@@ -368,17 +417,26 @@ BEGIN
     SELECT j.id INTO v_id FROM platform.job j
     WHERE j.queue = p_queue AND j.organization_id IS NOT DISTINCT FROM p_organization_id
       AND j.singleton_key = p_singleton_key AND j.state = 'queued';
+    RETURN v_id;
+  END IF;
+  -- Per-tenant, per-kind cap on queued work (the new row included).
+  IF p_organization_id IS NOT NULL THEN
+    SELECT count(*) INTO v_queued FROM platform.job j
+    WHERE j.queue = p_queue AND j.organization_id = p_organization_id AND j.state = 'queued';
+    IF v_queued > v_kind.max_queued_per_tenant THEN
+      RAISE EXCEPTION 'too many queued % jobs for this tenant', p_queue USING ERRCODE = 'program_limit_exceeded';
+    END IF;
   END IF;
   RETURN v_id;
 END
 $$;
 
 -- For app_user, inside the tenant transaction: the job exists only if the change commits.
+-- The kind decides the actor label and the attempt limit; the caller cannot.
 CREATE FUNCTION public.enqueue_job(
   p_queue          text,
   p_payload        jsonb   DEFAULT '{}',
   p_singleton_key  text    DEFAULT NULL,
-  p_actor_label    text    DEFAULT NULL,
   p_run_after      timestamptz DEFAULT NULL,
   p_max_attempts   integer DEFAULT NULL
 ) RETURNS uuid
@@ -389,7 +447,7 @@ AS $$
 BEGIN
   -- No missing_ok: a call without tenant context raises.
   RETURN platform.insert_job(current_setting('app.organization_id')::uuid, p_queue, p_payload, p_singleton_key,
-                             p_run_after, p_max_attempts, p_actor_label);
+                             p_run_after, p_max_attempts, NULL, true);
 END
 $$;
 
@@ -409,7 +467,27 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   RETURN platform.insert_job(p_organization_id, p_queue, p_payload, p_singleton_key, p_run_after, p_max_attempts,
-                             p_actor_label);
+                             p_actor_label, false);
+END
+$$;
+
+-- Retention for the run records (S5): finished jobs older than the given age are removed.
+CREATE FUNCTION platform.purge_finished_jobs(p_older_than interval)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_n integer;
+BEGIN
+  IF p_older_than IS NULL OR p_older_than < interval '1 day' THEN
+    RAISE EXCEPTION 'keep finished jobs at least one day' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  DELETE FROM platform.job
+  WHERE state IN ('completed', 'failed', 'superseded') AND finished_at < now() - p_older_than;
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  RETURN v_n;
 END
 $$;
 
@@ -490,15 +568,15 @@ BEGIN
 END
 $$;
 
-REVOKE ALL ON FUNCTION platform.insert_job(uuid, text, jsonb, text, timestamptz, integer, text),
-  public.enqueue_job(text, jsonb, text, text, timestamptz, integer),
+REVOKE ALL ON FUNCTION platform.insert_job(uuid, text, jsonb, text, timestamptz, integer, text, boolean),
+  public.enqueue_job(text, jsonb, text, timestamptz, integer),
   platform.enqueue_job(uuid, text, jsonb, text, text, timestamptz, integer),
   platform.claim_jobs(text[], integer, integer), platform.complete_job(uuid),
-  platform.fail_job(uuid, text, integer) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.enqueue_job(text, jsonb, text, text, timestamptz, integer) TO app_user;
+  platform.fail_job(uuid, text, integer), platform.purge_finished_jobs(interval) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.enqueue_job(text, jsonb, text, timestamptz, integer) TO app_user;
 GRANT EXECUTE ON FUNCTION platform.enqueue_job(uuid, text, jsonb, text, text, timestamptz, integer),
   platform.claim_jobs(text[], integer, integer), platform.complete_job(uuid),
-  platform.fail_job(uuid, text, integer) TO app_platform;
+  platform.fail_job(uuid, text, integer), platform.purge_finished_jobs(interval) TO app_platform;
 
 -- ---------------------------------------------------------------------------
 -- requirement_instance: not_assessed, catalog pin, reasons, and who marked N/A

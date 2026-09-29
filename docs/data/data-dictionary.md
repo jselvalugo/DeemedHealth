@@ -487,6 +487,20 @@ Job queue and run record (ADR-0001): enqueued in the transaction of the change; 
 | `finished_at` | internal | When the job completed, failed, or was superseded | at rest | no | shown |
 | `last_error_code` | internal | Stable error code of the latest failure (never a message) | at rest | no | shown |
 
+## `platform.job_kind`
+
+Registered job kinds (S5): who may enqueue, allowed payload keys, actor label, attempt and queue limits. Scope: platform. Owner: `backend-engineer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `queue` | internal | Queue name | at rest | no | shown |
+| `tenant_enqueueable` | internal | Whether app_user may enqueue it from a tenant transaction | at rest | no | shown |
+| `actor_label` | internal | Fixed actor label for the audit events the job writes | at rest | no | shown |
+| `max_attempts` | internal | Attempt limit (callers may lower it, never raise it) | at rest | no | shown |
+| `tenant_payload_keys` | internal | Payload keys a tenant may send (scalar values only) | at rest | no | shown |
+| `platform_payload_keys` | internal | Payload keys the platform may send | at rest | no | shown |
+| `max_queued_per_tenant` | internal | Cap on queued jobs of this kind per tenant | at rest | no | shown |
+
 ## `catalog.database_profile`
 
 Whether this database is production or non-production for catalog releases (ADR-0003 rule 8); set once. Scope: global. Owner: `backend-engineer`.

@@ -23,11 +23,14 @@ import { sql } from 'drizzle-orm';
 export const QUEUE_NAME = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 
 export interface SendOptions {
-  /** Ids and dates only, never personal data (ADR-0001). At most 8 KiB. */
+  /** Ids and dates only, never personal data (ADR-0001): registered keys, scalar values. */
   payload?: Record<string, string | number | boolean | null>;
   /** A queued job with the same queue, tenant, and key absorbs this one. */
   singletonKey?: string;
-  /** Label for the audit events the job writes (the system actor's label). */
+  /**
+   * Label for the audit events the job writes. Platform jobs only: a tenant-enqueued job
+   * always carries its kind's label from platform.job_kind (S5).
+   */
   actorLabel?: string;
   runAfter?: Date;
   maxAttempts?: number;
@@ -37,7 +40,11 @@ function assertQueue(queue: string): void {
   if (!QUEUE_NAME.test(queue)) throw new Error('invalid queue name');
 }
 
-/** Enqueues in the current tenant transaction (withTenant). Returns the job id. */
+/**
+ * Enqueues in the current tenant transaction (withTenant). Returns the job id. The kind
+ * must be registered in platform.job_kind as tenant-enqueueable; its registry row fixes
+ * the actor label, the attempt limit, the allowed payload keys, and the queued cap (S5).
+ */
 export async function sendJob(tx: Tx, queue: string, options: SendOptions = {}): Promise<string> {
   assertQueue(queue);
   const r = await tx.execute<{ id: string }>(sql`
@@ -45,7 +52,6 @@ export async function sendJob(tx: Tx, queue: string, options: SendOptions = {}):
       p_queue         => ${queue}::text,
       p_payload       => ${JSON.stringify(options.payload ?? {})}::jsonb,
       p_singleton_key => ${options.singletonKey ?? null}::text,
-      p_actor_label   => ${options.actorLabel ?? null}::text,
       p_run_after     => ${options.runAfter?.toISOString() ?? null}::timestamptz,
       p_max_attempts  => ${options.maxAttempts ?? null}::integer
     )::text AS id`);

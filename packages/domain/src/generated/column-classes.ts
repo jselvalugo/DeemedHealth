@@ -2127,6 +2127,54 @@ export const COLUMN_CLASSES: Readonly<Record<string, TableClasses>> = {
       },
     },
   },
+  'platform.job_kind': {
+    scope: 'platform',
+    columns: {
+      queue: { class: 'internal', encryption: null, fipa: 'no', display: 'shown', freeText: false },
+      tenant_enqueueable: {
+        class: 'internal',
+        encryption: null,
+        fipa: 'no',
+        display: 'shown',
+        freeText: false,
+      },
+      actor_label: {
+        class: 'internal',
+        encryption: null,
+        fipa: 'no',
+        display: 'shown',
+        freeText: false,
+      },
+      max_attempts: {
+        class: 'internal',
+        encryption: null,
+        fipa: 'no',
+        display: 'shown',
+        freeText: false,
+      },
+      tenant_payload_keys: {
+        class: 'internal',
+        encryption: null,
+        fipa: 'no',
+        display: 'shown',
+        freeText: false,
+      },
+      platform_payload_keys: {
+        class: 'internal',
+        encryption: null,
+        fipa: 'no',
+        display: 'shown',
+        freeText: false,
+      },
+      max_queued_per_tenant: {
+        class: 'internal',
+        encryption: null,
+        fipa: 'no',
+        display: 'shown',
+        freeText: false,
+      },
+    },
+  },
   'catalog.database_profile': {
     scope: 'global',
     columns: {

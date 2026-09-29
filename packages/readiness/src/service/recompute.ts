@@ -48,11 +48,7 @@ export { RECOMPUTE_QUEUE };
 
 /** Enqueue a recompute of the current tenant in the caller's transaction. */
 export async function enqueueRecompute(tx: Tx, cause: string): Promise<string> {
-  return sendJob(tx, RECOMPUTE_QUEUE, {
-    singletonKey: RECOMPUTE_QUEUE,
-    actorLabel: 'readiness recompute',
-    payload: { cause },
-  });
+  return sendJob(tx, RECOMPUTE_QUEUE, { singletonKey: RECOMPUTE_QUEUE, payload: { cause } });
 }
 
 /**

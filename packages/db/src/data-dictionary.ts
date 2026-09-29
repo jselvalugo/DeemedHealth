@@ -548,6 +548,24 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       last_error_code: c('internal', 'Stable error code of the latest failure (never a message)'),
     },
   },
+  'platform.job_kind': {
+    description:
+      'Registered job kinds (S5): who may enqueue, allowed payload keys, actor label, attempt and queue limits.',
+    scope: 'platform',
+    owner: 'backend-engineer',
+    columns: {
+      queue: c('internal', 'Queue name'),
+      tenant_enqueueable: c(
+        'internal',
+        'Whether app_user may enqueue it from a tenant transaction',
+      ),
+      actor_label: c('internal', 'Fixed actor label for the audit events the job writes'),
+      max_attempts: c('internal', 'Attempt limit (callers may lower it, never raise it)'),
+      tenant_payload_keys: c('internal', 'Payload keys a tenant may send (scalar values only)'),
+      platform_payload_keys: c('internal', 'Payload keys the platform may send'),
+      max_queued_per_tenant: c('internal', 'Cap on queued jobs of this kind per tenant'),
+    },
+  },
   'catalog.database_profile': {
     description:
       'Whether this database is production or non-production for catalog releases (ADR-0003 rule 8); set once.',

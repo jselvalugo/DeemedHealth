@@ -43,6 +43,17 @@ export const authThrottle = platformSchema.table('auth_throttle', {
   updatedAt: timestamptz('updated_at').notNull().defaultNow(),
 });
 
+/** Registered job kinds (migration 0010, S5). */
+export const jobKind = platformSchema.table('job_kind', {
+  queue: text('queue').primaryKey(),
+  tenantEnqueueable: boolean('tenant_enqueueable').notNull(),
+  actorLabel: text('actor_label').notNull(),
+  maxAttempts: integer('max_attempts').notNull(),
+  tenantPayloadKeys: text('tenant_payload_keys').array().notNull().default([]),
+  platformPayloadKeys: text('platform_payload_keys').array().notNull().default([]),
+  maxQueuedPerTenant: integer('max_queued_per_tenant').notNull(),
+});
+
 export const JOB_STATES = ['queued', 'active', 'completed', 'failed', 'superseded'] as const;
 export type JobState = (typeof JOB_STATES)[number];
 

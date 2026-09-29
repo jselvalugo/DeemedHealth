@@ -24,6 +24,15 @@ describeDb('job queue and drain()', () => {
   beforeAll(async () => {
     const c = need();
     admin = await connect(c.adminUrl);
+    // Test job kinds (S5): registered like migrations register real ones.
+    await admin.query(`
+      INSERT INTO platform.job_kind (queue, tenant_enqueueable, actor_label, max_attempts,
+                                     tenant_payload_keys, platform_payload_keys, max_queued_per_tenant)
+      VALUES ('test.echo', true, 'test echo', 5, ARRAY['n', 'big'], ARRAY['n', 'fanout'], 20),
+             ('test.flaky', true, 'test flaky', 5, '{}', '{}', 20),
+             ('test.capped', true, 'test capped', 2, '{}', '{}', 2),
+             ('test.platform_only', false, 'test platform only', 3, '{}', ARRAY['n'], 20)
+      ON CONFLICT (queue) DO NOTHING`);
     tenant = createDatabase({ connectionString: c.appUserUrl, max: 2 });
     platform = createDatabase({ connectionString: c.platformUrl, max: 2 });
     org = await platform.withPlatform(SYSTEM, (tx, context) =>
@@ -192,5 +201,145 @@ describeDb('job queue and drain()', () => {
         sendJob(tx, Q, { payload: { big: 'x'.repeat(9000) } }),
       ),
     ).rejects.toThrow();
+  });
+
+  const sqlState = async (promise: Promise<unknown>): Promise<string | undefined> => {
+    try {
+      await promise;
+    } catch (error) {
+      const e = error as { code?: string; cause?: { code?: string } };
+      return e.code ?? e.cause?.code;
+    }
+    return undefined;
+  };
+
+  it('accepts only registered kinds, and only tenant-enqueueable ones from a tenant (S5)', async () => {
+    expect(
+      await sqlState(tenant.withTenant(org, SYSTEM, (tx) => sendJob(tx, 'test.unknown'))),
+    ).toBe('22023');
+    expect(
+      await sqlState(tenant.withTenant(org, SYSTEM, (tx) => sendJob(tx, 'test.platform_only'))),
+    ).toBe('42501');
+    expect(
+      await sqlState(
+        platform.withPlatform(SYSTEM, (tx) => sendPlatformJob(tx, org, 'test.unknown')),
+      ),
+    ).toBe('22023');
+    const id = await platform.withPlatform(SYSTEM, (tx) =>
+      sendPlatformJob(tx, org, 'test.platform_only', { payload: { n: 1 } }),
+    );
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    await admin.query(`DELETE FROM platform.job WHERE id = $1`, [id]);
+  });
+
+  it('takes the actor label and attempt limit from the registry, never from the tenant (S5)', async () => {
+    const id = await tenant.withTenant(org, SYSTEM, (tx) =>
+      sendJob(tx, Q, { payload: { n: 9 }, maxAttempts: 25 }),
+    );
+    const row = (
+      await admin.query(`SELECT actor_label, max_attempts FROM platform.job WHERE id = $1`, [id])
+    ).rows[0];
+    expect(row).toEqual({ actor_label: 'test echo', max_attempts: 5 });
+    // A lower limit is honored; the platform may label its own fan-out.
+    const low = await platform.withPlatform(SYSTEM, (tx) =>
+      sendPlatformJob(tx, org, Q, { maxAttempts: 2, actorLabel: 'nightly fan-out' }),
+    );
+    const lowRow = (
+      await admin.query(`SELECT actor_label, max_attempts FROM platform.job WHERE id = $1`, [low])
+    ).rows[0];
+    expect(lowRow).toEqual({ actor_label: 'nightly fan-out', max_attempts: 2 });
+    await admin.query(`DELETE FROM platform.job WHERE id = ANY($1::uuid[])`, [[id, low]]);
+  });
+
+  it('refuses run_after in the past and payload keys outside the registry (S5)', async () => {
+    const past = new Date(Date.now() - 60_000);
+    expect(
+      await sqlState(tenant.withTenant(org, SYSTEM, (tx) => sendJob(tx, Q, { runAfter: past }))),
+    ).toBe('22023');
+    // Unregistered key, a platform-only key from a tenant, and a nested value.
+    expect(
+      await sqlState(
+        tenant.withTenant(org, SYSTEM, (tx) => sendJob(tx, Q, { payload: { email: 'x' } })),
+      ),
+    ).toBe('22023');
+    expect(
+      await sqlState(
+        tenant.withTenant(org, SYSTEM, (tx) => sendJob(tx, Q, { payload: { fanout: true } })),
+      ),
+    ).toBe('22023');
+    const nested = { n: { deep: 1 } } as unknown as Record<string, number>;
+    expect(
+      await sqlState(tenant.withTenant(org, SYSTEM, (tx) => sendJob(tx, Q, { payload: nested }))),
+    ).toBe('22023');
+    // A tenant never asks for a snapshot, even on the real recompute kind.
+    expect(
+      await sqlState(
+        tenant.withTenant(org, SYSTEM, (tx) =>
+          sendJob(tx, 'readiness.recompute', { payload: { snapshot: true } }),
+        ),
+      ),
+    ).toBe('22023');
+  });
+
+  it('caps queued jobs per tenant and kind (S5)', async () => {
+    await tenant.withTenant(org, SYSTEM, async (tx) => {
+      await sendJob(tx, 'test.capped');
+      await sendJob(tx, 'test.capped');
+    });
+    expect(await sqlState(tenant.withTenant(org, SYSTEM, (tx) => sendJob(tx, 'test.capped')))).toBe(
+      '54000',
+    );
+    // Coalesced sends do not count against the cap.
+    await admin.query(`DELETE FROM platform.job WHERE queue = 'test.capped'`);
+    await tenant.withTenant(org, SYSTEM, async (tx) => {
+      for (let i = 0; i < 5; i += 1) await sendJob(tx, 'test.capped', { singletonKey: 'same' });
+    });
+    expect((await jobs('test.capped')).filter((j) => j.state === 'queued')).toHaveLength(1);
+    await admin.query(`DELETE FROM platform.job WHERE queue = 'test.capped'`);
+  });
+
+  it('purges finished run records past the retention age, and never below one day (S5)', async () => {
+    const old = await platform.withPlatform(SYSTEM, (tx) =>
+      sendPlatformJob(tx, org, Q, { payload: { n: 70 } }),
+    );
+    const recent = await platform.withPlatform(SYSTEM, (tx) =>
+      sendPlatformJob(tx, org, Q, { payload: { n: 71 } }),
+    );
+    await admin.query(
+      `UPDATE platform.job SET state = 'completed', finished_at = now() - interval '400 days'
+       WHERE id = $1`,
+      [old],
+    );
+    await admin.query(
+      `UPDATE platform.job SET state = 'completed', finished_at = now() WHERE id = $1`,
+      [recent],
+    );
+    expect(
+      await sqlState(
+        platform.withPlatform(SYSTEM, (tx) =>
+          tx.execute(sql`SELECT platform.purge_finished_jobs(interval '1 hour')`),
+        ),
+      ),
+    ).toBe('22023');
+    const purged = await platform.withPlatform(SYSTEM, async (tx) => {
+      const r = await tx.execute<{ n: number }>(
+        sql`SELECT platform.purge_finished_jobs(interval '365 days') AS n`,
+      );
+      return r.rows[0]!.n;
+    });
+    expect(purged).toBeGreaterThanOrEqual(1);
+    const left = (await jobs(Q)).map((j) => j.id);
+    expect(left).not.toContain(old);
+    expect(left).toContain(recent);
+    // The tenant role cannot purge.
+    const user = await connect(need().appUserUrl);
+    try {
+      await expectPgError(
+        user.query(`SELECT platform.purge_finished_jobs(interval '1 day')`),
+        '42501',
+      );
+    } finally {
+      await user.end();
+    }
   });
 });
