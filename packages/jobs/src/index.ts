@@ -128,7 +128,8 @@ const ERROR_CODE = /^[A-Za-z0-9_.:-]{1,100}$/;
 
 function errorCode(error: unknown): string {
   if (error instanceof JobError && ERROR_CODE.test(error.code)) return error.code;
-  const pgCode = (error as { code?: unknown } | null)?.code;
+  const e = error as { code?: unknown; cause?: { code?: unknown } } | null;
+  const pgCode = typeof e?.code === 'string' ? e.code : e?.cause?.code;
   if (typeof pgCode === 'string' && /^[0-9A-Z]{5}$/.test(pgCode)) return `pg_${pgCode}`;
   return 'handler_error';
 }
