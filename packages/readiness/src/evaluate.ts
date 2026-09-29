@@ -139,25 +139,30 @@ function completions(
 ): ReadinessFact[] {
   if (!rule.approval) return facts.filter((f) => f.kind === 'document' || f.kind === 'completion');
   const backing = rule.approval;
-  const approvals = facts.filter(
+  const all = facts.filter(
+    (f): f is ReadinessFact & { approval: NonNullable<ReadinessFact['approval']> } =>
+      f.kind === 'approval' && Boolean(f.approval),
+  );
+  // An approval with no type cannot show what it approved: it never counts (F2).
+  if (all.some((f) => !f.approval.approvalTypeId)) reasons.push(reason('approval_type_missing'));
+  const approvals = all.filter(
     (f) =>
-      f.kind === 'approval' &&
-      f.approval &&
-      (!f.approval.approvalTypeId ||
-        approvalTypeMatches(backing.approvalTypeId, f.approval.approvalTypeId)),
+      Boolean(f.approval.approvalTypeId) &&
+      approvalTypeMatches(backing.approvalTypeId, f.approval.approvalTypeId as string),
   );
   const ok = approvals.filter(
     (f) =>
-      f.approval?.decision === 'approved' &&
+      f.approval.decision === 'approved' &&
       capacitySatisfies(backing.requiredCapacity, f.approval.capacity),
   );
-  if (approvals.some((f) => f.approval?.decision === 'rejected')) {
+  // Facts are sorted oldest first: report a rejection only when it is the latest decision.
+  if (approvals.at(-1)?.approval.decision === 'rejected') {
     reasons.push(reason('approval_rejected'));
   }
   if (
     approvals.some(
       (f) =>
-        f.approval?.decision === 'approved' &&
+        f.approval.decision === 'approved' &&
         !capacitySatisfies(backing.requiredCapacity, f.approval.capacity),
     )
   ) {

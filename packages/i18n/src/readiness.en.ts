@@ -41,7 +41,9 @@ export const readinessEn = {
   'readiness.reason.no_evidence': 'No qualifying evidence is on file.',
   'readiness.reason.approval_capacity_insufficient':
     'An approval on file was not recorded in the required capacity ({required}).',
-  'readiness.reason.approval_rejected': 'An approval decision on file was a rejection.',
+  'readiness.reason.approval_rejected': 'The latest approval decision on file was a rejection.',
+  'readiness.reason.approval_type_missing':
+    'An approval on file does not say what it approved, so it does not count.',
   'readiness.reason.valid_through': 'Valid through {date}.',
   'readiness.reason.expires_today': 'Expires today ({date}); valid until midnight site time.',
   'readiness.reason.expired': 'Expired on {date}.',

@@ -189,9 +189,13 @@ describe('periodic since last completion, bounded tenant parameter (TEST-05-PRIV
   });
 
   it('fails closed on an out-of-bounds or unset parameter (not_assessed, never a guess)', () => {
-    const out = run('2026-09-29T15:00:00Z', [approval('2025-01-31', 'designated')], {
-      reprivilegingIntervalMonths: 30,
-    });
+    const out = run(
+      '2026-09-29T15:00:00Z',
+      [approval('2025-01-31', 'designated', 'cp.privileges.grant')],
+      {
+        reprivilegingIntervalMonths: 30,
+      },
+    );
     expect(out.status).toBe('not_assessed');
     expect(out.reasons[0]).toMatchObject({
       code: 'tenant_parameter_out_of_bounds',
@@ -214,18 +218,31 @@ describe('periodic since last completion, bounded tenant parameter (TEST-05-PRIV
       },
     });
     const unset = evaluate(
-      input(noDefault, '2026-09-29T15:00:00Z', { facts: [approval('2025-01-31', 'designated')] }),
+      input(noDefault, '2026-09-29T15:00:00Z', {
+        facts: [approval('2025-01-31', 'designated', 'cp.privileges.grant')],
+      }),
     );
     expect(unset.status).toBe('not_assessed');
     expect(codes(unset)).toEqual(['tenant_parameter_unset']);
   });
 
   it('counts only approvals in a capacity that satisfies "designated", of the right type', () => {
-    const staff = run('2026-09-29T15:00:00Z', [approval('2025-01-31', 'staff')]);
+    const staff = run('2026-09-29T15:00:00Z', [
+      approval('2025-01-31', 'staff', 'cp.privileges.grant'),
+    ]);
     expect(staff.status).toBe('missing');
     expect(codes(staff)).toEqual(['approval_capacity_insufficient', 'no_evidence']);
-    const board = run('2026-09-29T15:00:00Z', [approval('2025-01-31', 'board')]);
+    const board = run('2026-09-29T15:00:00Z', [
+      approval('2025-01-31', 'board', 'cp.privileges.grant'),
+    ]);
     expect(board.status).toBe('met');
+    // An approval with no type never matches (F2), and neither does a wildcard type.
+    const untyped = run('2026-09-29T15:00:00Z', [approval('2025-01-31', 'board')]);
+    expect(untyped.status).toBe('missing');
+    expect(codes(untyped)).toEqual(['approval_type_missing', 'no_evidence']);
+    expect(
+      run('2026-09-29T15:00:00Z', [approval('2025-01-31', 'board', 'cp.*.grant')]).status,
+    ).toBe('missing');
     const otherType = run('2026-09-29T15:00:00Z', [
       approval('2025-01-31', 'board', 'budget.annual'),
     ]);
@@ -298,6 +315,26 @@ describe('board-approval-backed (TEST-19-BUDGET, board, every 12 months)', () =>
     const r = run([approval('2025-10-01', 'board', 'budget.annual', 'rejected')]);
     expect(r.status).toBe('missing');
     expect(codes(r)).toEqual(['approval_rejected', 'no_evidence']);
+  });
+
+  it('reports a rejection only when it is the latest decision of the matching type (F15)', () => {
+    const approvedLater = run([
+      approval('2025-09-01', 'board', 'budget.annual', 'rejected'),
+      approval('2025-10-01', 'board', 'budget.annual'),
+    ]);
+    expect(approvedLater.status).toBe('due_soon');
+    expect(codes(approvedLater)).not.toContain('approval_rejected');
+    const rejectedLater = run([
+      approval('2025-10-01', 'board', 'budget.annual'),
+      approval('2025-10-15', 'board', 'budget.annual', 'rejected'),
+    ]);
+    expect(codes(rejectedLater)).toContain('approval_rejected');
+    // A rejection of another approval type is not this requirement's rejection.
+    const otherType = run([
+      approval('2025-10-01', 'board', 'budget.annual'),
+      approval('2025-10-15', 'board', 'policy.sfdp', 'rejected'),
+    ]);
+    expect(codes(otherType)).not.toContain('approval_rejected');
   });
 
   it('does not count ordinary documents (a document is not an approval)', () => {

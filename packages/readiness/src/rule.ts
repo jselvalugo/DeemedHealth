@@ -103,6 +103,8 @@ export function capacitySatisfies(
  * segment (`cp.*` matches `cp.privileges`). Segment comparison only, no regex.
  */
 export function approvalTypeMatches(pattern: string, actual: string): boolean {
+  // A wildcard belongs to the catalog pattern only; a recorded type is always concrete.
+  if (actual.length === 0 || actual.includes('*')) return false;
   const p = pattern.split('.');
   const a = actual.split('.');
   if (p.length !== a.length) return false;

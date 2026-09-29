@@ -40,7 +40,9 @@ export const readinessEs: Record<keyof typeof readinessEn, string> = {
   'readiness.reason.no_evidence': 'No hay evidencia válida registrada.',
   'readiness.reason.approval_capacity_insufficient':
     'Una aprobación registrada no se hizo con la autoridad requerida ({required}).',
-  'readiness.reason.approval_rejected': 'Una decisión de aprobación registrada fue un rechazo.',
+  'readiness.reason.approval_rejected': 'La decisión de aprobación más reciente fue un rechazo.',
+  'readiness.reason.approval_type_missing':
+    'Una aprobación registrada no indica qué aprobó, así que no cuenta.',
   'readiness.reason.valid_through': 'Vigente hasta el {date}.',
   'readiness.reason.expires_today':
     'Vence hoy ({date}); vigente hasta la medianoche, hora del sitio.',

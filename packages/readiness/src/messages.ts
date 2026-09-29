@@ -26,7 +26,8 @@ export const REASON_TEMPLATES: Readonly<Record<ReasonCode, string>> = {
   no_evidence: 'No qualifying evidence is on file.',
   approval_capacity_insufficient:
     'An approval on file was not recorded in the required capacity ({required}).',
-  approval_rejected: 'An approval decision on file was a rejection.',
+  approval_rejected: 'The latest approval decision on file was a rejection.',
+  approval_type_missing: 'An approval on file does not say what it approved, so it does not count.',
   valid_through: 'Valid through {date}.',
   expires_today: 'Expires today ({date}); valid until midnight site time.',
   expired: 'Expired on {date}.',

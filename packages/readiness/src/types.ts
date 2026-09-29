@@ -124,6 +124,7 @@ export type ReasonCode =
   | 'no_evidence'
   | 'approval_capacity_insufficient'
   | 'approval_rejected'
+  | 'approval_type_missing'
   | 'valid_through'
   | 'expires_today'
   | 'expired'
