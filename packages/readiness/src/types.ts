@@ -86,6 +86,12 @@ export interface ApplicabilityContext {
   siteType: string | null;
   /** Staff types of a person subject; null when the subject is not a person. */
   staffTypes: readonly string[] | null;
+  /**
+   * Dimensions the platform holds no data for yet (e.g. staffTypes until provider
+   * profiles exist). The engine does not check them: the instance's existence is the
+   * applicability decision for those dimensions.
+   */
+  unknownDimensions?: readonly ('siteTypes' | 'staffTypes')[];
 }
 
 export interface EvaluationInput {
@@ -104,6 +110,8 @@ export interface EvaluationInput {
 }
 
 export type ReasonCode =
+  | 'no_catalog_release'
+  | 'not_in_catalog'
   | 'entry_not_verified'
   | 'entry_retired'
   | 'not_effective'

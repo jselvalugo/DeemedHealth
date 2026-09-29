@@ -77,15 +77,21 @@ export function applicabilityMismatch(
   ctx: ApplicabilityContext,
 ): string | null {
   const a = entry.appliesTo;
+  const unknown = ctx.unknownDimensions ?? [];
   if (a.awardTypes && !a.awardTypes.includes(ctx.awardType)) return 'awardTypes';
   if (a.subPrograms && !a.subPrograms.some((p) => ctx.subPrograms.includes(p))) {
     return 'subPrograms';
   }
-  if (a.siteTypes && (ctx.siteType === null || !a.siteTypes.includes(ctx.siteType as never))) {
+  if (
+    a.siteTypes &&
+    !unknown.includes('siteTypes') &&
+    (ctx.siteType === null || !a.siteTypes.includes(ctx.siteType as never))
+  ) {
     return 'siteTypes';
   }
   if (
     a.staffTypes &&
+    !unknown.includes('staffTypes') &&
     (ctx.staffTypes === null || !a.staffTypes.some((t) => ctx.staffTypes?.includes(t)))
   ) {
     return 'staffTypes';

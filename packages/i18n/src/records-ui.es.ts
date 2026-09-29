@@ -30,6 +30,7 @@ export const recordsUiEs: Record<keyof typeof recordsUiEn, string> = {
   'recordValue.requirement_instance.status.overdue': 'Vencido',
   'recordValue.requirement_instance.status.missing': 'Falta evidencia',
   'recordValue.requirement_instance.status.not_applicable': 'No aplica',
+  'recordValue.requirement_instance.status.not_assessed': 'Sin evaluar',
   'recordValue.requirement_instance.subjectType.organization': 'Centro de salud',
   'recordValue.requirement_instance.subjectType.site': 'Sitio',
   'recordValue.requirement_instance.subjectType.person': 'Persona',

@@ -3,7 +3,7 @@
 <!-- Generated from packages/db/src/data-dictionary.ts by `pnpm --filter @deemed/db dictionary`. Do not edit by hand. -->
 
 Owner: `data-architect`. Classes follow `docs/security/data-classification.md`.
-Every column of every table in the `public`, `audit`, `auth`, and `platform` schemas is listed;
+Every column of every table in the `public`, `audit`, `auth`, `platform`, and `catalog` schemas is listed;
 the `@deemed/db` tests fail when a column is missing here. No SSN column exists (decision D1).
 
 Scope: **tenant** = `organization_id` (or `organization.id`) with forced RLS;
@@ -280,12 +280,12 @@ A catalog requirement applied to an organization, site, or person. Scope: tenant
 | `id` | internal | Instance id | at rest | no | shown |
 | `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
 | `requirement_id` | public | Catalog requirementId | at rest | no | shown |
-| `requirement_version_id` | internal | Catalog requirement version (FK arrives with the catalog tables) | at rest | no | shown |
+| `requirement_version_id` | internal | Catalog requirement version the status was computed under | at rest | no | shown |
 | `subject_type` | internal | organization, site, or person | at rest | no | shown |
 | `subject_id` | internal | Subject row id | at rest | no | shown |
 | `site_id` | internal | Site the instance belongs to, if any | at rest | no | shown |
 | `owner_person_id` | internal | Accountable person | at rest | no | shown |
-| `status` | internal | met, due_soon, overdue, missing, not_applicable | at rest | no | shown |
+| `status` | internal | met, due_soon, overdue, missing, not_applicable, not_assessed | at rest | no | shown |
 | `not_applicable_reason` | PII | Required reason when status is not_applicable (free text) | at rest | no | shown |
 | `next_due_on` | internal | Next due date (site or organization time zone) | at rest | no | shown |
 | `status_computed_at` | internal | When the readiness engine last computed the status | at rest | no | shown |
@@ -297,6 +297,10 @@ A catalog requirement applied to an organization, site, or person. Scope: tenant
 | `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
 | `archived_by` | internal | user_account that archived the row; always the transaction actor (set_row_meta) | at rest | no | shown |
 | `archive_reason` | PII | Why the row was archived (free text) | at rest | no | shown |
+| `catalog_release_id` | internal | Catalog release the status was computed under | at rest | no | shown |
+| `status_reasons` | internal | Readiness engine reason codes and parameters (no free text) | at rest | no | shown |
+| `not_applicable_by` | internal | user_account that marked it not applicable (database-set) | at rest | no | shown |
+| `not_applicable_at` | internal | When it was marked not applicable (database-set) | at rest | no | shown |
 
 ## `public.task`
 
@@ -457,3 +461,154 @@ Sign-in throttle and lockout state per account or IP prefix, keyed by a SHA-256 
 | `window_started_at` | internal | Start of the counting window | at rest | no | shown |
 | `locked_until` | internal | Locked until this time | at rest | no | shown |
 | `updated_at` | internal | Last change | at rest | no | shown |
+
+## `platform.job`
+
+Job queue and run record (ADR-0001): enqueued in the transaction of the change; ids only in payloads. Scope: platform. Owner: `backend-engineer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Job id | at rest | no | shown |
+| `queue` | internal | Queue name, e.g. readiness.recompute | at rest | no | shown |
+| `organization_id` | internal | Tenant the job runs for; NULL for platform jobs | at rest | no | shown |
+| `actor_label` | internal | Job or operator label for the audit events it writes | at rest | no | shown |
+| `request_id` | internal | Correlation id of the request that enqueued it | at rest | no | shown |
+| `payload` | internal | Job arguments: ids and dates only, never personal data | at rest | no | shown |
+| `singleton_key` | internal | Coalesces queued jobs for the same work | at rest | no | shown |
+| `state` | internal | queued, active, completed, failed, superseded | at rest | no | shown |
+| `attempts` | internal | Runs started | at rest | no | shown |
+| `max_attempts` | internal | Runs allowed before the job fails | at rest | no | shown |
+| `run_after` | internal | Not before this time (retry backoff) | at rest | no | shown |
+| `locked_until` | internal | Lease of the current run; an expired lease makes it resumable | at rest | no | shown |
+| `created_at` | internal | When the job was enqueued | at rest | no | shown |
+| `started_at` | internal | When the latest run started | at rest | no | shown |
+| `finished_at` | internal | When the job completed, failed, or was superseded | at rest | no | shown |
+| `last_error_code` | internal | Stable error code of the latest failure (never a message) | at rest | no | shown |
+
+## `catalog.database_profile`
+
+Whether this database is production or non-production for catalog releases (ADR-0003 rule 8); set once. Scope: global. Owner: `backend-engineer`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `singleton` | internal | Always true: one row | at rest | no | shown |
+| `channel` | internal | production or non_production | at rest | no | shown |
+| `set_at` | internal | When the migration job set it | at rest | no | shown |
+| `set_by` | internal | Label of the job that set it | at rest | no | shown |
+
+## `catalog.catalog_release`
+
+An immutable catalog release (ADR-0003 rule 3). Scope: global. Owner: `hrsa-regulatory-analyst`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | public | Release id | at rest | no | shown |
+| `catalog_version` | public | Semver catalog version, e.g. 2026.1.0 | at rest | no | shown |
+| `channel` | public | production (verified only) or non_production (all statuses) | at rest | no | shown |
+| `bundle_format` | public | Bundle format version | at rest | no | shown |
+| `content_hash` | public | SHA-256 of the canonical bundle content | at rest | no | shown |
+| `source_register_hash` | public | SHA-256 of the canonical source register | at rest | no | shown |
+| `entry_count` | public | Entries in the release | at rest | no | shown |
+| `sources` | public | Source register entries the release cites | at rest | no | shown |
+| `changeset` | public | added, changed, retired per requirementId | at rest | no | shown |
+| `published_at` | internal | When the publish job loaded it | at rest | no | shown |
+| `published_by` | internal | Publish job label | at rest | no | shown |
+
+## `catalog.requirement`
+
+Every requirementId ever published here; never removed or renamed (ADR-0003 rule 2). Scope: global. Owner: `hrsa-regulatory-analyst`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | public | Stable requirementId | at rest | no | shown |
+| `jurisdiction` | public | federal or florida | at rest | no | shown |
+| `first_release_id` | public | Release that first published it | at rest | no | shown |
+
+## `catalog.requirement_version`
+
+A requirement as published in one release. Production rows are verified only (constraint). Scope: global. Owner: `hrsa-regulatory-analyst`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | public | Requirement version id | at rest | no | shown |
+| `catalog_release_id` | public | Release | at rest | no | shown |
+| `channel` | public | Release channel (carried by a composite key) | at rest | no | shown |
+| `requirement_id` | public | requirementId | at rest | no | shown |
+| `status` | public | draft, verified, retired | at rest | no | shown |
+| `entry_hash` | public | SHA-256 of the canonical entry | at rest | no | shown |
+| `chapter` | public | Compliance Manual chapter, if any | at rest | no | shown |
+| `layer` | public | requirement, best_practice, state_requirement | at rest | no | shown |
+| `jurisdiction` | public | federal or florida | at rest | no | shown |
+| `severity` | public | critical, high, medium, low | at rest | no | shown |
+| `title` | public | Title | at rest | no | shown |
+| `effective_from` | public | In effect from | at rest | no | shown |
+| `effective_to` | public | In effect through | at rest | no | shown |
+| `entry` | public | The compiled catalog entry | at rest | no | shown |
+
+## `public.tenant_parameter`
+
+A health center's value for a bounded catalog parameter (ADR-0003 rule 7), with its reason. Scope: tenant. Owner: `data-architect`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Parameter row id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `requirement_id` | public | Catalog requirementId that declares the parameter | at rest | no | shown |
+| `parameter_key` | public | Parameter name in the catalog entry | at rest | no | shown |
+| `value` | internal | The value, within the catalog bounds | at rest | no | shown |
+| `reason` | PII | Why the health center chose this value (free text) | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+| `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
+| `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
+| `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
+| `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+
+## `public.readiness_fact`
+
+Dated evidence the readiness engine reads; recorded by a person or an integration, corrected by retraction. Scope: tenant. Owner: `data-architect`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Fact id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `requirement_instance_id` | internal | Requirement instance the fact is evidence for | at rest | no | shown |
+| `kind` | internal | document, completion, expiration, approval, change | at rest | no | shown |
+| `effective_on` | internal | Date of the document, completion, approval, or change | at rest | no | shown |
+| `expires_on` | internal | Expiration facts: valid through this date | at rest | no | shown |
+| `approval_id` | internal | Approval record, for approval facts | at rest | no | shown |
+| `approval_capacity` | internal | board, committee_ratified, designated, staff | at rest | no | shown |
+| `approval_decision` | internal | approved or rejected | at rest | no | shown |
+| `approval_type_id` | internal | Approval type (approval-authority.md section 4) | at rest | no | shown |
+| `evidence_version_id` | internal | Evidence file version (FK arrives with S6) | at rest | no | shown |
+| `recorded_by_type` | internal | user, break_glass, or integration; never a service (AI) actor | at rest | no | shown |
+| `recorded_at` | internal | When it was recorded (database time) | at rest | no | shown |
+| `retracted_at` | internal | When it was retracted | at rest | no | shown |
+| `retracted_by` | internal | user_account that retracted it | at rest | no | shown |
+| `retract_reason` | PII | Why it was retracted (free text) | at rest | no | shown |
+| `row_version` | internal | Optimistic concurrency version; 1 on insert, +1 on every update (set_row_meta) | at rest | no | shown |
+| `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
+| `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
+| `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
+| `updated_by` | internal | user_account that last changed the row | at rest | no | shown |
+
+## `public.readiness_snapshot`
+
+Internal readiness snapshot pinned to its catalog release (ADR-0003 rule 4); insert-only. Scope: tenant. Owner: `data-architect`.
+
+| Column | Class | Description | Encryption | FIPA PI | Display |
+| --- | --- | --- | --- | --- | --- |
+| `id` | internal | Snapshot id | at rest | no | shown |
+| `organization_id` | internal | Tenant (organization) that owns the row; RLS key | at rest | no | shown |
+| `catalog_release_id` | internal | Catalog release it was computed under | at rest | no | shown |
+| `catalog_version` | internal | Catalog version it was computed under | at rest | no | shown |
+| `engine_version` | internal | Readiness engine version | at rest | no | shown |
+| `as_of_date` | internal | Organization calendar date of the snapshot | at rest | no | shown |
+| `kind` | internal | nightly or on_demand | at rest | no | shown |
+| `met` | internal | Instances met | at rest | no | shown |
+| `denominator` | internal | Instances counted (met, due_soon, overdue, missing) | at rest | no | shown |
+| `body` | internal | Counts by chapter, site, and authority, and per-instance status codes | at rest | no | shown |
+| `computed_at` | internal | When it was computed | at rest | no | shown |
+| `created_at` | internal | When the row was created (UTC), set by the database | at rest | no | shown |
+| `created_by` | internal | user_account that created the row, from the transaction actor | at rest | no | shown |
+| `updated_at` | internal | When the row last changed (UTC), set by the database | at rest | no | shown |
+| `updated_by` | internal | user_account that last changed the row | at rest | no | shown |

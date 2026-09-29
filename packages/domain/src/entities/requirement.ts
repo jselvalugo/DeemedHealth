@@ -38,6 +38,7 @@ export const RequirementInstanceStatus = z.enum([
   'overdue',
   'missing',
   'not_applicable',
+  'not_assessed',
 ]);
 export type RequirementInstanceStatus = z.infer<typeof RequirementInstanceStatus>;
 

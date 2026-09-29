@@ -53,6 +53,12 @@ export interface MigrateOptions {
   connectionString: string;
   dir?: string;
   log?: (message: string) => void;
+  /**
+   * Marks the database's catalog channel once, after the migrations (ADR-0003 rule 8):
+   * production databases accept only verified entries. Omitted: left as is (a database
+   * with no channel refuses every catalog publish).
+   */
+  catalogChannel?: 'production' | 'non_production';
 }
 
 export async function migrate(options: MigrateOptions): Promise<{ applied: string[] }> {
@@ -113,6 +119,22 @@ export async function migrate(options: MigrateOptions): Promise<{ applied: strin
         });
       }
       applied.push(file.name);
+    }
+    if (options.catalogChannel !== undefined) {
+      await client.query('BEGIN');
+      try {
+        await client.query('SET LOCAL ROLE app_owner');
+        await client.query(`SELECT catalog.set_database_channel($1, 'migration job')`, [
+          options.catalogChannel,
+        ]);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw new MigrationError(`could not set the catalog channel: ${(error as Error).message}`, {
+          cause: error,
+        });
+      }
+      log(`catalog channel: ${options.catalogChannel}`);
     }
     return { applied };
   } finally {

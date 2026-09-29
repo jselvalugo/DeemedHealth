@@ -229,6 +229,9 @@ importers:
         specifier: ^8.23.0
         version: 8.23.0
     devDependencies:
+      '@deemed/requirements-catalog':
+        specifier: workspace:*
+        version: link:../requirements-catalog
       '@deemed/test-fixtures':
         specifier: workspace:*
         version: link:../test-fixtures
@@ -252,16 +255,35 @@ importers:
 
   packages/integrations: {}
 
-  packages/jobs: {}
+  packages/jobs:
+    dependencies:
+      '@deemed/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: ^0.45.3
+        version: 0.45.3(@types/pg@8.23.1)(pg@8.23.0)
 
   packages/readiness:
     dependencies:
       '@deemed/dates':
         specifier: workspace:*
         version: link:../dates
+      '@deemed/db':
+        specifier: workspace:*
+        version: link:../db
+      '@deemed/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@deemed/jobs':
+        specifier: workspace:*
+        version: link:../jobs
       '@deemed/requirements-catalog':
         specifier: workspace:*
         version: link:../requirements-catalog
+      drizzle-orm:
+        specifier: ^0.45.3
+        version: 0.45.3(@types/pg@8.23.1)(pg@8.23.0)
     devDependencies:
       '@deemed/test-fixtures':
         specifier: workspace:*

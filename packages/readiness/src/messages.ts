@@ -6,6 +6,9 @@ import type { Authority, ReadinessStatus, Reason, ReasonCode, ReasonParams } fro
  * Placeholders are `{name}`; no personal data is ever a parameter.
  */
 export const REASON_TEMPLATES: Readonly<Record<ReasonCode, string>> = {
+  no_catalog_release: 'Not assessed: no catalog release is published in this environment yet.',
+  not_in_catalog:
+    'Not assessed: this requirement is not in catalog {catalogVersion} for this environment.',
   entry_not_verified:
     'Not assessed: this catalog entry is not verified, so production does not evaluate it.',
   entry_retired: 'Not assessed: this requirement was retired in catalog {catalogVersion}.',

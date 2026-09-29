@@ -22,8 +22,21 @@ import {
 } from './helpers.js';
 
 /** Reviewed non-tenant tables. Adding one here needs data-architect and security review. */
-const GLOBAL_TABLES = ['public.approval_area', 'public.role', 'audit.action_registry'];
-const PLATFORM_TABLES = ['platform.auth_throttle', 'platform.login_directory', 'platform.tenant'];
+const GLOBAL_TABLES = [
+  'public.approval_area',
+  'public.role',
+  'audit.action_registry',
+  'catalog.catalog_release',
+  'catalog.database_profile',
+  'catalog.requirement',
+  'catalog.requirement_version',
+];
+const PLATFORM_TABLES = [
+  'platform.auth_throttle',
+  'platform.job',
+  'platform.login_directory',
+  'platform.tenant',
+];
 
 const EXPECTED_TENANT_TABLES = [
   'audit.audit_event',
@@ -36,11 +49,14 @@ const EXPECTED_TENANT_TABLES = [
   'public.approval',
   'public.organization',
   'public.person',
+  'public.readiness_fact',
+  'public.readiness_snapshot',
   'public.requirement_instance',
   'public.role_assignment',
   'public.saved_view',
   'public.site',
   'public.task',
+  'public.tenant_parameter',
   'public.user_account',
 ];
 

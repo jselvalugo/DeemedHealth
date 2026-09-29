@@ -17,6 +17,7 @@ export {
   type TransactionContext,
   type Tx,
 } from './client.js';
+export { redactedDiff, type TextDigest } from './audit/diff.js';
 export {
   AUDIT_EXPORT_COLUMNS,
   appendAuditEvent,

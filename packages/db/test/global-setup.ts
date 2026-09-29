@@ -17,6 +17,7 @@ import { migrate } from '../src/migrate.js';
 import { GULF_FIXTURE, XYZ_FIXTURE } from '../seed/fixtures.js';
 import { runSeed } from '../seed/seed.js';
 import { seedAuthIsolationRows } from './auth-fixtures.js';
+import { seedReadinessIsolationRows } from './readiness-fixtures.js';
 import './context.js';
 import { acquirePostgres, withDatabase } from './pg-harness.js';
 
@@ -42,7 +43,10 @@ export default async function setup({ provide }: TestProject) {
 
   const adminUrl = withDatabase(acquired.adminUrl, dbName);
   try {
-    const { applied } = await migrate({ connectionString: adminUrl });
+    const { applied } = await migrate({
+      connectionString: adminUrl,
+      catalogChannel: 'non_production',
+    });
     log(`database ${dbName} (${acquired.source}): applied ${applied.join(', ')}`);
 
     // Test-only login credentials for the runtime roles. Roles are cluster-wide; in CI
@@ -64,6 +68,10 @@ export default async function setup({ provide }: TestProject) {
       personaPasswordHash: await hash(personaPassword),
     });
     if (!xyz || !gulf) throw new Error('seed returned no tenants');
+    await seedReadinessIsolationRows(adminUrl, [
+      { organizationId: xyz.organizationId, userAccountId: xyz.userIds.provider1 as string },
+      { organizationId: gulf.organizationId, userAccountId: gulf.userIds.provider1 as string },
+    ]);
     await seedAuthIsolationRows(adminUrl, [
       { organizationId: xyz.organizationId, userAccountId: xyz.userIds.provider1 as string },
       { organizationId: gulf.organizationId, userAccountId: gulf.userIds.provider1 as string },

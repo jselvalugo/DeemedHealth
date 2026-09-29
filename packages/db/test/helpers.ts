@@ -94,7 +94,7 @@ export interface TenantTable {
 }
 
 /** Schemas whose tables belong to the application (tenant, global, and platform tables). */
-export const APP_SCHEMAS = ['public', 'audit', 'auth', 'platform'] as const;
+export const APP_SCHEMAS = ['public', 'audit', 'auth', 'platform', 'catalog'] as const;
 
 /**
  * Tenant tables discovered from pg_catalog: every ordinary or partitioned (not partition)

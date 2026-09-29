@@ -2,7 +2,7 @@
   "name": "@deemed/readiness",
   "version": "0.0.0",
   "private": true,
-  "description": "Deterministic readiness engine (ADR-0003 rule 4, phase-1 plan S4). Pure: no I/O, no clock.",
+  "description": "Deterministic readiness engine (pure) and its database service: catalog publish job, recompute job, audited mutations (ADR-0003, phase-1 plan S4).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./service": {
+      "types": "./dist/service/index.d.ts",
+      "default": "./dist/service/index.js"
     }
   },
   "scripts": {
@@ -19,7 +23,11 @@
   },
   "dependencies": {
     "@deemed/dates": "workspace:*",
-    "@deemed/requirements-catalog": "workspace:*"
+    "@deemed/db": "workspace:*",
+    "@deemed/domain": "workspace:*",
+    "@deemed/jobs": "workspace:*",
+    "@deemed/requirements-catalog": "workspace:*",
+    "drizzle-orm": "^0.45.3"
   },
   "devDependencies": {
     "@deemed/test-fixtures": "workspace:*",

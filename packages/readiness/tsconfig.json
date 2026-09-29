@@ -3,5 +3,11 @@
   "compilerOptions": { "rootDir": "src", "outDir": "dist" },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test-utils.ts"],
-  "references": [{ "path": "../dates" }, { "path": "../requirements-catalog" }]
+  "references": [
+    { "path": "../dates" },
+    { "path": "../requirements-catalog" },
+    { "path": "../domain" },
+    { "path": "../db" },
+    { "path": "../jobs" }
+  ]
 }

@@ -8,7 +8,7 @@
  *  - `chainSeq` lets the request transaction prove that a mutation wrote an event.
  *  - `deniedEvent` shapes the event for a refused request (outcome = denied).
  */
-import { DATA_DICTIONARY, type AuditEventInput, type Tx } from '@deemed/db';
+import type { AuditEventInput, Tx } from '@deemed/db';
 import {
   AUDIT_ACTIONS,
   DENIABLE_CATEGORIES,
@@ -19,61 +19,9 @@ import { sql } from 'drizzle-orm';
 import type { DenialTarget, DeniedError } from './errors.js';
 import type { RouteId, RouteSpec } from './manifest.js';
 
-type Row = Record<string, JsonValue | Date | undefined>;
-
-function plain(value: JsonValue | Date | undefined): JsonValue {
-  if (value === undefined) return null;
-  return value instanceof Date ? value.toISOString() : value;
-}
-
-/** A keyed digest of free text for one tenant (AuthService.textDigest). */
-export interface TextDigest {
-  digest(text: string): string;
-  keyId: string;
-}
-
-/**
- * Free text (reasons, comments): never the words. Only the length and, when a keyed
- * digest is given, its HMAC under the tenant's key (ADR-0008 section 5); never an
- * unsalted hash, which could be tested against guessed texts.
- */
-function redactText(value: JsonValue, digest: TextDigest | undefined): JsonValue {
-  if (value === null) return null;
-  const text = typeof value === 'string' ? value : JSON.stringify(value);
-  return {
-    redacted: true,
-    length: [...text].length,
-    ...(digest ? { hmac_sha256: digest.digest(text), digest_key: digest.keyId } : {}),
-  };
-}
-
-/** `{ fields: { column: { before, after } } }` for changed columns, redacted by class. */
-export function redactedDiff(
-  table: string,
-  before: Row | null,
-  after: Row | null,
-  digest?: TextDigest,
-): JsonValue {
-  const entry = DATA_DICTIONARY[table];
-  if (!entry) throw new Error(`audit diff: ${table} is not in the data dictionary`);
-  const columns = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);
-  const fields: Record<string, JsonValue> = {};
-  for (const column of columns) {
-    const spec = entry.columns[column];
-    if (!spec) throw new Error(`audit diff: ${table}.${column} has no sensitivity class`);
-    const b = plain(before?.[column]);
-    const a = plain(after?.[column]);
-    if (JSON.stringify(b) === JSON.stringify(a)) continue;
-    if (spec.freeText) {
-      fields[column] = { before: redactText(b, digest), after: redactText(a, digest) };
-    } else if (spec.encryption || spec.class === 'PII' || spec.class === 'PHI') {
-      fields[column] = { changed: true, redacted: true };
-    } else {
-      fields[column] = { before: b, after: a };
-    }
-  }
-  return { fields };
-}
+// The diff builder lives in @deemed/db so domain services that write their own events
+// (readiness) redact the same way.
+export { redactedDiff, type TextDigest } from '@deemed/db';
 
 export async function chainSeq(tx: Tx, organizationId: string): Promise<number> {
   const r = await tx.execute<{ seq: string | null }>(

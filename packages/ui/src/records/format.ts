@@ -101,6 +101,7 @@ const TONES: Readonly<Record<string, BadgeStatus>> = {
   missing: 'critical',
   invited: 'info',
   not_applicable: 'neutral',
+  not_assessed: 'neutral',
   deprovisioned: 'neutral',
 };
 
