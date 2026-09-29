@@ -17,7 +17,7 @@ import {
   type TransactionContext,
   type Tx,
 } from '@deemed/db';
-import type { JsonValue } from '@deemed/domain';
+import { containsSsnShape, type JsonValue } from '@deemed/domain';
 import {
   KnownParameters,
   checkTenantParameterValue,
@@ -40,6 +40,8 @@ function cleanReason(reason: unknown, field = 'reason'): string {
   if (typeof reason !== 'string') throw new ReadinessError('invalid_reason', [field]);
   const t = reason.trim();
   if (t.length === 0 || t.length > MAX_REASON) throw new ReadinessError('invalid_reason', [field]);
+  // Decision D1: nothing SSN-shaped is stored (the error names the field, never the value).
+  if (containsSsnShape(t)) throw new ReadinessError('invalid_reason', [field]);
   return t;
 }
 
@@ -148,6 +150,8 @@ export async function clearNotApplicable(
   input: MarkNotApplicableInput,
 ): Promise<{ instance: InstanceRef; rowVersion: number; jobId: string }> {
   requireHuman(ctx);
+  // A reason is required and validated, but its words never reach the audit log (S1):
+  // only its length and, with the tenant key, a keyed digest.
   const reason = cleanReason(input.reason);
   const instance = await loadInstance(tx, input.instanceId);
   checkVersion(instance, input.expectedRowVersion);
@@ -170,6 +174,15 @@ export async function clearNotApplicable(
       { status: 'not_assessed', not_applicable_reason: null },
       input.digest,
     ),
+    metadata: {
+      clearReason: {
+        redacted: true,
+        length: [...reason].length,
+        ...(input.digest
+          ? { hmac_sha256: input.digest.digest(reason), digest_key: input.digest.keyId }
+          : {}),
+      },
+    },
   });
   const jobId = await enqueueRecompute(tx, 'clear_not_applicable');
   return { instance, rowVersion: r.rows[0]?.row_version ?? instance.rowVersion + 1, jobId };

@@ -484,6 +484,9 @@ ALTER TABLE public.requirement_instance
     AND (not_applicable_reason IS NULL OR length(btrim(not_applicable_reason)) > 0)),
   -- Set by the recompute job when the effective catalog entry no longer allows N/A: the
   -- mark is kept and flagged for human review (status computed normally).
+  -- Decision D1, as in audit.append_event: no SSN-shaped value in free text.
+  ADD CONSTRAINT requirement_instance_na_reason_no_ssn CHECK (
+    not_applicable_reason IS NULL OR not_applicable_reason !~ '(^|[^0-9-])[0-9]{3}-[0-9]{2}-[0-9]{4}([^0-9-]|$)'),
   ADD COLUMN not_applicable_superseded_at              timestamptz,
   ADD COLUMN not_applicable_superseded_catalog_version text,
   ADD CONSTRAINT requirement_instance_na_superseded CHECK (
@@ -547,7 +550,8 @@ CREATE TABLE public.tenant_parameter (
   requirement_id   text        NOT NULL CHECK (requirement_id ~ '^[A-Z0-9]+(-[A-Za-z0-9&]+)+$'),
   parameter_key    text        NOT NULL CHECK (parameter_key ~ '^[a-z][A-Za-z0-9]{0,63}$'),
   value            integer     NOT NULL CHECK (value BETWEEN -100000 AND 100000),
-  reason           text        NOT NULL CHECK (length(btrim(reason)) BETWEEN 1 AND 2000),
+  reason           text        NOT NULL CHECK (length(btrim(reason)) BETWEEN 1 AND 2000)
+                   CHECK (reason !~ '(^|[^0-9-])[0-9]{3}-[0-9]{2}-[0-9]{4}([^0-9-]|$)'),
   row_version      integer     NOT NULL DEFAULT 1 CHECK (row_version >= 1),
   created_at       timestamptz NOT NULL DEFAULT now(),
   created_by       uuid,
@@ -634,7 +638,8 @@ CREATE TABLE public.readiness_fact (
     END),
   CONSTRAINT readiness_fact_retraction CHECK (
     (retracted_at IS NULL) = (retract_reason IS NULL)
-    AND (retract_reason IS NULL OR length(btrim(retract_reason)) BETWEEN 1 AND 2000)),
+    AND (retract_reason IS NULL OR length(btrim(retract_reason)) BETWEEN 1 AND 2000)
+    AND (retract_reason IS NULL OR retract_reason !~ '(^|[^0-9-])[0-9]{3}-[0-9]{2}-[0-9]{4}([^0-9-]|$)')),
   CONSTRAINT readiness_fact_org_id_key UNIQUE (organization_id, id)
 );
 

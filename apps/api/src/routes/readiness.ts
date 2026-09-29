@@ -12,7 +12,7 @@
  * Statuses are internal readiness, never an HRSA determination.
  */
 import { schema } from '@deemed/db';
-import type { RequirementInstanceView } from '@deemed/domain';
+import { containsSsnShape, type RequirementInstanceView } from '@deemed/domain';
 import {
   ReadinessError,
   clearNotApplicable,
@@ -30,13 +30,20 @@ import type { RouteId } from '../manifest.js';
 import { digestOf, ifMatch } from '../records/http.js';
 
 const IdParams = z.object({ id: z.string().uuid() });
-const ReasonBody = z.object({ reason: z.string().trim().min(1).max(2000) }).strict();
+/** Free text: 1 to 2000 characters, never SSN-shaped (D1; the error names the field only). */
+const Reason = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2000)
+  .refine((v) => !containsSsnShape(v), 'ssn_shaped');
+const ReasonBody = z.object({ reason: Reason }).strict();
 const ParameterBody = z
   .object({
     requirementId: z.string().regex(/^[A-Z0-9]+(-[A-Za-z0-9&]+)+$/),
     key: z.string().regex(/^[a-z][A-Za-z0-9]{0,63}$/),
     value: z.number().int(),
-    reason: z.string().trim().min(1).max(2000),
+    reason: Reason,
   })
   .strict();
 

@@ -193,6 +193,22 @@ defineRouteTests('readiness.instance.not_applicable', {
       currentVersion: before.row_version,
     });
   },
+  refusesSsnShapedReasons: async () => {
+    // Built at run time so no SSN-shaped literal sits in the repository (check:no-ssn).
+    const ssnLike = ['900', '12', '3456'].join('-');
+    const before = await row(inst.deaS3);
+    for (const [url, body] of [
+      [NA(inst.deaS3), { reason: `Synthetic ${ssnLike}` }],
+      [CLEAR(inst.deaS3), { reason: `Synthetic ${ssnLike}` }],
+      ['/api/readiness/tenant-parameters', { ...PARAM, value: 6, reason: `Synthetic ${ssnLike}` }],
+    ] as const) {
+      const res = await clients.co.post(url, body, match(before.row_version));
+      expect(res.statusCode, url).toBe(400);
+      expect(res.json().error).toMatchObject({ code: 'bad_request', fields: ['reason'] });
+      expect(res.body).not.toContain(ssnLike);
+    }
+    expect(await row(inst.deaS3)).toEqual(before);
+  },
   refusesWhereTheCatalogDoesNotAllowIt: async () => {
     const before = await row(inst.licS1);
     const res = await clients.co.post(

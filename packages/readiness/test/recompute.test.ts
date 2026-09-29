@@ -496,6 +496,26 @@ describeDb('readiness service and recompute job', () => {
         ),
       ),
     ).toBe('invalid_reason');
+    // Nothing SSN-shaped is stored (D1): the service refuses it, and so does the table (S8).
+    const ssnLike = ['900', '12', '3456'].join('-');
+    expect(
+      await err(
+        asHuman(w.a, (tx, ctx) =>
+          markNotApplicable(tx, ctx, {
+            instanceId: w.a.instances.licenseC,
+            reason: `x ${ssnLike}`,
+          }),
+        ),
+      ),
+    ).toBe('invalid_reason');
+    expect(
+      await pgError(
+        asHuman(w.a, (tx) =>
+          tx.execute(sql`UPDATE public.tenant_parameter SET reason = ${`x ${ssnLike}`}
+                         WHERE organization_id = ${w.a.id}::uuid`),
+        ),
+      ),
+    ).toMatchObject({ code: '23514' });
     expect(
       await err(
         asHuman(w.a, (tx, ctx) =>
