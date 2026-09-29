@@ -162,7 +162,12 @@ const STATIC_ROUTES = {
   'readiness.instance.not_applicable': {
     method: 'POST',
     url: '/api/readiness/requirement-instances/:id/not-applicable',
-    access: { kind: 'permission', permission: 'readiness:write', record: true },
+    access: {
+      kind: 'permission',
+      permission: 'readiness:write',
+      recentAuth: true,
+      record: true,
+    },
     audit: { action: 'requirement_instance.mark_not_applicable' },
     summary:
       'Mark a requirement instance not applicable, with a reason (only where the catalog allows; If-Match)',
@@ -170,16 +175,27 @@ const STATIC_ROUTES = {
   'readiness.instance.clear_not_applicable': {
     method: 'POST',
     url: '/api/readiness/requirement-instances/:id/not-applicable/clear',
-    access: { kind: 'permission', permission: 'readiness:write', record: true },
+    access: {
+      kind: 'permission',
+      permission: 'readiness:write',
+      recentAuth: true,
+      record: true,
+    },
     audit: { action: 'requirement_instance.clear_not_applicable' },
     summary: 'Remove a not-applicable mark, with a reason (If-Match)',
   },
   'readiness.parameter.set': {
     method: 'POST',
     url: '/api/readiness/tenant-parameters',
-    access: { kind: 'permission', permission: 'readiness:write', record: true },
+    access: {
+      kind: 'permission',
+      permission: 'readiness:write',
+      recentAuth: true,
+      record: true,
+    },
     audit: { action: 'tenant_parameter.set' },
-    summary: "Set the health center's value for a bounded catalog parameter, with a reason",
+    summary:
+      "Set the health center's value for a bounded catalog parameter, with a reason (If-None-Match: * to create, If-Match to update)",
   },
   'admin.roles.list': {
     method: 'GET',

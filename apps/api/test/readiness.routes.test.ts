@@ -14,6 +14,7 @@ import {
   createUser,
   signIn,
   startApi,
+  stepUp,
   type Client,
   type TestApi,
   type TestUser,
@@ -94,6 +95,9 @@ beforeEach(async () => {
     if (res.statusCode === 200) clients[key].csrf = res.json().csrfToken;
     else clients[key] = await signIn(api, users[key]);
   }
+  // These routes need a step-up within 5 minutes (S10) for everyone who may pass the
+  // permission check.
+  for (const key of ['co', 'coS1', 'gco'] as const) await stepUp(api, users[key], clients[key]);
 });
 
 afterAll(async () => {
@@ -178,6 +182,18 @@ defineRouteTests('readiness.instance.not_applicable', {
     const own = await row(inst.deaGulf);
     const ok = await clients.gco.post(NA(inst.deaGulf), { reason: REASON }, match(own.row_version));
     expect(ok.statusCode).toBe(200);
+  },
+  reauthRequired: async () => {
+    api.clock.advance({ minutes: 6 });
+    const before = await row(inst.deaS3);
+    const res = await clients.co.post(
+      NA(inst.deaS3),
+      { reason: REASON },
+      match(before.row_version),
+    );
+    expect(res.statusCode).toBe(401);
+    expect(res.json().error.code).toBe('reauth_required');
+    expect(await row(inst.deaS3)).toEqual(before);
   },
   requiresIfMatchAndCurrentVersion: async () => {
     expect((await clients.co.post(NA(inst.deaS3), { reason: REASON })).statusCode).toBe(428);
@@ -280,6 +296,17 @@ defineRouteTests('readiness.instance.clear_not_applicable', {
     expect(res.statusCode).toBe(403);
     expect(await row(inst.deaS3)).toEqual(before);
   },
+  reauthRequired: async () => {
+    api.clock.advance({ minutes: 6 });
+    const before = await row(inst.deaS3);
+    const res = await clients.co.post(
+      CLEAR(inst.deaS3),
+      { reason: 'x' },
+      match(before.row_version),
+    );
+    expect(res.statusCode).toBe(401);
+    expect(await row(inst.deaS3)).toEqual(before);
+  },
   otherTenant: async () => {
     const before = await row(inst.deaS3);
     const res = await clients.gco.post(
@@ -297,18 +324,27 @@ const PARAM = {
   key: 'reprivilegingIntervalMonths',
   reason: 'Synthetic: our C&P procedures re-privilege every year',
 };
-const paramOf = async (org: string) =>
+const paramRow = async (org: string) =>
   (
     await api.admin.query(
-      `SELECT value FROM public.tenant_parameter WHERE organization_id = $1 AND requirement_id = 'TEST-05-PRIV'
-       AND parameter_key = 'reprivilegingIntervalMonths'`,
+      `SELECT value, row_version FROM public.tenant_parameter WHERE organization_id = $1
+       AND requirement_id = 'TEST-05-PRIV' AND parameter_key = 'reprivilegingIntervalMonths'`,
       [org],
     )
-  ).rows[0]?.value;
+  ).rows[0] as { value: number; row_version: number } | undefined;
+const paramOf = async (org: string) => (await paramRow(org))?.value;
+/** POST with If-Match on the current row (every seeded tenant already has a value). */
+const setParam = async (who: Client, org: string, body: Record<string, unknown>) =>
+  who.post(
+    '/api/readiness/tenant-parameters',
+    body,
+    match((await paramRow(org))?.row_version ?? 1),
+  );
 
 defineRouteTests('readiness.parameter.set', {
   allowed: async () => {
-    const res = await clients.co.post('/api/readiness/tenant-parameters', { ...PARAM, value: 12 });
+    const org = users.co.organizationId;
+    const res = await setParam(clients.co, org, { ...PARAM, value: 12 });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ value: 12, recomputeQueued: true });
     const [event] = await auditFor(api, res);
@@ -321,44 +357,58 @@ defineRouteTests('readiness.parameter.set', {
       before: 24,
       after: 12,
     });
-    expect(await paramOf(users.co.organizationId)).toBe(12);
+    expect(await paramOf(org)).toBe(12);
     // Setting the same value again changes nothing and writes nothing.
-    const same = await clients.co.post('/api/readiness/tenant-parameters', { ...PARAM, value: 12 });
+    const same = await setParam(clients.co, org, { ...PARAM, value: 12 });
     expect(same.statusCode).toBe(200);
     expect(await auditFor(api, same)).toEqual([]);
   },
   deniedRole: async () => {
-    const res = await clients.auditor.post('/api/readiness/tenant-parameters', {
-      ...PARAM,
-      value: 6,
-    });
+    const res = await setParam(clients.auditor, users.co.organizationId, { ...PARAM, value: 6 });
     expect(res.statusCode).toBe(403);
     expect(await paramOf(users.co.organizationId)).toBe(12);
   },
   otherSite: async () => {
     // A health-center parameter covers every site: a site-scoped grant cannot set it.
-    const res = await clients.coS1.post('/api/readiness/tenant-parameters', { ...PARAM, value: 6 });
+    const res = await setParam(clients.coS1, users.co.organizationId, { ...PARAM, value: 6 });
     expect(res.statusCode).toBe(403);
     const [event] = await auditFor(api, res);
     expect(event).toMatchObject({ action: 'tenant_parameter.set', outcome: 'denied' });
     expect(await paramOf(users.co.organizationId)).toBe(12);
   },
   otherTenant: async () => {
-    const res = await clients.gco.post('/api/readiness/tenant-parameters', { ...PARAM, value: 18 });
+    const res = await setParam(clients.gco, users.gco.organizationId, { ...PARAM, value: 18 });
     expect(res.statusCode).toBe(200);
     expect(await paramOf(users.gco.organizationId)).toBe(18);
     // Only the caller's own tenant changed.
     expect(await paramOf(users.co.organizationId)).toBe(12);
   },
-  enforcesCatalogBounds: async () => {
-    const out = await clients.co.post('/api/readiness/tenant-parameters', { ...PARAM, value: 30 });
-    expect(out.statusCode).toBe(400);
-    const unknown = await clients.co.post('/api/readiness/tenant-parameters', {
-      ...PARAM,
-      key: 'madeUp',
-      value: 3,
-    });
-    expect(unknown.statusCode).toBe(400);
+  reauthRequired: async () => {
+    api.clock.advance({ minutes: 6 });
+    const res = await setParam(clients.co, users.co.organizationId, { ...PARAM, value: 6 });
+    expect(res.statusCode).toBe(401);
+    expect(res.json().error.code).toBe('reauth_required');
     expect(await paramOf(users.co.organizationId)).toBe(12);
+  },
+  requiresIfMatchOrIfNoneMatch: async () => {
+    const org = users.co.organizationId;
+    const url = '/api/readiness/tenant-parameters';
+    // No precondition: 428. Create over an existing value, or a stale version: 409.
+    expect((await clients.co.post(url, { ...PARAM, value: 6 })).statusCode).toBe(428);
+    const create = await clients.co.post(url, { ...PARAM, value: 6 }, { 'if-none-match': '*' });
+    expect(create.statusCode).toBe(409);
+    const version = (await paramRow(org))!.row_version;
+    const stale = await clients.co.post(url, { ...PARAM, value: 6 }, match(version + 3));
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().error).toMatchObject({ code: 'version_conflict', currentVersion: version });
+    expect(await paramOf(org)).toBe(12);
+  },
+  enforcesCatalogBounds: async () => {
+    const org = users.co.organizationId;
+    const out = await setParam(clients.co, org, { ...PARAM, value: 30 });
+    expect(out.statusCode).toBe(400);
+    const unknown = await setParam(clients.co, org, { ...PARAM, key: 'madeUp', value: 3 });
+    expect(unknown.statusCode).toBe(400);
+    expect(await paramOf(org)).toBe(12);
   },
 });

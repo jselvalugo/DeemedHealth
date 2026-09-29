@@ -161,8 +161,17 @@ export const readinessHandlers = {
     return naChange(h, reply, ifMatch(req), id, reason, clearNotApplicable);
   },
 
-  'readiness.parameter.set': async (_req, reply, h) => {
+  'readiness.parameter.set': async (req, reply, h) => {
     const body = h.body(ParameterBody);
+    // S10: If-None-Match: * creates the first value; If-Match: "<rowVersion>" updates it.
+    const noneMatch = req.headers['if-none-match'];
+    const precondition =
+      noneMatch === '*'
+        ? { expectCreate: true }
+        : req.headers['if-match'] !== undefined
+          ? { expectedRowVersion: ifMatch(req) }
+          : null;
+    if (!precondition) throw new ApiError('precondition_required');
     return h.tenant(async (tx, txCtx) => {
       // A health-center parameter applies to every site: an organization-wide grant only.
       h.authorize(
@@ -171,7 +180,11 @@ export const readinessHandlers = {
         { table: 'tenant_parameter', id: txCtx.organizationId as string },
       );
       try {
-        const out = await setTenantParameter(tx, txCtx, { ...body, digest: digestOf(h) });
+        const out = await setTenantParameter(tx, txCtx, {
+          ...body,
+          ...precondition,
+          digest: digestOf(h),
+        });
         if (out.jobId === null) h.declareNoChange();
         void reply.header('etag', `"${out.rowVersion}"`);
         return {

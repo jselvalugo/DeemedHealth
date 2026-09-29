@@ -193,7 +193,10 @@ export interface SetTenantParameterInput {
   key: string;
   value: number;
   reason: string;
+  /** Update: the row version the caller last saw (If-Match). */
   expectedRowVersion?: number;
+  /** Create: the caller expects no value yet (If-None-Match: *). */
+  expectCreate?: boolean;
   digest?: TextDigest;
 }
 
@@ -222,6 +225,13 @@ export async function setTenantParameter(
     existing.row_version !== input.expectedRowVersion
   ) {
     throw new ReadinessError('version_conflict', [], existing.row_version);
+  }
+  // S10: a create must not overwrite a value someone else set, nor an update invent one.
+  if (existing && input.expectCreate) {
+    throw new ReadinessError('version_conflict', [], existing.row_version);
+  }
+  if (!existing && input.expectedRowVersion !== undefined) {
+    throw new ReadinessError('version_conflict');
   }
   const before: Record<string, JsonValue> | null = existing
     ? { value: existing.value, reason: existing.reason }

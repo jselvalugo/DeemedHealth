@@ -34,6 +34,11 @@ import {
   type World,
 } from './world.js';
 
+const PRIV_PARAM = {
+  requirementId: 'TEST-05-PRIV',
+  key: 'reprivilegingIntervalMonths',
+  reason: 'Synthetic',
+};
 const NA_REASON = 'Synthetic: this practitioner does not prescribe controlled substances';
 const TODAY = '2030-09-29T15:00:00Z';
 
@@ -622,6 +627,28 @@ describeDb('readiness service and recompute job', () => {
       'not_in_catalog',
     );
     expect(await set(24)).toBeNull();
+    // S10: a create never overwrites, and an update never invents a value.
+    expect(
+      await err(
+        asHuman(w.a, (tx, ctx) =>
+          setTenantParameter(tx, ctx, { ...PRIV_PARAM, value: 20, expectCreate: true }),
+        ),
+      ),
+    ).toBe('version_conflict');
+    expect(
+      await err(
+        asHuman(w.b, (tx, ctx) =>
+          setTenantParameter(tx, ctx, { ...PRIV_PARAM, value: 20, expectedRowVersion: 1 }),
+        ),
+      ),
+    ).toBe('version_conflict');
+    expect(
+      await err(
+        asHuman(w.b, (tx, ctx) =>
+          setTenantParameter(tx, ctx, { ...PRIV_PARAM, value: 20, expectCreate: true }),
+        ),
+      ),
+    ).toBeNull();
     const [stored] = (
       await w.admin.query(
         `SELECT value FROM public.tenant_parameter WHERE organization_id = $1 AND requirement_id = 'TEST-05-PRIV'`,
