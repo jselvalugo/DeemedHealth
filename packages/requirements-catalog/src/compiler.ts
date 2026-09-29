@@ -47,7 +47,10 @@ export interface CatalogBundle {
   format: typeof CATALOG_BUNDLE_FORMAT;
   catalogVersion: string;
   channel: BundleChannel;
-  /** SHA-256 of the canonical {channel, entries, sources}. Same content, same hash. */
+  /**
+   * SHA-256 of the canonical bundle without this field (bundleContentHash): version,
+   * channel, entries, sources, changeset, exclusions, everything (S13).
+   */
   contentHash: string;
   /** SHA-256 of the canonical source register. */
   sourceRegisterHash: string;
@@ -248,18 +251,24 @@ function makeBundle(
     }
   }
   changeset.sort((a, b) => byId({ id: a.requirementId }, { id: b.requirementId }));
-  const contentHash = sha256Hex(canonicalJson({ channel, entries, sources }));
-  return {
+  const body = {
     format: CATALOG_BUNDLE_FORMAT,
     catalogVersion,
     channel,
-    contentHash,
     sourceRegisterHash,
     entries,
     sources,
     changeset,
     excluded,
-  };
+  } as const;
+  return { ...body, contentHash: bundleContentHash(body) };
+}
+
+/** The hash of every bundle field except contentHash itself (S13). */
+export function bundleContentHash(bundle: Omit<CatalogBundle, 'contentHash'> | CatalogBundle): string {
+  const rest: Record<string, unknown> = { ...bundle };
+  delete rest.contentHash;
+  return sha256Hex(canonicalJson(rest));
 }
 
 export function compileCatalog(input: CatalogSources, options: CompileOptions): CompileResult {

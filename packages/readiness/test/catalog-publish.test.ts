@@ -170,8 +170,12 @@ describeDb('catalog publish job (app_platform)', () => {
       });
       const ownerDb = await connect(url.toString());
       try {
-        // 1. The TypeScript job refuses before calling the database.
+        // 1. The TypeScript job refuses before calling the database, and any edit to a
+        //    built bundle (here its changeset) breaks the content hash (S13).
         expect(() => verifyBundle(forged, 'production')).toThrow(ReadinessError);
+        expect(() =>
+          verifyBundle({ ...drafts.nonProduction, changeset: [] }, 'non_production'),
+        ).toThrow(ReadinessError);
         // 2. The SQL function refuses the draft entry by name.
         const refused = await pgError(
           prod.withPlatform(SYSTEM, (tx) =>

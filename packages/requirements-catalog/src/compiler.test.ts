@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalJson } from './canonical.js';
-import { compileCatalog, compareCatalogVersions, type CatalogSources } from './compiler.js';
+import {
+  bundleContentHash,
+  compileCatalog,
+  compareCatalogVersions,
+  type CatalogSources,
+} from './compiler.js';
 import { effectiveAtRiskDays } from './conventions.js';
 import { loadCatalogSources } from './loader.js';
 
@@ -95,6 +100,15 @@ describe('bundles', () => {
     expect(r.production!.excluded).toEqual({ draft: 1, retired: 1 });
     expect(r.productionEmpty).toBe(false);
     expect(r.productionMessage).toMatch(/holds 1 of 3/);
+  });
+
+  it('hashes the whole bundle except contentHash: version, changeset, and exclusions included (S13)', () => {
+    const r = compileCatalog(src(entry('TEST-05-A')), { catalogVersion: '1.0.0' });
+    const b = r.nonProduction!;
+    expect(bundleContentHash(b)).toBe(b.contentHash);
+    expect(bundleContentHash({ ...b, changeset: [] })).not.toBe(b.contentHash);
+    expect(bundleContentHash({ ...b, catalogVersion: '9.0.0' })).not.toBe(b.contentHash);
+    expect(bundleContentHash({ ...b, excluded: { draft: 1, retired: 0 } })).not.toBe(b.contentHash);
   });
 
   it('hash changes when content changes and entries are sorted by id', () => {

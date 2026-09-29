@@ -12,6 +12,7 @@ import { listTenants } from '@deemed/db';
 import { sendPlatformJob } from '@deemed/jobs';
 import { CatalogEntrySchema, type CatalogEntry } from '@deemed/requirements-catalog';
 import {
+  bundleContentHash,
   canonicalJson,
   sha256Hex,
   type BundleChannel,
@@ -39,10 +40,11 @@ export function verifyBundle(bundle: CatalogBundle, channel: BundleChannel): voi
       throw new ReadinessError('bundle_not_verified', [e.id]);
     }
   }
-  const content = sha256Hex(
-    canonicalJson({ channel: bundle.channel, entries: bundle.entries, sources: bundle.sources }),
-  );
-  if (content !== bundle.contentHash) throw new ReadinessError('bundle_invalid', ['contentHash']);
+  // The hash covers the whole bundle (version, changeset, sources, exclusions), so nothing
+  // in it can be altered between the build and the publish (S13).
+  if (bundleContentHash(bundle) !== bundle.contentHash) {
+    throw new ReadinessError('bundle_invalid', ['contentHash']);
+  }
 }
 
 export async function databaseChannel(tx: Tx): Promise<BundleChannel | null> {
