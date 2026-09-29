@@ -210,6 +210,10 @@ export const BASE_AUDIT_ACTIONS = {
     category: 'system',
     description: 'Readiness snapshot stored (internal readiness)',
   },
+  'readiness.recompute_batch': {
+    category: 'system',
+    description: 'Readiness recompute batch finished (internal readiness)',
+  },
   'organization.provision': {
     category: 'system',
     description: 'Tenant provisioned by the platform',

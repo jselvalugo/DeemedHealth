@@ -84,6 +84,19 @@ tenant, release, date, and kind). The recompute writes only what changed, one
 `requirement_instance.evaluate` audit event per change, and `catalog_release.applied`
 the first time a tenant is evaluated under a release. Running it twice changes nothing.
 
+Scaling (security review S6):
+
+- The recompute reads instances in keyset pages by id, 200 by default and at most 500,
+  with one transaction per page and that page's facts only. Each page that changes
+  something also writes one `readiness.recompute_batch` summary event.
+- The first page fixes the as-of instant and the catalog release. A release that lands
+  mid-run stops the run with the retryable `catalog_release_changed`.
+- The page cap keeps each transaction well inside the 300 s job lease, so the adapter has
+  no heartbeat.
+- Completing or failing a job names the attempt it claimed.
+- A new release spreads the per-tenant jobs over 5 minutes and the nightly sweep over 15,
+  with a stable delay per tenant (`spreadDelaySeconds`).
+
 ## Tests
 
 - `src/*.test.ts` (unit): rule shapes, Eastern and Central zones, DST days, month ends,

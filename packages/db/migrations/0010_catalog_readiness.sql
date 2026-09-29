@@ -991,4 +991,5 @@ INSERT INTO audit.action_registry (action, category, description) VALUES
   ('tenant_parameter.set',                      'mutation', 'Health center value for a catalog parameter set, with reason'),
   ('readiness_fact.record',                     'mutation', 'Readiness evidence fact recorded'),
   ('readiness_fact.retract',                    'mutation', 'Readiness evidence fact retracted, with reason'),
-  ('readiness_snapshot.create',                 'system',   'Readiness snapshot stored (internal readiness)');
+  ('readiness_snapshot.create',                 'system',   'Readiness snapshot stored (internal readiness)'),
+  ('readiness.recompute_batch',                 'system',   'Readiness recompute batch finished (internal readiness)');

@@ -49,7 +49,7 @@ import {
   type ReadinessStatus,
   type Reason,
 } from '../types.js';
-import { RECOMPUTE_QUEUE, loadActiveCatalog } from './catalog.js';
+import { RECOMPUTE_QUEUE, loadActiveCatalog, type ActiveCatalog } from './catalog.js';
 
 export { RECOMPUTE_QUEUE };
 
@@ -97,13 +97,24 @@ export interface RecomputeOptions {
   asOf?: Instant;
   snapshot?: 'nightly' | 'on_demand' | null;
   actorLabel?: string;
+  /**
+   * Instances per transaction (default 200, at most RECOMPUTE_BATCH_MAX). Each batch is its
+   * own transaction, so a large tenant never holds one long transaction, and each batch
+   * finishes well inside the job lease (default 300 s) without a heartbeat (S6).
+   */
+  batchSize?: number;
 }
+
+export const RECOMPUTE_BATCH_DEFAULT = 200;
+export const RECOMPUTE_BATCH_MAX = 500;
 
 export interface RecomputeSummary {
   organizationId: string;
   catalogVersion: string | null;
   evaluated: number;
   changed: number;
+  /** Transactions the run took (one per keyset page of instances). */
+  batches: number;
   snapshotId: string | null;
   statuses: Record<ReadinessStatus, number>;
 }
@@ -159,28 +170,110 @@ function storedReasons(reasons: readonly Reason[]): Stored['status_reasons'] {
   return reasons.map((r) => ({ code: r.code, params: r.params, paramKeys: r.paramKeys }));
 }
 
-/** Evaluates every active instance of one tenant and stores the changes. */
+type Release = ActiveCatalog['release'];
+
+interface BatchInput {
+  asOf: Instant | null;
+  /** Keyset cursor: the last instance id of the previous batch. */
+  after: string | null;
+  limit: number;
+  /** The release the first batch saw; later batches must see the same one. */
+  pinned: { release: Release } | null;
+}
+
+interface BatchResult {
+  asOf: Instant;
+  release: Release;
+  lastId: string | null;
+  evaluated: number;
+  changed: number;
+  statuses: Record<ReadinessStatus, number>;
+  items: SnapshotItem[];
+}
+
+/**
+ * A bound array parameter: drizzle expands a JS array into a tuple, so the ids travel as one
+ * JSON text value and Postgres unpacks them.
+ */
+const jsonArray = (values: readonly string[]) =>
+  sql`ARRAY(SELECT jsonb_array_elements_text(${JSON.stringify(values)}::jsonb))`;
+
+const emptyStatuses = (): Record<ReadinessStatus, number> =>
+  Object.fromEntries(READINESS_STATUSES.map((s) => [s, 0])) as Record<ReadinessStatus, number>;
+
+/**
+ * Evaluates every active instance of one tenant and stores the changes. Instances are read
+ * in keyset pages (by id), one transaction per page, with that page's facts only (S6). The
+ * as-of instant and the catalog release are fixed by the first page; if a new release lands
+ * mid-run, the run stops with a retryable error and the retry evaluates everything under
+ * the new release. Each page is idempotent, so a run that dies part-way is simply resumed.
+ */
 export async function recomputeTenant(
   db: Database,
   organizationId: string,
   options: RecomputeOptions,
 ): Promise<RecomputeSummary> {
   const actor: Actor = { type: 'system', label: options.actorLabel ?? 'readiness recompute' };
-  return db.withTenant(organizationId, actor, (tx, ctx) =>
-    recomputeInTransaction(tx, ctx, organizationId, options),
+  const limit = Math.max(
+    1,
+    Math.min(RECOMPUTE_BATCH_MAX, Math.floor(options.batchSize ?? RECOMPUTE_BATCH_DEFAULT)),
   );
+  const statuses = emptyStatuses();
+  const items: SnapshotItem[] = [];
+  let asOf: Instant | null = options.asOf ?? null;
+  let pinned: BatchInput['pinned'] = null;
+  let after: string | null = null;
+  let evaluated = 0;
+  let changed = 0;
+  let batches = 0;
+
+  for (;;) {
+    const input: BatchInput = { asOf, after, limit, pinned };
+    const page = await db.withTenant(organizationId, actor, (tx, ctx) =>
+      recomputeBatch(tx, ctx, organizationId, input),
+    );
+    batches += 1;
+    asOf = page.asOf;
+    pinned ??= { release: page.release };
+    evaluated += page.evaluated;
+    changed += page.changed;
+    for (const k of READINESS_STATUSES) statuses[k] += page.statuses[k];
+    items.push(...page.items);
+    if (page.evaluated < limit || page.lastId === null) break;
+    after = page.lastId;
+  }
+
+  const release = pinned?.release ?? null;
+  let snapshotId: string | null = null;
+  if (options.snapshot && release && asOf) {
+    const at = asOf;
+    const kind = options.snapshot;
+    snapshotId = await db.withTenant(organizationId, actor, (tx, ctx) =>
+      storeSnapshot(tx, ctx, organizationId, release, at, kind, items),
+    );
+  }
+
+  return {
+    organizationId,
+    catalogVersion: release?.catalogVersion ?? null,
+    evaluated,
+    changed,
+    batches,
+    snapshotId,
+    statuses,
+  };
 }
 
-async function recomputeInTransaction(
+async function recomputeBatch(
   tx: Tx,
   ctx: TransactionContext,
   organizationId: string,
-  options: RecomputeOptions,
-): Promise<RecomputeSummary> {
-  // One recompute per tenant at a time; a second waits and then sees the first's result.
+  input: BatchInput,
+): Promise<BatchResult> {
+  // One recompute page per tenant at a time; a second waits and then sees the first's result.
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('readiness:' || ${organizationId}))`);
   const asOf =
-    options.asOf ??
+    input.asOf ??
     instantFromEpochMilliseconds(
       Number(
         (
@@ -201,14 +294,11 @@ async function recomputeInTransaction(
   ).rows[0];
   if (!org) throw new JobError('organization_not_found');
   const orgZone = parseTimeZone(org.time_zone);
-  const sites = new Map(
-    (
-      await tx.execute<{ id: string; site_type: string; time_zone: string }>(
-        sql`SELECT id::text, site_type, time_zone FROM public.site`,
-      )
-    ).rows.map((s) => [s.id, { siteType: s.site_type, zone: parseTimeZone(s.time_zone) }]),
-  );
   const catalog = await loadActiveCatalog(tx);
+  const release = catalog.release;
+  if (input.pinned && (input.pinned.release?.id ?? null) !== (release?.id ?? null)) {
+    throw new JobError('catalog_release_changed', { retryAfterSeconds: 0 });
+  }
   const instances = (
     await tx.execute<InstanceRow>(sql`
       SELECT id::text, requirement_id, subject_type, site_id::text, status,
@@ -216,8 +306,21 @@ async function recomputeInTransaction(
              requirement_version_id::text, not_applicable_reason,
              not_applicable_superseded_catalog_version AS na_superseded_version,
              floor(extract(epoch FROM not_applicable_at) * 1000)::bigint::text AS na_recorded_ms
-      FROM public.requirement_instance WHERE archived_at IS NULL ORDER BY id`)
+      FROM public.requirement_instance
+      WHERE archived_at IS NULL AND (${input.after}::uuid IS NULL OR id > ${input.after}::uuid)
+      ORDER BY id
+      LIMIT ${input.limit}`)
   ).rows;
+  const ids = instances.map((i) => i.id);
+  const siteIds = [...new Set(instances.flatMap((i) => (i.site_id ? [i.site_id] : [])))];
+  const requirementIds = [...new Set(instances.map((i) => i.requirement_id))];
+  const sites = new Map(
+    (
+      await tx.execute<{ id: string; site_type: string; time_zone: string }>(
+        sql`SELECT id::text, site_type, time_zone FROM public.site WHERE id = ANY(${jsonArray(siteIds)}::uuid[])`,
+      )
+    ).rows.map((s) => [s.id, { siteType: s.site_type, zone: parseTimeZone(s.time_zone) }]),
+  );
   const facts = new Map<string, ReadinessFact[]>();
   for (const f of (
     await tx.execute<FactRow>(sql`
@@ -226,7 +329,9 @@ async function recomputeInTransaction(
              approval_capacity, approval_decision, approval_type_id,
              floor(extract(epoch FROM recorded_at) * 1000)::bigint::text AS recorded_ms,
              floor(extract(epoch FROM retracted_at) * 1000)::bigint::text AS retracted_ms
-      FROM public.readiness_fact ORDER BY id`)
+      FROM public.readiness_fact
+      WHERE requirement_instance_id = ANY(${jsonArray(ids)}::uuid[])
+      ORDER BY id`)
   ).rows) {
     const list = facts.get(f.requirement_instance_id) ?? [];
     list.push({
@@ -251,7 +356,8 @@ async function recomputeInTransaction(
   const params = new Map<string, Record<string, number>>();
   for (const p of (
     await tx.execute<{ requirement_id: string; parameter_key: string; value: number }>(
-      sql`SELECT requirement_id, parameter_key, value FROM public.tenant_parameter`,
+      sql`SELECT requirement_id, parameter_key, value FROM public.tenant_parameter
+          WHERE requirement_id = ANY(${jsonArray(requirementIds)}::text[])`,
     )
   ).rows) {
     params.set(p.requirement_id, {
@@ -260,15 +366,17 @@ async function recomputeInTransaction(
     });
   }
 
-  const release = catalog.release;
+  // The release is "applied" when the first page of a run finds no active instance on it yet.
   const firstUnderRelease =
+    input.pinned === null &&
     release !== null &&
     instances.length > 0 &&
-    !instances.some((i) => i.catalog_release_id === release.id);
-  const statuses = Object.fromEntries(READINESS_STATUSES.map((s) => [s, 0])) as Record<
-    ReadinessStatus,
-    number
-  >;
+    (
+      await tx.execute<{ any: boolean }>(sql`
+        SELECT EXISTS (SELECT 1 FROM public.requirement_instance
+                       WHERE archived_at IS NULL AND catalog_release_id = ${release.id}::uuid) AS any`)
+    ).rows[0]?.any === false;
+  const statuses = emptyStatuses();
   const items: SnapshotItem[] = [];
   let changed = 0;
 
@@ -401,50 +509,86 @@ async function recomputeInTransaction(
       metadata: { catalogVersion: release.catalogVersion, channel: release.channel },
     });
   }
-
-  let snapshotId: string | null = null;
-  if (options.snapshot && release) {
-    const asOfDate = toZonedDate(asOf, orgZone);
-    const body = buildSnapshot({
-      catalogVersion: release.catalogVersion,
-      channel: release.channel,
-      asOfDate,
-      items,
+  // One summary event per page that changed something (S6); each change above keeps its own
+  // before/after event (principle 5).
+  if (changed > 0) {
+    await appendAuditEvent(tx, ctx, {
+      category: 'system',
+      action: 'readiness.recompute_batch',
+      reason: 'readiness recompute batch (internal readiness, not an HRSA determination)',
+      metadata: {
+        catalogVersion: release?.catalogVersion ?? null,
+        engineVersion: ENGINE_VERSION,
+        evaluated: instances.length,
+        changed,
+        firstInstanceId: instances[0]?.id ?? null,
+        lastInstanceId: instances.at(-1)?.id ?? null,
+      },
     });
-    const r = await tx.execute<{ id: string }>(sql`
-      INSERT INTO public.readiness_snapshot
-        (organization_id, catalog_release_id, catalog_version, engine_version, as_of_date, kind,
-         met, denominator, body)
-      VALUES (${organizationId}::uuid, ${release.id}::uuid, ${release.catalogVersion}, ${ENGINE_VERSION},
-              ${asOfDate}::date, ${options.snapshot}, ${body.total.met}, ${body.total.denominator},
-              ${JSON.stringify(body)}::jsonb)
-      ON CONFLICT (organization_id, catalog_release_id, as_of_date, kind) DO NOTHING
-      RETURNING id::text`);
-    snapshotId = r.rows[0]?.id ?? null;
-    if (snapshotId) {
-      await appendAuditEvent(tx, ctx, {
-        category: 'system',
-        action: 'readiness_snapshot.create',
-        targetTable: 'readiness_snapshot',
-        targetId: snapshotId,
-        reason: `${options.snapshot} readiness snapshot for ${asOfDate} (internal readiness, not an HRSA determination)`,
-        metadata: {
-          catalogVersion: release.catalogVersion,
-          met: body.total.met,
-          denominator: body.total.denominator,
-        },
-      });
-    }
   }
 
   return {
-    organizationId,
-    catalogVersion: release?.catalogVersion ?? null,
+    asOf,
+    release,
+    lastId: instances.at(-1)?.id ?? null,
     evaluated: instances.length,
     changed,
-    snapshotId,
     statuses,
+    items,
   };
+}
+
+async function storeSnapshot(
+  tx: Tx,
+  ctx: TransactionContext,
+  organizationId: string,
+  release: NonNullable<Release>,
+  asOf: Instant,
+  kind: 'nightly' | 'on_demand',
+  items: readonly SnapshotItem[],
+): Promise<string | null> {
+  const active = await loadActiveCatalog(tx);
+  if (active.release?.id !== release.id) {
+    throw new JobError('catalog_release_changed', { retryAfterSeconds: 0 });
+  }
+  const zone = (
+    await tx.execute<{ time_zone: string }>(
+      sql`SELECT time_zone FROM public.organization WHERE id = ${organizationId}::uuid`,
+    )
+  ).rows[0]?.time_zone;
+  if (!zone) throw new JobError('organization_not_found');
+  const asOfDate = toZonedDate(asOf, parseTimeZone(zone));
+  const body = buildSnapshot({
+    catalogVersion: release.catalogVersion,
+    channel: release.channel,
+    asOfDate,
+    items,
+  });
+  const r = await tx.execute<{ id: string }>(sql`
+    INSERT INTO public.readiness_snapshot
+      (organization_id, catalog_release_id, catalog_version, engine_version, as_of_date, kind,
+       met, denominator, body)
+    VALUES (${organizationId}::uuid, ${release.id}::uuid, ${release.catalogVersion}, ${ENGINE_VERSION},
+            ${asOfDate}::date, ${kind}, ${body.total.met}, ${body.total.denominator},
+            ${JSON.stringify(body)}::jsonb)
+    ON CONFLICT (organization_id, catalog_release_id, as_of_date, kind) DO NOTHING
+    RETURNING id::text`);
+  const snapshotId = r.rows[0]?.id ?? null;
+  if (snapshotId) {
+    await appendAuditEvent(tx, ctx, {
+      category: 'system',
+      action: 'readiness_snapshot.create',
+      targetTable: 'readiness_snapshot',
+      targetId: snapshotId,
+      reason: `${kind} readiness snapshot for ${asOfDate} (internal readiness, not an HRSA determination)`,
+      metadata: {
+        catalogVersion: release.catalogVersion,
+        met: body.total.met,
+        denominator: body.total.denominator,
+      },
+    });
+  }
+  return snapshotId;
 }
 
 /**

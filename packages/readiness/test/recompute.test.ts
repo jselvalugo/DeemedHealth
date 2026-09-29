@@ -809,6 +809,33 @@ describeDb('readiness service and recompute job', () => {
     );
   });
 
+  it('recomputes in keyset batches, one transaction each, with a summary event per changed batch (S6)', async () => {
+    const far = parseInstant('2034-06-01T15:00:00Z');
+    const beforeBatches = (await audit(w.a, 'readiness.recompute_batch')).length;
+    const beforeEvals = (await audit(w.a, 'requirement_instance.evaluate')).length;
+    const paged = await recomputeTenant(w.tenant, w.a.id, { asOf: far, batchSize: 2 });
+    expect(paged).toMatchObject({ evaluated: 7, batches: 4 });
+    expect(paged.changed).toBeGreaterThan(0);
+    const summaries = (await audit(w.a, 'readiness.recompute_batch')).slice(beforeBatches);
+    expect(summaries.length).toBeGreaterThanOrEqual(1);
+    expect(summaries.length).toBeLessThanOrEqual(4);
+    expect(summaries.every((e) => e.category === 'system' && e.actor_type === 'system')).toBe(true);
+    expect(summaries.reduce((n, e) => n + e.metadata.changed, 0)).toBe(paged.changed);
+    // Every change still has its own before/after event.
+    expect((await audit(w.a, 'requirement_instance.evaluate')).length - beforeEvals).toBe(
+      paged.changed,
+    );
+    // One big batch agrees with the pages: nothing left to change, same statuses.
+    const whole = await recomputeTenant(w.tenant, w.a.id, { asOf: far, batchSize: 10_000 });
+    expect(whole).toMatchObject({ evaluated: 7, changed: 0, batches: 1, statuses: paged.statuses });
+    // A zero or negative size is clamped to one instance per batch.
+    const tiny = await recomputeTenant(w.tenant, w.a.id, { asOf: far, batchSize: 0 });
+    expect(tiny).toMatchObject({ evaluated: 7, changed: 0, batches: 8 });
+    await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant(TODAY) });
+    const chain = await w.admin.query('SELECT ok FROM audit.verify_chain($1)', [w.a.id]);
+    expect(chain.rows[0].ok).toBe(true);
+  });
+
   it('spreads the nightly sweep over its window, one stable delay per tenant (S6)', async () => {
     const day = '2031-01-15T15:00:00Z';
     await w.platform.withPlatform(SYSTEM, (tx) => enqueueNightlySweep(tx, parseInstant(day)));
