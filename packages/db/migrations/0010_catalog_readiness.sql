@@ -522,7 +522,10 @@ BEGIN
 END
 $$;
 
-CREATE FUNCTION platform.complete_job(p_id uuid)
+-- complete_job and fail_job take the attempt number the caller claimed (security review
+-- S6): a worker whose lease expired and whose job was re-claimed by another worker cannot
+-- complete or fail the newer attempt.
+CREATE FUNCTION platform.complete_job(p_id uuid, p_attempt integer)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -530,14 +533,14 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   UPDATE platform.job SET state = 'completed', finished_at = clock_timestamp(), locked_until = NULL
-  WHERE id = p_id AND state = 'active';
+  WHERE id = p_id AND state = 'active' AND attempts = p_attempt;
   RETURN FOUND;
 END
 $$;
 
 -- Retries with the given delay while attempts remain, then fails. If a newer queued job with
 -- the same singleton key exists, this one is superseded (the newer one does the work).
-CREATE FUNCTION platform.fail_job(p_id uuid, p_error_code text, p_retry_after_seconds integer)
+CREATE FUNCTION platform.fail_job(p_id uuid, p_attempt integer, p_error_code text, p_retry_after_seconds integer)
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -546,7 +549,7 @@ AS $$
 DECLARE
   v_job platform.job;
 BEGIN
-  SELECT * INTO v_job FROM platform.job WHERE id = p_id AND state = 'active' FOR UPDATE;
+  SELECT * INTO v_job FROM platform.job WHERE id = p_id AND state = 'active' AND attempts = p_attempt FOR UPDATE;
   IF NOT FOUND THEN
     RETURN NULL;
   END IF;
@@ -571,12 +574,12 @@ $$;
 REVOKE ALL ON FUNCTION platform.insert_job(uuid, text, jsonb, text, timestamptz, integer, text, boolean),
   public.enqueue_job(text, jsonb, text, timestamptz, integer),
   platform.enqueue_job(uuid, text, jsonb, text, text, timestamptz, integer),
-  platform.claim_jobs(text[], integer, integer), platform.complete_job(uuid),
-  platform.fail_job(uuid, text, integer), platform.purge_finished_jobs(interval) FROM PUBLIC;
+  platform.claim_jobs(text[], integer, integer), platform.complete_job(uuid, integer),
+  platform.fail_job(uuid, integer, text, integer), platform.purge_finished_jobs(interval) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.enqueue_job(text, jsonb, text, timestamptz, integer) TO app_user;
 GRANT EXECUTE ON FUNCTION platform.enqueue_job(uuid, text, jsonb, text, text, timestamptz, integer),
-  platform.claim_jobs(text[], integer, integer), platform.complete_job(uuid),
-  platform.fail_job(uuid, text, integer), platform.purge_finished_jobs(interval) TO app_platform;
+  platform.claim_jobs(text[], integer, integer), platform.complete_job(uuid, integer),
+  platform.fail_job(uuid, integer, text, integer), platform.purge_finished_jobs(interval) TO app_platform;
 
 -- ---------------------------------------------------------------------------
 -- requirement_instance: not_assessed, catalog pin, reasons, and who marked N/A

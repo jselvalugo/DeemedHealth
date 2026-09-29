@@ -9,7 +9,8 @@
  *    is empty or the budget is spent; unfinished work waits for the next drain. Handlers
  *    open their own withTenant transaction from the job's tenant (ADR-0001).
  *  - A claimed job holds a lease; if the process dies, the lease expires and the next
- *    drain resumes it. Every job row is its own run record (state, attempts, times,
+ *    drain resumes it. Completing or failing a run names the attempt it claimed, so a
+ *    worker whose lease lapsed cannot finish the newer attempt (S6). Every job row is its own run record (state, attempts, times,
  *    last error code). Error messages are never stored or logged, only stable codes.
  *
  * Interim adapter: ADR-0001 names pg-boss. This adapter keeps the same interface on
@@ -188,7 +189,7 @@ export async function drain(options: DrainOptions): Promise<DrainResult> {
       try {
         await handler(job);
         await options.platform.withPlatform(DRAIN_ACTOR, (tx) =>
-          tx.execute(sql`SELECT platform.complete_job(${job.id}::uuid)`),
+          tx.execute(sql`SELECT platform.complete_job(${job.id}::uuid, ${job.attempts}::integer)`),
         );
         runs.push({ id: job.id, queue: job.queue, outcome: 'completed' });
       } catch (error) {
@@ -199,7 +200,8 @@ export async function drain(options: DrainOptions): Promise<DrainResult> {
             : retry(job.attempts);
         const outcome = await options.platform.withPlatform(DRAIN_ACTOR, async (tx) => {
           const r = await tx.execute<{ outcome: RunOutcome | null }>(
-            sql`SELECT platform.fail_job(${job.id}::uuid, ${code}::text, ${delay}::integer) AS outcome`,
+            sql`SELECT platform.fail_job(${job.id}::uuid, ${job.attempts}::integer, ${code}::text,
+                                     ${delay}::integer) AS outcome`,
           );
           return r.rows[0]?.outcome ?? 'failed';
         });

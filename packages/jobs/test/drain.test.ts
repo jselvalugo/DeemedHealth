@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { createDatabase, provisionOrganization, type Actor, type Database } from '@deemed/db';
 import { JobError, drain, sendJob, sendPlatformJob, type ClaimedJob } from '@deemed/jobs';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import type pg from 'pg';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { connect, describeDb, expectPgError, need } from '../../db/test/helpers.js';
@@ -341,5 +341,37 @@ describeDb('job queue and drain()', () => {
     } finally {
       await user.end();
     }
+  });
+
+  it('fences complete and fail by attempt: a worker whose lease lapsed cannot finish the re-claimed run (S6)', async () => {
+    const id = await tenant.withTenant(org, SYSTEM, (tx) => sendJob(tx, Q, { payload: { n: 80 } }));
+    const claim = () =>
+      platform.withPlatform(SYSTEM, async (tx) => {
+        const r = await tx.execute<{ id: string; attempts: number }>(
+          sql`SELECT id::text, attempts FROM platform.claim_jobs(ARRAY['test.echo'], 10, 60)`,
+        );
+        return r.rows.find((j) => j.id === id);
+      });
+    expect(await claim()).toMatchObject({ attempts: 1 });
+    await admin.query(
+      `UPDATE platform.job SET locked_until = now() - interval '1 second' WHERE id = $1`,
+      [id],
+    );
+    expect(await claim()).toMatchObject({ attempts: 2 });
+    const call = (query: SQL) =>
+      platform.withPlatform(
+        SYSTEM,
+        async (tx) => (await tx.execute<{ r: unknown }>(query)).rows[0]!.r,
+      );
+    // The first worker comes back late: both calls are no-ops.
+    expect(await call(sql`SELECT platform.complete_job(${id}::uuid, 1) AS r`)).toBe(false);
+    expect(await call(sql`SELECT platform.fail_job(${id}::uuid, 1, 'late', 0) AS r`)).toBeNull();
+    expect((await jobs(Q)).find((j) => j.id === id)).toMatchObject({
+      state: 'active',
+      attempts: 2,
+    });
+    // The current attempt completes.
+    expect(await call(sql`SELECT platform.complete_job(${id}::uuid, 2) AS r`)).toBe(true);
+    expect((await jobs(Q)).find((j) => j.id === id)).toMatchObject({ state: 'completed' });
   });
 });
