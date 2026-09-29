@@ -159,16 +159,6 @@ describeDb('readiness service and recompute job', () => {
         integration,
       ],
       [
-        'budget',
-        {
-          instanceId: w.a.instances.budget,
-          kind: 'approval',
-          effectiveOn: '2029-10-01',
-          approval: { capacity: 'board', decision: 'approved', approvalTypeId: 'budget.annual' },
-        },
-        w.human(w.a),
-      ],
-      [
         'meetings',
         { instanceId: w.a.instances.meetings, kind: 'completion', effectiveOn: '2030-09-10' },
         w.human(w.a),
@@ -176,20 +166,6 @@ describeDb('readiness service and recompute job', () => {
       [
         'procedures',
         { instanceId: w.a.instances.procedures, kind: 'document', effectiveOn: '2030-03-01' },
-        w.human(w.a),
-      ],
-      [
-        'priv',
-        {
-          instanceId: w.a.instances.priv,
-          kind: 'approval',
-          effectiveOn: '2029-08-31',
-          approval: {
-            capacity: 'designated',
-            decision: 'approved',
-            approvalTypeId: 'cp.privileges.grant',
-          },
-        },
         w.human(w.a),
       ],
     ];
@@ -200,6 +176,97 @@ describeDb('readiness service and recompute job', () => {
     const events = await audit(w.a, 'readiness_fact.record');
     expect(events).toHaveLength(facts.length);
     expect(events[0]).toMatchObject({ actor_type: 'integration', actor_user_id: null });
+    // The diff names who recorded it and the (empty) approval and evidence links (S11).
+    expect(Object.keys(events[0].diff.fields).sort()).toEqual(
+      ['effective_on', 'expires_on', 'kind', 'recorded_by_type', 'requirement_instance_id'].sort(),
+    );
+    expect(events[0].diff.fields.recorded_by_type).toEqual({ before: null, after: 'integration' });
+  });
+
+  it('refuses approval facts until S5, integration approvals always, and integration documents until S6 (F3, S2)', async () => {
+    const code = (p: Promise<unknown>) =>
+      p.then(
+        () => null,
+        (e: ReadinessError) => e.code,
+      );
+    const approvalFact = {
+      instanceId: w.a.instances.budget,
+      kind: 'approval' as const,
+      effectiveOn: '2029-10-01',
+    };
+    expect(await code(asHuman(w.a, (tx, ctx) => recordFact(tx, ctx, approvalFact)))).toBe(
+      'approval_facts_unavailable',
+    );
+    expect(
+      await code(asActor(w.a, integration, (tx, ctx) => recordFact(tx, ctx, approvalFact))),
+    ).toBe('actor_not_allowed');
+    expect(
+      await code(
+        asActor(w.a, integration, (tx, ctx) =>
+          recordFact(tx, ctx, {
+            instanceId: w.a.instances.procedures,
+            kind: 'document',
+            effectiveOn: '2030-03-01',
+          }),
+        ),
+      ),
+    ).toBe('actor_not_allowed');
+    // The database refuses them too, whatever the input says.
+    // A real, human-recorded approval exists; the fact is still refused (no capacity or type
+    // on public.approval to copy).
+    const approvalId = await asHuman(w.a, async (tx) => {
+      const r = await tx.execute<{ id: string }>(sql`
+        INSERT INTO public.approval (organization_id, subject_type, subject_id, approver_person_id,
+                                     approver_user_account_id, decision)
+        VALUES (${w.a.id}::uuid, 'requirement_instance', ${w.a.instances.budget}::uuid,
+                ${w.a.personE}::uuid, ${w.a.userId}::uuid, 'approved')
+        RETURNING id::text`);
+      return r.rows[0]?.id as string;
+    });
+    expect(
+      await pgError(
+        asHuman(w.a, (tx) =>
+          tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on,
+                           approval_id, approval_capacity, approval_decision, approval_type_id, recorded_by_type)
+                         VALUES (${w.a.id}::uuid, ${w.a.instances.budget}::uuid, 'approval', DATE '2029-10-01',
+                                 ${approvalId}::uuid, 'board', 'approved', 'budget.annual', 'user')`),
+        ),
+      ),
+    ).toMatchObject({ code: '0A000' });
+    // Untyped, wildcard, or unlinked approval rows are rejected by the table checks (F2).
+    for (const [type, link] of [
+      [null, approvalId],
+      ['budget.*', approvalId],
+      ['budget.annual', null],
+    ] as const) {
+      expect(
+        await pgError(
+          asHuman(w.a, (tx) =>
+            tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on,
+                             approval_id, approval_capacity, approval_decision, approval_type_id, recorded_by_type)
+                           VALUES (${w.a.id}::uuid, ${w.a.instances.budget}::uuid, 'approval', DATE '2029-10-01',
+                                   ${link}::uuid, 'board', 'approved', ${type}, 'user')`),
+          ),
+        ),
+      ).toMatchObject({ code: '23514' });
+    }
+    // recorded_by_type must be the transaction's actor type, and service actors never write (S3).
+    expect(
+      await pgError(
+        asActor(w.a, assistant(w.a), (tx) =>
+          tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on, recorded_by_type)
+                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'completion', DATE '2030-03-01', 'integration')`),
+        ),
+      ),
+    ).toMatchObject({ code: '42501' });
+    expect(
+      await pgError(
+        asActor(w.a, integration, (tx) =>
+          tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on, recorded_by_type)
+                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'completion', DATE '2030-03-01', 'user')`),
+        ),
+      ),
+    ).toMatchObject({ code: '42501' });
   });
 
   it('drains the job: every instance evaluated in its site zone, pinned to the catalog release', async () => {
@@ -217,17 +284,13 @@ describeDb('readiness service and recompute job', () => {
       status: 'not_applicable',
       not_applicable_by: w.a.userId,
     });
-    expect(await instance(i.budget)).toMatchObject({
-      status: 'due_soon',
-      next_due_on: '2030-10-01',
-    });
+    // Board-approval-backed and approval-backed items have no qualifying evidence until S5.
+    expect(await instance(i.budget)).toMatchObject({ status: 'missing', next_due_on: null });
     expect(await instance(i.meetings)).toMatchObject({ status: 'met', next_due_on: '2030-10-31' });
     expect(await instance(i.procedures)).toMatchObject({ status: 'met', next_due_on: null });
-    // Tenant parameter 12 months from 2029-08-31: due 2030-08-31, overdue today.
-    expect(await instance(i.priv)).toMatchObject({ status: 'overdue', next_due_on: '2030-08-31' });
+    expect(await instance(i.priv)).toMatchObject({ status: 'missing', next_due_on: null });
     expect((await instance(i.priv)).status_reasons.map((r: { code: string }) => r.code)).toEqual([
-      'evidence_on_file',
-      'past_due',
+      'no_evidence',
     ]);
   });
 
@@ -493,12 +556,16 @@ describeDb('readiness service and recompute job', () => {
       'not_in_catalog',
     );
     expect(await set(24)).toBeNull();
+    const [stored] = (
+      await w.admin.query(
+        `SELECT value FROM public.tenant_parameter WHERE organization_id = $1 AND requirement_id = 'TEST-05-PRIV'`,
+        [w.a.id],
+      )
+    ).rows;
+    expect(stored.value).toBe(24);
     await drainAt(TODAY);
-    // 24 months from 2029-08-31: due 2031-08-31.
-    expect(await instance(w.a.instances.priv)).toMatchObject({
-      status: 'met',
-      next_due_on: '2031-08-31',
-    });
+    // No approval evidence can exist until S5: still missing (engine unit tests cover the interval).
+    expect(await instance(w.a.instances.priv)).toMatchObject({ status: 'missing' });
   });
 
   it('retracting evidence is human-only, audited, and re-evaluates', async () => {
@@ -542,7 +609,7 @@ describeDb('readiness service and recompute job', () => {
       asActor(w.b, integration, (tx, ctx) =>
         recordFact(tx, ctx, {
           instanceId: w.a.instances.procedures,
-          kind: 'document',
+          kind: 'completion',
           effectiveOn: '2030-01-01',
         }),
       ),
@@ -614,10 +681,7 @@ describeDb('readiness service and recompute job', () => {
     expect(after.map((s) => s.catalog_version)).toEqual([latest, v2]);
     expect(after[0]).toEqual(first[0]);
     expect(await instance(w.a.instances.procedures)).toMatchObject({ status: 'not_assessed' });
-    expect(await instance(w.a.instances.budget)).toMatchObject({
-      status: 'met',
-      next_due_on: '2031-10-01',
-    });
+    expect(await instance(w.a.instances.budget)).toMatchObject({ status: 'missing' });
     // A snapshot is never edited, whoever tries.
     await expectPgError(
       w.admin.query(`UPDATE public.readiness_snapshot SET met = 0 WHERE id = $1`, [first[0].id]),

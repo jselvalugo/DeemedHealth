@@ -24,7 +24,7 @@ import {
   type CatalogEntry,
 } from '@deemed/requirements-catalog';
 import { sql } from 'drizzle-orm';
-import type { ApprovalCapacity, FactKind } from '../types.js';
+import type { FactKind } from '../types.js';
 import { loadActiveCatalog } from './catalog.js';
 import { ReadinessError } from './errors.js';
 import { enqueueRecompute } from './recompute.js';
@@ -257,21 +257,22 @@ export async function setTenantParameter(
 
 export interface RecordFactInput {
   instanceId: string;
+  /** document, completion, expiration, or change. Approval facts arrive with S5. */
   kind: FactKind;
   effectiveOn: string;
   expiresOn?: string | null;
-  approval?: {
-    approvalId?: string | null;
-    capacity: ApprovalCapacity;
-    decision: 'approved' | 'rejected';
-    approvalTypeId?: string | null;
-  } | null;
+  /** S6: the evidence file version behind the fact (no FK until evidence tables exist). */
   evidenceVersionId?: string | null;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Records one evidence fact (a person or an integration; never a service/AI actor). */
+/**
+ * Records one evidence fact: a person or an integration, never a service (AI) or system
+ * actor. Approval facts are refused until S5 (F3, S2): public.approval records no
+ * capacity or approval type, and a fact never takes them from input. Integrations may
+ * not record approvals at all, nor documents until evidence versions exist (S6).
+ */
 export async function recordFact(
   tx: Tx,
   ctx: TransactionContext,
@@ -281,34 +282,27 @@ export async function recordFact(
   if (type !== 'user' && type !== 'break_glass' && type !== 'integration') {
     throw new ReadinessError('actor_not_allowed');
   }
+  if (input.kind === 'approval') {
+    if (type === 'integration') throw new ReadinessError('actor_not_allowed');
+    throw new ReadinessError('approval_facts_unavailable');
+  }
+  if (input.kind === 'document' && type === 'integration') {
+    // TODO(S6): accept integration documents that reference an evidence_version.
+    throw new ReadinessError('actor_not_allowed');
+  }
   if (!ISO_DATE.test(input.effectiveOn) || (input.expiresOn && !ISO_DATE.test(input.expiresOn))) {
     throw new ReadinessError('invalid_fact', ['effectiveOn']);
   }
   if ((input.kind === 'expiration') !== Boolean(input.expiresOn)) {
     throw new ReadinessError('invalid_fact', ['expiresOn']);
   }
-  if ((input.kind === 'approval') !== Boolean(input.approval)) {
-    throw new ReadinessError('invalid_fact', ['approval']);
-  }
   const instance = await loadInstance(tx, input.instanceId);
-  if (input.approval?.approvalId) {
-    const a = (
-      await tx.execute<{ decision: string }>(
-        sql`SELECT decision FROM public.approval WHERE id = ${input.approval.approvalId}::uuid`,
-      )
-    ).rows[0];
-    if (!a || a.decision !== input.approval.decision) {
-      throw new ReadinessError('invalid_fact', ['approval.approvalId']);
-    }
-  }
   const r = await tx.execute<{ id: string }>(sql`
     INSERT INTO public.readiness_fact
-      (organization_id, requirement_instance_id, kind, effective_on, expires_on, approval_id,
-       approval_capacity, approval_decision, approval_type_id, evidence_version_id, recorded_by_type)
+      (organization_id, requirement_instance_id, kind, effective_on, expires_on,
+       evidence_version_id, recorded_by_type)
     VALUES (${ctx.organizationId}::uuid, ${instance.id}::uuid, ${input.kind}, ${input.effectiveOn}::date,
-            ${input.expiresOn ?? null}::date, ${input.approval?.approvalId ?? null}::uuid,
-            ${input.approval?.capacity ?? null}, ${input.approval?.decision ?? null},
-            ${input.approval?.approvalTypeId ?? null}, ${input.evidenceVersionId ?? null}::uuid, ${type})
+            ${input.expiresOn ?? null}::date, ${input.evidenceVersionId ?? null}::uuid, ${type})
     RETURNING id::text`);
   const id = r.rows[0]?.id as string;
   await appendAuditEvent(tx, ctx, {
@@ -323,8 +317,12 @@ export async function recordFact(
       kind: input.kind,
       effective_on: input.effectiveOn,
       expires_on: input.expiresOn ?? null,
-      approval_capacity: input.approval?.capacity ?? null,
-      approval_decision: input.approval?.decision ?? null,
+      recorded_by_type: type,
+      approval_id: null,
+      approval_type_id: null,
+      approval_capacity: null,
+      approval_decision: null,
+      evidence_version_id: input.evidenceVersionId ?? null,
     }),
   });
   const jobId = await enqueueRecompute(tx, 'readiness_fact');

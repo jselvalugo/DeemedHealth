@@ -604,7 +604,8 @@ CREATE TABLE public.readiness_fact (
   approval_id              uuid,
   approval_capacity        text        CHECK (approval_capacity IN ('board', 'committee_ratified', 'designated', 'staff')),
   approval_decision        text        CHECK (approval_decision IN ('approved', 'rejected')),
-  approval_type_id         text        CHECK (approval_type_id ~ '^[a-z][a-z0-9_]*([.][a-z0-9_*]+)+$'),
+  -- A recorded approval type is concrete: no '*' (wildcards belong to catalog patterns).
+  approval_type_id         text        CHECK (approval_type_id ~ '^[a-z][a-z0-9_]*([.][a-z0-9_]+)+$'),
   evidence_version_id      uuid,
   recorded_by_type         text        NOT NULL CHECK (recorded_by_type IN ('user', 'break_glass', 'integration')),
   recorded_at              timestamptz NOT NULL DEFAULT now(),
@@ -623,8 +624,14 @@ CREATE TABLE public.readiness_fact (
   CONSTRAINT readiness_fact_retracted_by_fk FOREIGN KEY (organization_id, retracted_by)
     REFERENCES public.user_account (organization_id, id),
   CONSTRAINT readiness_fact_expiration_has_date CHECK ((kind = 'expiration') = (expires_on IS NOT NULL)),
+  -- An approval fact names its approval record and type (F2, F3); other facts carry none.
   CONSTRAINT readiness_fact_approval_fields CHECK (
-    (kind = 'approval') = (approval_capacity IS NOT NULL AND approval_decision IS NOT NULL)),
+    CASE WHEN kind = 'approval'
+      THEN approval_id IS NOT NULL AND approval_type_id IS NOT NULL
+           AND approval_capacity IS NOT NULL AND approval_decision IS NOT NULL
+      ELSE approval_id IS NULL AND approval_type_id IS NULL
+           AND approval_capacity IS NULL AND approval_decision IS NULL
+    END),
   CONSTRAINT readiness_fact_retraction CHECK (
     (retracted_at IS NULL) = (retract_reason IS NULL)
     AND (retract_reason IS NULL OR length(btrim(retract_reason)) BETWEEN 1 AND 2000)),
@@ -636,8 +643,8 @@ CREATE INDEX readiness_fact_instance_idx ON public.readiness_fact (organization_
 CREATE TRIGGER readiness_fact_row_meta BEFORE INSERT OR UPDATE ON public.readiness_fact
   FOR EACH ROW EXECUTE FUNCTION public.set_row_meta();
 
--- Facts are recorded by people or integrations, never by a service (AI) actor; the time is
--- the database's. A fact is never edited: the one allowed change is a human retraction.
+-- The recorded time is the database's. A fact is never edited: the one allowed change is a
+-- human retraction.
 CREATE FUNCTION public.readiness_fact_guard() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
@@ -646,10 +653,6 @@ DECLARE
   v_actor uuid := nullif(current_setting('app.actor_id', true), '')::uuid;
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    IF (NEW.recorded_by_type IN ('user', 'break_glass')) <> (v_actor IS NOT NULL) THEN
-      RAISE EXCEPTION 'readiness_fact recorded_by_type % does not match the transaction actor', NEW.recorded_by_type
-        USING ERRCODE = 'insufficient_privilege';
-    END IF;
     IF NEW.retracted_at IS NOT NULL THEN
       RAISE EXCEPTION 'a new readiness_fact cannot be retracted already' USING ERRCODE = 'check_violation';
     END IF;
@@ -663,7 +666,7 @@ BEGIN
      IS DISTINCT FROM (to_jsonb(OLD) - ARRAY['retracted_at', 'retracted_by', 'retract_reason', 'row_version', 'updated_at', 'updated_by']) THEN
     RAISE EXCEPTION 'readiness_fact is never edited; retract it and record a new one' USING ERRCODE = 'check_violation';
   END IF;
-  IF v_actor IS NULL THEN
+  IF v_actor IS NULL OR current_setting('app.actor_type', true) NOT IN ('user', 'break_glass') THEN
     RAISE EXCEPTION 'retracting evidence needs a human user' USING ERRCODE = 'insufficient_privilege';
   END IF;
   NEW.retracted_at := now();
@@ -674,6 +677,49 @@ $$;
 
 CREATE TRIGGER readiness_fact_guard BEFORE INSERT OR UPDATE ON public.readiness_fact
   FOR EACH ROW EXECUTE FUNCTION public.readiness_fact_guard();
+
+-- Who may record which fact (runs AFTER the row passes RLS, so a cross-tenant write fails
+-- on RLS first):
+--   * recorded_by_type must equal the transaction's app.actor_type (S3), and service (AI)
+--     and system actors never record evidence (product principle 2);
+--   * approval facts are refused until S5 (F3, S2): public.approval has no capacity,
+--     approval type, or confirmation to copy, and a fact must never take them from input.
+--     S5 replaces this refusal with a BEFORE INSERT copy from the confirmed approval row;
+--     integrations will still never record approvals;
+--   * document facts from integrations are refused until S6 (S2): an integration document
+--     must reference an evidence_version, and that table does not exist yet.
+--     TODO(S6): require evidence_version_id with a composite FK to evidence_version.
+CREATE FUNCTION public.readiness_fact_actor_check() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_type  text := nullif(current_setting('app.actor_type', true), '');
+  v_actor uuid := nullif(current_setting('app.actor_id', true), '')::uuid;
+BEGIN
+  IF v_type IS NULL OR v_type IN ('service', 'system') THEN
+    RAISE EXCEPTION 'evidence is recorded by a person or an integration, never by a % actor', coalesce(v_type, 'unknown')
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NEW.recorded_by_type IS DISTINCT FROM v_type
+     OR (v_type IN ('user', 'break_glass')) <> (v_actor IS NOT NULL) THEN
+    RAISE EXCEPTION 'readiness_fact recorded_by_type does not match the transaction actor'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NEW.kind = 'approval' THEN
+    RAISE EXCEPTION 'approval facts are not accepted until approvals record capacity and type (S5)'
+      USING ERRCODE = 'feature_not_supported';
+  END IF;
+  IF NEW.kind = 'document' AND v_type = 'integration' THEN
+    RAISE EXCEPTION 'an integration cannot record a document fact until evidence versions exist (S6)'
+      USING ERRCODE = 'feature_not_supported';
+  END IF;
+  RETURN NULL;
+END
+$$;
+
+CREATE TRIGGER readiness_fact_actor_check AFTER INSERT ON public.readiness_fact
+  FOR EACH ROW EXECUTE FUNCTION public.readiness_fact_actor_check();
 
 ALTER TABLE public.readiness_fact ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.readiness_fact FORCE ROW LEVEL SECURITY;

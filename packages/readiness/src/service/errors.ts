@@ -12,6 +12,7 @@ export type ReadinessErrorCode =
   | 'parameter_unknown'
   | 'parameter_out_of_bounds'
   | 'invalid_fact'
+  | 'approval_facts_unavailable'
   | 'fact_retracted'
   | 'version_conflict'
   | 'bundle_invalid'

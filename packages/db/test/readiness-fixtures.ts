@@ -56,7 +56,7 @@ export async function seedReadinessIsolationRows(
           await tx.execute(sql`
             INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on,
                                                recorded_by_type)
-            VALUES (${t.organizationId}::uuid, ${inst.rows[0]?.id}::uuid, 'document', DATE '2026-01-15',
+            VALUES (${t.organizationId}::uuid, ${inst.rows[0]?.id}::uuid, 'completion', DATE '2026-01-15',
                     'integration')`);
           await tx.execute(sql`
             INSERT INTO public.readiness_snapshot (organization_id, catalog_release_id, catalog_version,
