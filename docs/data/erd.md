@@ -3,8 +3,11 @@
 Owner: `data-architect`. Status: v0.2 (2026-09-27). Phase 1 slice S2 implements
 `organization`, `site`, `person`, `user_account`, `role`, `role_assignment`,
 `requirement_instance` (minimal), `task` (minimal), `approval` (minimal),
-`audit_event`, `chain_head`, and `platform.tenant` in `packages/db/migrations`;
-the other entities below are still design. Column classes are in
+`audit_event`, `chain_head`, and `platform.tenant` in `packages/db/migrations`.
+S4 (migration 0010) adds the catalog tables in schema `catalog` (`catalog_release`,
+`requirement`, `requirement_version`, and `database_profile`), `readiness_snapshot`,
+`tenant_parameter`, `readiness_fact`, and `platform.job`; the other entities below are
+still design. Column classes are in
 `docs/data/data-dictionary.md` (generated from `packages/db/src/data-dictionary.ts`).
 
 Scope: the shared core only. Module-owned tables (credentialing, enrollment,
@@ -249,12 +252,13 @@ erDiagram
         uuid id PK
         uuid organization_id FK
         text requirement_id "catalog requirementId"
-        uuid requirement_version_id FK "FK arrives with catalog tables"
+        uuid requirement_version_id FK "catalog.requirement_version (0010)"
+        uuid catalog_release_id FK "release the status was computed under"
         text subject_type "S2: organization site person; more per module"
         uuid subject_id
         uuid site_id FK
         uuid owner_person_id FK
-        text status "met due_soon overdue missing not_applicable"
+        text status "met due_soon overdue missing not_applicable not_assessed"
         text not_applicable_reason
         date next_due_on
         timestamptz archived_at

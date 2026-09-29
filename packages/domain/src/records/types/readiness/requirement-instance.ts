@@ -106,9 +106,9 @@ export const requirementInstanceRecord = defineRecordType({
     field: 'status',
     initial: 'missing',
     states: REQUIREMENT_INSTANCE_STATUSES,
-    // "Mark not applicable" (reason required) arrives with the readiness module (S4).
+    // "Not applicable" (reason required) has its own audited endpoints (S4, routes/readiness).
     transitions: [],
-    derived: ['met', 'due_soon', 'overdue', 'missing'],
+    derived: ['met', 'due_soon', 'overdue', 'missing', 'not_assessed'],
   },
   owner: { field: 'ownerPersonId' },
   list: {
