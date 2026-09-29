@@ -56,6 +56,7 @@ Logo: `assets/brand/deemed-health-logo.png`. Tagline: "FQHC Compliance Software"
 | `docs/compliance/florida.md` | Florida operating profile: state sources, privacy and breach rules, time zones |
 | `docs/compliance/market-requirements.md` | What Florida FQHCs expect (ONC, HIPAA, OSV, UDS, Medicaid PPS, Florida rules), what is on plan, and what is blocked |
 | `docs/adr/` | Architecture Decision Records (`NNNN-title.md`) |
+| `docs/business/` | Business plan (PDF) and the cost model behind it (launch and operating costs) |
 | `assets/brand/` | Logo and brand assets |
 
 ## Agent roster and routing
