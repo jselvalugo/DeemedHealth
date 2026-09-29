@@ -143,6 +143,7 @@ export type ReasonCode =
   | 'period_satisfied'
   | 'period_pending'
   | 'period_missed'
+  | 'period_missed_in_lookback'
   | 'evidence_on_file'
   | 'changed_since_evidence'
   | 'draft_entry';

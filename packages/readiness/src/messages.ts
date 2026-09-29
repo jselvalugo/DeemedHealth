@@ -42,6 +42,8 @@ export const REASON_TEMPLATES: Readonly<Record<ReasonCode, string>> = {
   period_satisfied: 'Done for the period {periodStart} to {periodEnd}.',
   period_pending: 'Due by {periodEnd} for the current period.',
   period_missed: 'Nothing on file for the period {periodStart} to {periodEnd}.',
+  period_missed_in_lookback:
+    'In the last {lookbackMonths} months, {count} calendar period(s) had nothing on file: {periods}.',
   evidence_on_file: 'Evidence on file, dated {date}.',
   changed_since_evidence: 'The underlying fact changed on {date}, after the evidence on file.',
   draft_entry: 'Draft catalog entry (not verified): shown in non-production only.',

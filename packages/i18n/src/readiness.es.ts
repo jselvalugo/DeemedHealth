@@ -59,6 +59,8 @@ export const readinessEs: Record<keyof typeof readinessEn, string> = {
   'readiness.reason.period_pending': 'Vence el {periodEnd} para el período actual.',
   'readiness.reason.period_missed':
     'No hay nada registrado para el período del {periodStart} al {periodEnd}.',
+  'readiness.reason.period_missed_in_lookback':
+    'En los últimos {lookbackMonths} meses, {count} período(s) del calendario no tuvieron nada registrado: {periods}.',
   'readiness.reason.evidence_on_file': 'Evidencia registrada, con fecha del {date}.',
   'readiness.reason.changed_since_evidence':
     'El dato de base cambió el {date}, después de la evidencia registrada.',

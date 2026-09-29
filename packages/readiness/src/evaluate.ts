@@ -31,6 +31,7 @@ import {
 } from '@deemed/dates';
 import {
   ENGINE_PARAMETER_KEYS,
+  KnownParameters,
   effectiveAtRiskDays,
   type CatalogEntry,
 } from '@deemed/requirements-catalog';
@@ -340,6 +341,24 @@ function evaluateRule(
   const current = calendarPeriodOf(asOfDate, months);
   const inPeriod = (p: ReturnType<typeof calendarPeriodAt>) =>
     done.some((f) => isInPeriod(f.effectiveOn, p));
+  // The status looks at this period and the last; the lookback lists every earlier missed
+  // period in parameters.lookbackMonths (F9) so a gap is never hidden by a later meeting.
+  const lookback = KnownParameters.safeParse(input.entry.parameters);
+  const lookbackMonths = lookback.success ? (lookback.data.lookbackMonths ?? 0) : 0;
+  const missed: ReturnType<typeof calendarPeriodAt>[] = [];
+  for (let k = Math.floor(lookbackMonths / months); k >= 1; k--) {
+    const p = calendarPeriodAt(current.index - k, months);
+    if (!inPeriod(p)) missed.push(p);
+  }
+  if (missed.length > 0) {
+    reasons.push(
+      reason('period_missed_in_lookback', {
+        count: missed.length,
+        lookbackMonths,
+        periods: missed.map((p) => `${p.start} to ${p.end}`).join('; '),
+      }),
+    );
+  }
   if (inPeriod(current)) {
     const next = calendarPeriodAt(current.index + 1, months);
     return {

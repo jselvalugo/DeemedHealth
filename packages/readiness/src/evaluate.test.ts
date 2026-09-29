@@ -146,7 +146,7 @@ describe('periodic, calendar period (TEST-19-MEETINGS, monthly, lead 14/7)', () 
   it('is met when this month has a meeting; next due is the end of next month', () => {
     const r = run('2026-09-29T15:00:00Z', ['2026-09-10']);
     expect(r).toMatchObject({ status: 'met', nextDueOn: '2026-10-31', intervalMonths: 1 });
-    expect(codes(r)).toEqual(['period_satisfied', 'due_on']);
+    expect(codes(r)).toEqual(['period_missed_in_lookback', 'period_satisfied', 'due_on']);
   });
 
   it('is pending (met, then due_soon inside the lead days) when last month was covered', () => {
@@ -163,7 +163,7 @@ describe('periodic, calendar period (TEST-19-MEETINGS, monthly, lead 14/7)', () 
   it('is overdue when a whole calendar month was missed', () => {
     const r = run('2026-09-05T15:00:00Z', ['2026-07-20']);
     expect(r.status).toBe('overdue');
-    expect(r.reasons[0]).toMatchObject({
+    expect(r.reasons.find((x) => x.code === 'period_missed')).toMatchObject({
       code: 'period_missed',
       params: { periodStart: '2026-08-01', periodEnd: '2026-08-31' },
     });
@@ -172,6 +172,26 @@ describe('periodic, calendar period (TEST-19-MEETINGS, monthly, lead 14/7)', () 
   it('uses real month ends, including leap February (FX-DATE-MONTHEND)', () => {
     expect(run('2028-02-20T15:00:00Z', ['2028-01-15'])).toMatchObject({ nextDueOn: '2028-02-29' });
     expect(run('2027-02-20T15:00:00Z', ['2027-01-15'])).toMatchObject({ nextDueOn: '2027-02-28' });
+  });
+
+  it('keeps the status but lists missed months within lookbackMonths (F9)', () => {
+    // The 12 closed months before Sep 2026 are Sep 2025 to Aug 2026. Meetings in Jan, Mar,
+    // Aug, and Sep 2026: met now, with Sep to Dec 2025, Feb, and Apr to Jul 2026 missed.
+    const r = run('2026-09-29T15:00:00Z', ['2026-01-15', '2026-03-10', '2026-08-20', '2026-09-10']);
+    expect(r.status).toBe('met');
+    const lookback = r.reasons.find((x) => x.code === 'period_missed_in_lookback');
+    expect(lookback?.params).toMatchObject({ count: 9, lookbackMonths: 12 });
+    expect(String(lookback?.params.periods)).toContain('2025-09-01 to 2025-09-30');
+    expect(String(lookback?.params.periods)).not.toContain('2025-08-01');
+    expect(String(lookback?.params.periods)).toContain('2026-02-01 to 2026-02-28');
+    expect(String(lookback?.params.periods)).not.toContain('2026-03-01');
+    // Every month covered: no lookback reason.
+    const all = Array.from({ length: 12 }, (_, i) => {
+      const m = ((8 + i) % 12) + 1;
+      const y = m >= 9 ? 2025 : 2026;
+      return `${y}-${String(m).padStart(2, '0')}-10`;
+    });
+    expect(codes(run('2026-09-29T15:00:00Z', all))).not.toContain('period_missed_in_lookback');
   });
 
   it('is missing with no meetings at all', () => {

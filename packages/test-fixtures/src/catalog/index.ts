@@ -58,7 +58,7 @@ export const FX_CAT_ENTRIES = {
     sources: [verifiedRef('CM', 'Synthetic chapter 19 locator')],
     evidence: ['board_meeting_minutes'],
     cadence: { trigger: 'periodic', renewalMonths: 1, leadDays: [14, 7] },
-    parameters: { cadenceBasis: 'calendar_period' },
+    parameters: { cadenceBasis: 'calendar_period', lookbackMonths: 12 },
   },
   privileges: {
     ...base,

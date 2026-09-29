@@ -58,6 +58,8 @@ export const readinessEn = {
   'readiness.reason.period_satisfied': 'Done for the period {periodStart} to {periodEnd}.',
   'readiness.reason.period_pending': 'Due by {periodEnd} for the current period.',
   'readiness.reason.period_missed': 'Nothing on file for the period {periodStart} to {periodEnd}.',
+  'readiness.reason.period_missed_in_lookback':
+    'In the last {lookbackMonths} months, {count} calendar period(s) had nothing on file: {periods}.',
   'readiness.reason.evidence_on_file': 'Evidence on file, dated {date}.',
   'readiness.reason.changed_since_evidence':
     'The underlying fact changed on {date}, after the evidence on file.',
