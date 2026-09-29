@@ -77,7 +77,12 @@ export async function enqueueNightlySweep(tx: Tx, asOf: Instant): Promise<number
 }
 
 export interface RecomputeOptions {
-  asOf: Instant;
+  /**
+   * The evaluation instant. Omitted (the live job): the database clock of the recompute
+   * transaction, the same clock that stamps recorded_at and not_applicable_at, so a mark or
+   * fact that just committed is never "in the future" because of worker clock skew.
+   */
+  asOf?: Instant;
   snapshot?: 'nightly' | 'on_demand' | null;
   actorLabel?: string;
 }
@@ -157,6 +162,17 @@ async function recomputeInTransaction(
 ): Promise<RecomputeSummary> {
   // One recompute per tenant at a time; a second waits and then sees the first's result.
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('readiness:' || ${organizationId}))`);
+  const asOf =
+    options.asOf ??
+    instantFromEpochMilliseconds(
+      Number(
+        (
+          await tx.execute<{ ms: string }>(
+            sql`SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint::text AS ms`,
+          )
+        ).rows[0]?.ms,
+      ),
+    );
   const org = (
     await tx.execute<{
       award_type: 'section330' | 'lookalike';
@@ -285,7 +301,7 @@ async function recomputeInTransaction(
         tenantParameters: params.get(inst.requirement_id) ?? {},
         facts: facts.get(inst.id) ?? [],
         notApplicable: na,
-        asOf: options.asOf,
+        asOf,
         timeZone: zone,
       });
       status = result.status;
@@ -369,7 +385,7 @@ async function recomputeInTransaction(
 
   let snapshotId: string | null = null;
   if (options.snapshot && release) {
-    const asOfDate = toZonedDate(options.asOf, orgZone);
+    const asOfDate = toZonedDate(asOf, orgZone);
     const body = buildSnapshot({
       catalogVersion: release.catalogVersion,
       channel: release.channel,
@@ -412,13 +428,17 @@ async function recomputeInTransaction(
   };
 }
 
-/** The `readiness.recompute` handler: runs as app_user under the job's tenant. */
-export function recomputeHandler(tenantDb: Database, clock: Clock): JobHandler {
+/**
+ * The `readiness.recompute` handler: runs as app_user under the job's tenant. The live
+ * worker passes no clock (the database clock is the as-of instant); tests and as-of runs
+ * pass a fixed one.
+ */
+export function recomputeHandler(tenantDb: Database, clock?: Clock): JobHandler {
   return async (job: ClaimedJob) => {
     if (!job.organizationId) throw new JobError('no_tenant');
     const snapshot = job.payload.snapshot;
     await recomputeTenant(tenantDb, job.organizationId, {
-      asOf: clock.now(),
+      ...(clock ? { asOf: clock.now() } : {}),
       snapshot: snapshot === 'nightly' || snapshot === 'on_demand' ? snapshot : null,
       actorLabel: job.actorLabel,
     });

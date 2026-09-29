@@ -6,7 +6,6 @@
  * S4 registers the readiness recompute. The scheduled tick, the nightly sweep window,
  * and the other queues (screening, expirations, notifications) arrive with S5.
  */
-import type { Clock } from '@deemed/dates';
 import type { Database } from '@deemed/db';
 import type { JobHandler } from '@deemed/jobs';
 import { RECOMPUTE_QUEUE, recomputeHandler } from '@deemed/readiness/service';
@@ -16,11 +15,10 @@ export const packageName = '@deemed/worker';
 export interface WorkerServices {
   /** app_user connection: handlers open their own withTenant transaction. */
   tenant: Database;
-  clock: Clock;
 }
 
 export function workerHandlers(services: WorkerServices): Record<string, JobHandler> {
   return {
-    [RECOMPUTE_QUEUE]: recomputeHandler(services.tenant, services.clock),
+    [RECOMPUTE_QUEUE]: recomputeHandler(services.tenant),
   };
 }

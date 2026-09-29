@@ -35,7 +35,7 @@ import {
 } from './world.js';
 
 const NA_REASON = 'Synthetic: this practitioner does not prescribe controlled substances';
-const TODAY = '2026-09-29T15:00:00Z';
+const TODAY = '2030-09-29T15:00:00Z';
 
 describeDb('readiness service and recompute job', () => {
   let w: World;
@@ -143,8 +143,8 @@ describeDb('readiness service and recompute job', () => {
         {
           instanceId: w.a.instances.licenseE,
           kind: 'expiration',
-          effectiveOn: '2025-07-01',
-          expiresOn: '2027-06-30',
+          effectiveOn: '2029-07-01',
+          expiresOn: '2031-06-30',
         },
         integration,
       ],
@@ -153,8 +153,8 @@ describeDb('readiness service and recompute job', () => {
         {
           instanceId: w.a.instances.licenseC,
           kind: 'expiration',
-          effectiveOn: '2025-07-01',
-          expiresOn: '2027-06-30',
+          effectiveOn: '2029-07-01',
+          expiresOn: '2031-06-30',
         },
         integration,
       ],
@@ -163,19 +163,19 @@ describeDb('readiness service and recompute job', () => {
         {
           instanceId: w.a.instances.budget,
           kind: 'approval',
-          effectiveOn: '2025-10-01',
+          effectiveOn: '2029-10-01',
           approval: { capacity: 'board', decision: 'approved', approvalTypeId: 'budget.annual' },
         },
         w.human(w.a),
       ],
       [
         'meetings',
-        { instanceId: w.a.instances.meetings, kind: 'completion', effectiveOn: '2026-09-10' },
+        { instanceId: w.a.instances.meetings, kind: 'completion', effectiveOn: '2030-09-10' },
         w.human(w.a),
       ],
       [
         'procedures',
-        { instanceId: w.a.instances.procedures, kind: 'document', effectiveOn: '2026-03-01' },
+        { instanceId: w.a.instances.procedures, kind: 'document', effectiveOn: '2030-03-01' },
         w.human(w.a),
       ],
       [
@@ -183,7 +183,7 @@ describeDb('readiness service and recompute job', () => {
         {
           instanceId: w.a.instances.priv,
           kind: 'approval',
-          effectiveOn: '2025-08-31',
+          effectiveOn: '2029-08-31',
           approval: {
             capacity: 'designated',
             decision: 'approved',
@@ -209,7 +209,7 @@ describeDb('readiness service and recompute job', () => {
     const i = w.a.instances;
     expect(await instance(i.licenseE)).toMatchObject({
       status: 'met',
-      next_due_on: '2027-06-30',
+      next_due_on: '2031-06-30',
       catalog_release_id: v1Release,
     });
     expect((await instance(i.licenseE)).requirement_version_id).toMatch(/^[0-9a-f-]{36}$/);
@@ -219,12 +219,12 @@ describeDb('readiness service and recompute job', () => {
     });
     expect(await instance(i.budget)).toMatchObject({
       status: 'due_soon',
-      next_due_on: '2026-10-01',
+      next_due_on: '2030-10-01',
     });
-    expect(await instance(i.meetings)).toMatchObject({ status: 'met', next_due_on: '2026-10-31' });
+    expect(await instance(i.meetings)).toMatchObject({ status: 'met', next_due_on: '2030-10-31' });
     expect(await instance(i.procedures)).toMatchObject({ status: 'met', next_due_on: null });
-    // Tenant parameter 12 months from 2025-08-31: due 2026-08-31, overdue today.
-    expect(await instance(i.priv)).toMatchObject({ status: 'overdue', next_due_on: '2026-08-31' });
+    // Tenant parameter 12 months from 2029-08-31: due 2030-08-31, overdue today.
+    expect(await instance(i.priv)).toMatchObject({ status: 'overdue', next_due_on: '2030-08-31' });
     expect((await instance(i.priv)).status_reasons.map((r: { code: string }) => r.code)).toEqual([
       'evidence_on_file',
       'past_due',
@@ -232,11 +232,11 @@ describeDb('readiness service and recompute job', () => {
   });
 
   it('evaluates Eastern and Central sites in their own zones (FX-DATE-TZ-E, FX-DATE-TZ-C)', async () => {
-    // 2027-07-01T04:30Z: 00:30 on July 1 in Tampa, 23:30 on June 30 in Pensacola.
-    await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant('2027-07-01T04:30:00Z') });
+    // 2031-07-01T04:30Z: 00:30 on July 1 in Tampa, 23:30 on June 30 in Pensacola.
+    await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant('2031-07-01T04:30:00Z') });
     expect(await instance(w.a.instances.licenseE)).toMatchObject({ status: 'overdue' });
     expect(await instance(w.a.instances.licenseC)).toMatchObject({ status: 'due_soon' });
-    await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant('2027-07-01T05:00:00Z') });
+    await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant('2031-07-01T05:00:00Z') });
     expect(await instance(w.a.instances.licenseC)).toMatchObject({ status: 'overdue' });
     await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant(TODAY) });
     expect(await instance(w.a.instances.licenseE)).toMatchObject({ status: 'met' });
@@ -302,7 +302,7 @@ describeDb('readiness service and recompute job', () => {
         recordFact(tx, ctx, {
           instanceId: w.a.instances.procedures,
           kind: 'document',
-          effectiveOn: '2026-09-01',
+          effectiveOn: '2030-09-01',
         }),
       ),
     ).rejects.toMatchObject({ code: 'actor_not_allowed' });
@@ -327,7 +327,7 @@ describeDb('readiness service and recompute job', () => {
       await pgError(
         asActor(w.a, SYSTEM, (tx) =>
           tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on, recorded_by_type)
-                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'document', DATE '2026-09-01', 'user')`),
+                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'document', DATE '2030-09-01', 'user')`),
         ),
       ),
     ).toMatchObject({ code: '42501' });
@@ -394,6 +394,23 @@ describeDb('readiness service and recompute job', () => {
     await publish(all);
     expect(await instance(id)).toMatchObject({ status: 'not_applicable' });
     expect(await mark()).toEqual(original);
+  });
+
+  it('takes the as-of instant from the database clock when none is given, so a fresh mark is never "in the future" (S7)', async () => {
+    await asHuman(w.b, (tx, ctx) =>
+      markNotApplicable(tx, ctx, { instanceId: w.b.instances.deaE, reason: NA_REASON }),
+    );
+    const summary = await recomputeTenant(w.tenant, w.b.id, {});
+    expect(summary.evaluated).toBe(7);
+    expect(await instance(w.b.instances.deaE)).toMatchObject({
+      status: 'not_applicable',
+      not_applicable_reason: NA_REASON,
+    });
+    // An as-of instant before the mark ignores it for that evaluation but never clears it.
+    await recomputeTenant(w.tenant, w.b.id, { asOf: parseInstant('2020-01-01T12:00:00Z') });
+    expect(await instance(w.b.instances.deaE)).toMatchObject({ not_applicable_reason: NA_REASON });
+    await recomputeTenant(w.tenant, w.b.id, {});
+    expect(await instance(w.b.instances.deaE)).toMatchObject({ status: 'not_applicable' });
   });
 
   it('allows N/A only where the catalog does, with a reason, once; clearing needs a reason and is audited', async () => {
@@ -477,10 +494,10 @@ describeDb('readiness service and recompute job', () => {
     );
     expect(await set(24)).toBeNull();
     await drainAt(TODAY);
-    // 24 months from 2025-08-31: due 2027-08-31.
+    // 24 months from 2029-08-31: due 2031-08-31.
     expect(await instance(w.a.instances.priv)).toMatchObject({
       status: 'met',
-      next_due_on: '2027-08-31',
+      next_due_on: '2031-08-31',
     });
   });
 
@@ -526,7 +543,7 @@ describeDb('readiness service and recompute job', () => {
         recordFact(tx, ctx, {
           instanceId: w.a.instances.procedures,
           kind: 'document',
-          effectiveOn: '2026-01-01',
+          effectiveOn: '2030-01-01',
         }),
       ),
     ).rejects.toMatchObject({ code: 'not_found' });
@@ -535,7 +552,7 @@ describeDb('readiness service and recompute job', () => {
       [w.b.id],
     );
     const bChain = (await audit(w.b)).length;
-    await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant('2027-07-01T04:30:00Z') });
+    await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant('2031-07-01T04:30:00Z') });
     await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant(TODAY) });
     const bAfter = await w.admin.query(
       `SELECT id, status, row_version FROM public.requirement_instance WHERE organization_id = $1 ORDER BY id`,
@@ -548,7 +565,7 @@ describeDb('readiness service and recompute job', () => {
       recordFact(tx, ctx, {
         instanceId: w.b.instances.procedures,
         kind: 'document',
-        effectiveOn: '2026-02-01',
+        effectiveOn: '2030-02-01',
       }),
     );
     const jobs = await w.admin.query(
@@ -579,7 +596,7 @@ describeDb('readiness service and recompute job', () => {
     expect(first).toHaveLength(1);
     expect(first[0]).toMatchObject({
       catalog_version: latest,
-      as_of_date: '2026-09-29',
+      as_of_date: '2030-09-29',
       kind: 'nightly',
     });
     expect(first[0].body.label).toBe('internal_readiness_not_hrsa_determination');
@@ -599,7 +616,7 @@ describeDb('readiness service and recompute job', () => {
     expect(await instance(w.a.instances.procedures)).toMatchObject({ status: 'not_assessed' });
     expect(await instance(w.a.instances.budget)).toMatchObject({
       status: 'met',
-      next_due_on: '2027-10-01',
+      next_due_on: '2031-10-01',
     });
     // A snapshot is never edited, whoever tries.
     await expectPgError(
