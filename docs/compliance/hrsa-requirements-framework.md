@@ -147,12 +147,36 @@ flrules.org, leg.state.fl.us), so every entry is `status: draft` with source
 4. The catalog version is bumped. Past readiness snapshots keep the version they
    were computed under.
 
-## 6. Readiness scoring (initial proposal)
+## 6. Readiness scoring (as built in S4; product defaults pending owner confirmation)
 
-- Each requirement instance is `Met`, `At risk` (due in 30 days or evidence stale),
-  `Not met`, `Not applicable` (the reason is required), or `Not assessed`.
-- Chapter readiness is the percent of applicable requirement instances that are Met,
-  weighted by severity. The weights live in the catalog.
-- The score is always shown with its denominator and a link to the underlying items.
+Each requirement instance has one status, computed by the readiness engine
+(`packages/readiness`) from the catalog entry, the health center's parameters,
+and the evidence on file, in the instance's site time zone.
+
+| Stored status | Framework term | When |
+| --- | --- | --- |
+| `met` | Met | Evidence of a type the entry lists satisfies the rule, and the due date is more than `atRiskDays` away |
+| `due_soon` | At risk | Within `atRiskDays` of the due date, or due / expiring today (on time until local midnight); also any item whose N/A mark the catalog no longer allows, when it would otherwise be Met |
+| `overdue` | Not met | Expired, past due, or a whole calendar period with nothing on file |
+| `missing` | Not met | No qualifying evidence at all |
+| `not_applicable` | Not applicable | A person marked it, with a reason, and the catalog allows N/A |
+| `not_assessed` | Not assessed | No catalog release, not in the release, a draft entry in production, retired, not in effect, outside `appliesTo`, a required tenant parameter unset or out of bounds, or a parameter the engine does not evaluate (e.g. board size thresholds) |
+
+- **At-risk rule.** An item turns At risk at `cadence.atRiskDays` days before the
+  due date (default 30, capped at the entry's largest lead day, which it may not
+  exceed). Lead days (e.g. 90/60/30/0) drive reminders only. Something due on
+  date D is on time through the end of D in the site's time zone and Not met
+  from local midnight starting D+1.
+- **N/A marks.** Only a person sets or clears a mark, with a reason. The engine
+  never clears one. When a catalog version stops allowing N/A, the mark is kept,
+  flagged for review (`na_superseded_needs_review`), and the item is scored
+  normally, never better than At risk.
+- **Score.** Numerator: Met only. Denominator: Met, At risk, and Not met.
+  Not applicable and Not assessed are excluded. The headline total counts HRSA
+  requirements only; Florida requirements and best practices are separate lines
+  with their own labels. Severity weights are not in the catalog yet, so the
+  score is unweighted for now.
+- The score is always shown with its denominator ("12 of 15 met") and a link to
+  the underlying items.
 - The score is **for internal readiness only**. The UI must never present it as
   an HRSA determination.

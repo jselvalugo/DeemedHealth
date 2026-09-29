@@ -45,4 +45,5 @@ notes: >-
   source. Approval type B3 in approval-authority.md. The real due point is
   "before the budget period starts", which differs by health center; 12 months
   from the last approval is a first approximation. A later revision can anchor
-  on a tenant budget-period start. Look-Alike applicability is assumed; confirm.
+  on a tenant budget-period start (TODO, tracked in packages/readiness/README.md,
+  regulatory review F10). Look-Alike applicability is assumed; confirm.

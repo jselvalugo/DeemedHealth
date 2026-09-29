@@ -25,12 +25,21 @@ Stored in `requirement_instance.status`; mapped to the framework's section 6 ter
 
 | Status | Framework term | When |
 | --- | --- | --- |
-| `met` | Met | Evidence satisfies the rule and the due date is outside the lead window |
-| `due_soon` | At risk | Inside the catalog's largest lead day, or due / expiring today (on time until local midnight) |
+| `met` | Met | Evidence of a listed type satisfies the rule and the due date is more than `atRiskDays` away |
+| `due_soon` | At risk | Within `cadence.atRiskDays` (default 30, capped at the largest lead day), or due / expiring today (on time until local midnight); or met but carrying a superseded N/A mark |
 | `overdue` | Not met | Expired, past due, or a whole calendar period with nothing on file |
 | `missing` | Not met | No qualifying evidence at all |
 | `not_applicable` | Not applicable | A person marked it, with a reason, and the catalog allows N/A |
-| `not_assessed` | Not assessed | Not evaluated: no release, not in the release, draft entry in production, retired, not in effect, outside `appliesTo`, or a required tenant parameter unset or out of bounds |
+| `not_assessed` | Not assessed | Not evaluated: no release, not in the release, draft entry in production, retired, not in effect, outside `appliesTo`, a required tenant parameter unset or out of bounds, or a parameter the engine does not evaluate (`threshold_not_evaluated`) |
+
+The framework's copy of this table and the score rule live in
+`docs/compliance/hrsa-requirements-framework.md` section 6.
+
+**Known approximation (F10).** CM-19-BUDGET-ANNUAL is due 12 months after the last
+board approval. The real due point is "before the budget period starts", which
+differs by health center. TODO: add a tenant parameter for the budget period start
+(month and day) and anchor the entry on it as a calendar period. The entry stays
+draft either way.
 
 ## Rules (in order; the first that applies decides)
 
