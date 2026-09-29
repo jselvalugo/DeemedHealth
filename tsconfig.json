@@ -6,6 +6,7 @@
     { "path": "packages/db" },
     { "path": "packages/auth" },
     { "path": "packages/dates" },
+    { "path": "packages/requirements-catalog" },
     { "path": "packages/jobs" },
     { "path": "packages/audit" },
     { "path": "packages/ai-gateway" },
