@@ -99,7 +99,9 @@ CREATE TABLE catalog.requirement_version (
   CONSTRAINT requirement_version_release_requirement_key UNIQUE (catalog_release_id, requirement_id),
   CONSTRAINT requirement_version_effective_range CHECK (effective_to IS NULL OR effective_to >= effective_from),
   -- ADR-0003 rule 8: a production release holds verified entries only.
-  CONSTRAINT requirement_version_production_verified CHECK (channel <> 'production' OR status = 'verified')
+  CONSTRAINT requirement_version_production_verified CHECK (channel <> 'production' OR status = 'verified'),
+  -- The stored entry and the status column never disagree (S9).
+  CONSTRAINT requirement_version_entry_status CHECK (entry ->> 'status' = status)
 );
 
 CREATE INDEX requirement_version_requirement_idx ON catalog.requirement_version (requirement_id, catalog_release_id);
@@ -132,6 +134,24 @@ CREATE TRIGGER database_profile_immutable BEFORE UPDATE OR DELETE ON catalog.dat
   FOR EACH ROW EXECUTE FUNCTION catalog.forbid_mutation();
 CREATE TRIGGER database_profile_no_truncate BEFORE TRUNCATE ON catalog.database_profile
   FOR EACH STATEMENT EXECUTE FUNCTION catalog.forbid_mutation();
+
+-- S9: versions are added only to the release being published in this transaction (set by
+-- catalog.publish_release), so no one appends an entry to a released version later.
+CREATE FUNCTION catalog.requirement_version_release_guard() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF NEW.catalog_release_id::text IS DISTINCT FROM nullif(current_setting('catalog.publishing_release', true), '') THEN
+    RAISE EXCEPTION 'requirement versions are added only while their release is being published'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER requirement_version_release_guard BEFORE INSERT ON catalog.requirement_version
+  FOR EACH ROW EXECUTE FUNCTION catalog.requirement_version_release_guard();
 
 -- A release's channel must be this database's channel.
 CREATE FUNCTION catalog.release_channel_guard() RETURNS trigger
@@ -242,6 +262,7 @@ BEGIN
           jsonb_array_length(p_bundle -> 'entries'), coalesce(p_bundle -> 'sources', '[]'::jsonb),
           coalesce(p_bundle -> 'changeset', '[]'::jsonb), coalesce(nullif(btrim(p_published_by), ''), 'catalog publish job'))
   RETURNING id INTO v_release_id;
+  PERFORM set_config('catalog.publishing_release', v_release_id::text, true);
 
   FOR v_entry IN SELECT e FROM jsonb_array_elements(p_bundle -> 'entries') e LOOP
     INSERT INTO catalog.requirement (id, jurisdiction, first_release_id)
@@ -254,6 +275,7 @@ BEGIN
             coalesce(v_entry #>> '{appliesTo,jurisdiction}', 'federal'), v_entry ->> 'severity', v_entry ->> 'title',
             (v_entry #>> '{effective,from}')::date, (v_entry #>> '{effective,to}')::date, v_entry - 'entryHash');
   END LOOP;
+  PERFORM set_config('catalog.publishing_release', '', true);
   RETURN v_release_id;
 END
 $$;

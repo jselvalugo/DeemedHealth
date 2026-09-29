@@ -206,13 +206,42 @@ describeDb('catalog publish job (app_platform)', () => {
           `INSERT INTO catalog.requirement (id, jurisdiction, first_release_id) VALUES ('TEST-05-LICENSE', 'federal', $1)`,
           [rel.rows[0].id],
         );
+        // Outside a publish, nothing can be added to a release (S9).
+        await expectPgError(
+          attempt(ownerDb, () =>
+            ownerDb.query(
+              `INSERT INTO catalog.requirement_version (catalog_release_id, channel, requirement_id, status, entry_hash,
+                 chapter, layer, jurisdiction, severity, title, effective_from, entry)
+               VALUES ($1, 'production', 'TEST-05-LICENSE', 'verified', repeat('c', 64), 5, 'requirement', 'federal',
+                       'high', 'Synthetic', DATE '2020-01-01', '{"status":"verified"}')`,
+              [rel.rows[0].id],
+            ),
+          ),
+          '42501',
+        );
+        // Even inside one, the stored entry must agree with the status column.
+        await ownerDb.query(`SELECT set_config('catalog.publishing_release', $1, true)`, [
+          rel.rows[0].id,
+        ]);
+        await expectPgError(
+          attempt(ownerDb, () =>
+            ownerDb.query(
+              `INSERT INTO catalog.requirement_version (catalog_release_id, channel, requirement_id, status, entry_hash,
+                 chapter, layer, jurisdiction, severity, title, effective_from, entry)
+               VALUES ($1, 'production', 'TEST-05-LICENSE', 'verified', repeat('c', 64), 5, 'requirement', 'federal',
+                       'high', 'Synthetic', DATE '2020-01-01', '{"status":"draft"}')`,
+              [rel.rows[0].id],
+            ),
+          ),
+          '23514',
+        );
         const msg = await expectPgError(
           attempt(ownerDb, () =>
             ownerDb.query(
               `INSERT INTO catalog.requirement_version (catalog_release_id, channel, requirement_id, status, entry_hash,
                  chapter, layer, jurisdiction, severity, title, effective_from, entry)
                VALUES ($1, 'production', 'TEST-05-LICENSE', 'draft', repeat('c', 64), 5, 'requirement', 'federal',
-                       'high', 'Synthetic', DATE '2020-01-01', '{}')`,
+                       'high', 'Synthetic', DATE '2020-01-01', '{"status":"draft"}')`,
               [rel.rows[0].id],
             ),
           ),

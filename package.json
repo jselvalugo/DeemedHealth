@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:no-ssn": "node scripts/check-no-ssn.mjs",
+    "check:catalog-migrations": "node scripts/check-catalog-migrations.mjs",
     "build": "turbo run build",
     "dev": "turbo run dev"
   },
