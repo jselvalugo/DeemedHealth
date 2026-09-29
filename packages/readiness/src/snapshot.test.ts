@@ -163,8 +163,8 @@ describe('readiness snapshots', () => {
     expect(snap.items.map((i) => i.instanceId)).toEqual(['i-1', 'i-2', 'i-3', 'i-4']);
     expect(snap.total).toMatchObject({ met: 1, denominator: 3 });
     expect(snap.total.counts).toMatchObject({ met: 1, due_soon: 1, overdue: 1, not_applicable: 1 });
-    expect(formatScore(snap.total)).toBe(
-      '1 of 3 met (internal readiness, not an HRSA determination)',
+    expect(formatScore(snap.total, 'hrsa')).toBe(
+      '1 of 3 met (HRSA requirements; internal readiness, not an HRSA determination)',
     );
     expect(snap.label).toBe('internal_readiness_not_hrsa_determination');
     expect(snap).toMatchSnapshot();
@@ -237,5 +237,11 @@ describe('readiness snapshots', () => {
     });
     expect(Object.keys(snap.byAuthority)).toEqual(['florida']);
     expect(Object.keys(snap.byChapter)).toEqual(['none']);
+    // The total counts HRSA requirements only; Florida has its own line and label (F8).
+    expect(snap.total).toMatchObject({ met: 0, denominator: 0 });
+    expect(snap.byAuthority.florida).toMatchObject({ met: 1, denominator: 1 });
+    expect(formatScore(snap.byAuthority.florida!, 'florida')).toBe(
+      '1 of 1 met (Florida requirements; internal readiness, not a determination by HRSA or the State of Florida)',
+    );
   });
 });

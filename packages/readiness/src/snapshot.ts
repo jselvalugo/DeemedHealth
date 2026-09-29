@@ -43,6 +43,7 @@ export interface ReadinessSnapshotBody {
   engineVersion: string;
   asOfDate: CalendarDate;
   label: 'internal_readiness_not_hrsa_determination';
+  /** HRSA requirements only (F8). Florida and best-practice items are in byAuthority. */
   total: ScoreLine;
   byChapter: Readonly<Record<string, ScoreLine>>;
   bySite: Readonly<Record<string, ScoreLine>>;
@@ -96,7 +97,7 @@ export function buildSnapshot(input: {
     engineVersion: ENGINE_VERSION,
     asOfDate: input.asOfDate,
     label: 'internal_readiness_not_hrsa_determination',
-    total: line(items),
+    total: line(items.filter((i) => i.authority === 'hrsa')),
     byChapter: groupBy(items, (i) => (i.chapter === null ? 'none' : String(i.chapter))),
     bySite: groupBy(items, (i) => i.siteId ?? 'organization'),
     byAuthority: groupBy(items, (i) => i.authority),
@@ -104,7 +105,17 @@ export function buildSnapshot(input: {
   };
 }
 
-/** "12 of 15 met": the only way a score is rendered. */
-export function formatScore(score: ScoreLine): string {
-  return `${score.met} of ${score.denominator} met (internal readiness, not an HRSA determination)`;
+const SCORE_LABEL: Readonly<Record<Authority, string>> = {
+  hrsa: 'HRSA requirements; internal readiness, not an HRSA determination',
+  florida:
+    'Florida requirements; internal readiness, not a determination by HRSA or the State of Florida',
+  best_practice: 'best practices, not HRSA requirements; internal readiness',
+};
+
+/**
+ * "12 of 15 met (HRSA requirements; ...)": the only way a score is rendered, always with
+ * its denominator and the label of the authority it counts (F8).
+ */
+export function formatScore(score: ScoreLine, authority: Authority): string {
+  return `${score.met} of ${score.denominator} met (${SCORE_LABEL[authority]})`;
 }
