@@ -17,6 +17,7 @@ export {
   type TransactionContext,
   type Tx,
 } from './client.js';
+export { redactedDiff, type TextDigest } from './audit/diff.js';
 export {
   AUDIT_EXPORT_COLUMNS,
   appendAuditEvent,
@@ -27,6 +28,7 @@ export {
   type RawAuditExportRow,
   type SqlChainVerification,
 } from './audit/index.js';
+export { CatalogChannelMismatchError, assertCatalogChannel } from './catalog-channel.js';
 export {
   ensureAuditPartitions,
   listTenants,
@@ -40,6 +42,8 @@ export {
   MigrationError,
   loadMigrations,
   migrate,
+  resolveCatalogChannel,
+  type CatalogChannel,
   type MigrateOptions,
   type MigrationFile,
 } from './migrate.js';

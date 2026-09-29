@@ -28,6 +28,8 @@ cadence:
   leadDays: [14, 7]
 parameters:
   cadenceBasis: calendar_period
+  # Unverified draft value: how far back readiness lists missed months (F9).
+  lookbackMonths: 12
 severity: high
 effective: { from: 2018-08-20, to: null }
 supersedes: []
@@ -38,7 +40,8 @@ notes: >-
   ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
   come from docs/compliance and general program knowledge, not the source text.
   Source url, verifiedOn, and verifiedBy stay null until someone opens the
-  source. Open question for the HRSA project officer: whether any board (for
+  source. lookbackMonths 12 is an unverified product draft (how far back the
+  engine lists missed monthly meetings), not an HRSA number. Open question for the HRSA project officer: whether any board (for
   example one with a patient-majority waiver, or a co-applicant board) may meet
   less often. If so, that becomes an applicability rule or a waiver record, not
   N/A. HRSA does not require signed minutes (secondary source,

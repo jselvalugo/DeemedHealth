@@ -354,12 +354,11 @@ describeDb('schema against the database', () => {
           );
         await expectPgError(insert('not_applicable', null, 'organization', org), '23514');
         await expectPgError(insert('not_applicable', '   ', 'organization', org), '23514');
-        await insert(
-          'not_applicable',
-          'No board: public-agency co-applicant arrangement (synthetic)',
-          'organization',
-          org,
-        );
+        const reason = 'No board: public-agency co-applicant arrangement (synthetic)';
+        // Marking "not applicable" is a human decision (0010): no human actor, no mark.
+        await expectPgError(insert('not_applicable', reason, 'organization', org), '42501');
+        await setTenant(user, org, c.tenants.xyz.userIds.provider1 as string);
+        await insert('not_applicable', reason, 'organization', org);
         await expectPgError(
           insert('missing', null, 'organization', c.tenants.gulf.organizationId),
           '23503',

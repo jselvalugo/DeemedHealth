@@ -53,6 +53,35 @@ export interface MigrateOptions {
   connectionString: string;
   dir?: string;
   log?: (message: string) => void;
+  /**
+   * Marks the database's catalog channel once, after the migrations (ADR-0003 rule 8):
+   * production databases accept only verified entries. Omitted: left as is (a database
+   * with no channel refuses every catalog publish).
+   */
+  catalogChannel?: CatalogChannel;
+}
+
+export type CatalogChannel = 'production' | 'non_production';
+
+/**
+ * The explicit `--catalog-channel` value, checked against DH_ENV (S4): production goes
+ * with production only, every other environment with non_production. No flag: undefined
+ * (the channel is left as it is; a database with none refuses every catalog publish).
+ */
+export function resolveCatalogChannel(
+  flag: string | undefined,
+  dhEnv: string | undefined,
+): CatalogChannel | undefined {
+  if (flag === undefined) return undefined;
+  if (flag !== 'production' && flag !== 'non_production') {
+    throw new MigrationError('--catalog-channel must be production or non_production');
+  }
+  if (!dhEnv) throw new MigrationError('--catalog-channel needs DH_ENV to agree with');
+  const expected: CatalogChannel = dhEnv === 'production' ? 'production' : 'non_production';
+  if (flag !== expected) {
+    throw new MigrationError(`--catalog-channel ${flag} does not agree with DH_ENV ${dhEnv}`);
+  }
+  return flag;
 }
 
 export async function migrate(options: MigrateOptions): Promise<{ applied: string[] }> {
@@ -113,6 +142,22 @@ export async function migrate(options: MigrateOptions): Promise<{ applied: strin
         });
       }
       applied.push(file.name);
+    }
+    if (options.catalogChannel !== undefined) {
+      await client.query('BEGIN');
+      try {
+        await client.query('SET LOCAL ROLE app_owner');
+        await client.query(`SELECT catalog.set_database_channel($1, 'migration job')`, [
+          options.catalogChannel,
+        ]);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw new MigrationError(`could not set the catalog channel: ${(error as Error).message}`, {
+          cause: error,
+        });
+      }
+      log(`catalog channel: ${options.catalogChannel}`);
     }
     return { applied };
   } finally {

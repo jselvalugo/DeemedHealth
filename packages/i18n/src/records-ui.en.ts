@@ -34,6 +34,7 @@ export const recordsUiEn = {
   'recordValue.requirement_instance.status.overdue': 'Overdue',
   'recordValue.requirement_instance.status.missing': 'Missing evidence',
   'recordValue.requirement_instance.status.not_applicable': 'Not applicable',
+  'recordValue.requirement_instance.status.not_assessed': 'Not assessed',
   'recordValue.requirement_instance.subjectType.organization': 'Health center',
   'recordValue.requirement_instance.subjectType.site': 'Site',
   'recordValue.requirement_instance.subjectType.person': 'Person',

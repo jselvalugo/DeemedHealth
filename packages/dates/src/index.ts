@@ -82,6 +82,12 @@ export {
   rollToBusinessDay,
 } from './business-days.js';
 export {
+  type CalendarPeriod,
+  calendarPeriodAt,
+  calendarPeriodOf,
+  isInPeriod,
+} from './calendar-period.js';
+export {
   type DueEvaluation,
   type DueOptions,
   type DueStatus,

@@ -7,6 +7,8 @@
 export const TENANT_SETTINGS = {
   organizationId: 'app.organization_id',
   actorId: 'app.actor_id',
+  /** user | break_glass | service | integration | system (S4, database guards on who may write). */
+  actorType: 'app.actor_type',
   requestId: 'app.request_id',
   /** PHI tables only (ADR-0002 §5). */
   siteIds: 'app.site_ids',

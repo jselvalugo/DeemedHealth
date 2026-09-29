@@ -68,8 +68,31 @@ export const KnownParameters = z
     cadenceBasis: CadenceBasis.optional(),
     approval: ApprovalBacking.optional(),
     tenantParameters: z.record(z.string().regex(/^[a-z][A-Za-z0-9]*$/), TenantParameterSpec).optional(),
+    /** calendar_period only: how far back the engine lists missed periods (months). */
+    lookbackMonths: z.number().int().positive().max(120).optional(),
   })
   .passthrough();
+
+/**
+ * The parameter keys the readiness engine evaluates. An entry with any other key (a
+ * threshold such as `minMembers`) is not assessed until the engine learns it: fail closed.
+ */
+export const ENGINE_PARAMETER_KEYS: readonly string[] = [
+  "cadenceBasis",
+  "approval",
+  "tenantParameters",
+  "lookbackMonths",
+];
+
+/** The product default for cadence.atRiskDays (F6; pending owner confirmation). */
+export const DEFAULT_AT_RISK_DAYS = 30;
+
+/** When an item turns at risk: cadence.atRiskDays, else 30 capped at the largest lead day. */
+export function effectiveAtRiskDays(cadence: { leadDays: readonly number[]; atRiskDays?: number | undefined }): number {
+  if (cadence.atRiskDays !== undefined) return cadence.atRiskDays;
+  const largest = cadence.leadDays.length > 0 ? Math.max(...cadence.leadDays) : 0;
+  return Math.min(DEFAULT_AT_RISK_DAYS, largest);
+}
 
 /** Payer-rule ids and the source keys a payer rule must rest on (CLAUDE.md, "Medicare and Medicaid rules"). */
 const PAYER_ID = /^(CMS|MCD)-/;
@@ -137,6 +160,9 @@ export function checkEntryConventions(e: CatalogEntry): ConventionIssue[] {
   const hasDueDate = trigger.data !== "on_change";
   if (hasDueDate && c.leadDays.length === 0) add("cadence.leadDays", "a dated cadence needs lead days");
   if (new Set(c.leadDays).size !== c.leadDays.length) add("cadence.leadDays", "lead days must not repeat");
+  if (c.atRiskDays !== undefined && c.atRiskDays > (c.leadDays.length ? Math.max(...c.leadDays) : 0)) {
+    add("cadence.atRiskDays", "atRiskDays must not exceed the largest lead day");
+  }
   if (trigger.data === "periodic") {
     if (!cadenceBasis) add("parameters.cadenceBasis", "a periodic cadence needs cadenceBasis");
     const sources = (c.renewalMonths === null ? 0 : 1) + driving.length;

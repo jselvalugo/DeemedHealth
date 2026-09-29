@@ -201,9 +201,13 @@ describe('RequirementInstance', () => {
         notApplicableReason: 'No pharmacy at this site',
       }).success,
     ).toBe(true);
+    // A kept mark under another status is valid: only a person clears a mark.
     expect(
-      RequirementInstance.safeParse({ ...instance, notApplicableReason: 'stray' }).success,
-    ).toBe(false);
+      RequirementInstance.safeParse({ ...instance, notApplicableReason: 'kept mark' }).success,
+    ).toBe(true);
+    expect(RequirementInstance.safeParse({ ...instance, notApplicableReason: '   ' }).success).toBe(
+      false,
+    );
   });
 });
 

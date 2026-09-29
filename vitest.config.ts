@@ -16,7 +16,15 @@ export default defineConfig({
     alias: [
       { find: '@deemed/ui/module-registry', replacement: `${packages}ui/src/module-registry.ts` },
       {
-        find: /^@deemed\/(domain|i18n|ui|db|auth|dates)$/,
+        find: /^@deemed\/requirements-catalog\/compiler$/,
+        replacement: `${packages}requirements-catalog/src/node.ts`,
+      },
+      {
+        find: /^@deemed\/readiness\/service$/,
+        replacement: `${packages}readiness/src/service/index.ts`,
+      },
+      {
+        find: /^@deemed\/(domain|i18n|ui|db|auth|dates|jobs|readiness|requirements-catalog)$/,
         replacement: `${packages}$1/src/index.ts`,
       },
     ],

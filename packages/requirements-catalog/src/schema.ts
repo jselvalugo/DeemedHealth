@@ -5,7 +5,7 @@ export const IsoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
   .refine((s) => {
-    const [y, m, d] = s.split("-").map(Number);
+    const [y = NaN, m = NaN, d = NaN] = s.split("-").map(Number);
     const dt = new Date(Date.UTC(y, m - 1, d));
     return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
   }, "Not a real calendar date");
@@ -118,6 +118,12 @@ export const Cadence = z.object({
   trigger: z.string().min(1),
   renewalMonths: z.number().int().positive().nullable(),
   leadDays: z.array(z.number().int().nonnegative()).default([]),
+  /**
+   * Days before the due date at which the item turns "at risk" (S4, F6). Omitted: 30, or
+   * the largest lead day when that is smaller. Must not exceed the largest lead day. Lead
+   * days still drive reminders; this drives status.
+   */
+  atRiskDays: z.number().int().nonnegative().optional(),
 });
 
 /**

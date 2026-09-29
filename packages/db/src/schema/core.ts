@@ -36,6 +36,7 @@ export const REQUIREMENT_STATUSES = [
   'overdue',
   'missing',
   'not_applicable',
+  'not_assessed',
 ] as const;
 
 export const REQUIREMENT_SUBJECT_TYPES = ['organization', 'site', 'person'] as const;
@@ -192,6 +193,16 @@ export const requirementInstance = pgTable('requirement_instance', {
   ...rowMeta(),
   archivedAt: timestamptz('archived_at'),
   ...archiveMeta(),
+  /** Catalog release the status was computed under (migration 0010). */
+  catalogReleaseId: uuid('catalog_release_id'),
+  /** Engine reason codes and parameters (no free text). */
+  statusReasons: jsonb('status_reasons').notNull().default([]),
+  /** Set by the database from the human actor who marked it not applicable. */
+  notApplicableBy: uuid('not_applicable_by'),
+  notApplicableAt: timestamptz('not_applicable_at'),
+  /** Set by the recompute job when the catalog no longer allows the mark (kept for review). */
+  notApplicableSupersededAt: timestamptz('not_applicable_superseded_at'),
+  notApplicableSupersededCatalogVersion: text('not_applicable_superseded_catalog_version'),
 });
 
 export const task = pgTable('task', {

@@ -12,7 +12,14 @@
       "@deemed/db": ["../../packages/db/src/index.ts"],
       "@deemed/auth": ["../../packages/auth/src/index.ts"],
       "@deemed/i18n": ["../../packages/i18n/src/index.ts"],
-      "@deemed/ui/module-registry": ["../../packages/ui/src/module-registry.ts"]
+      "@deemed/ui/module-registry": ["../../packages/ui/src/module-registry.ts"],
+      "@deemed/dates": ["../../packages/dates/src/index.ts"],
+      "@deemed/jobs": ["../../packages/jobs/src/index.ts"],
+      "@deemed/readiness": ["../../packages/readiness/src/index.ts"],
+      "@deemed/readiness/service": ["../../packages/readiness/src/service/index.ts"],
+      "@deemed/requirements-catalog": ["../../packages/requirements-catalog/src/index.ts"],
+      "@deemed/requirements-catalog/compiler": ["../../packages/requirements-catalog/src/node.ts"],
+      "@deemed/test-fixtures/catalog": ["../../packages/test-fixtures/src/catalog/index.ts"]
     }
   },
   "include": ["src", "test"]

@@ -1,0 +1,42 @@
+{
+  "name": "@deemed/readiness",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Deterministic readiness engine (pure) and its database service: catalog publish job, recompute job, audited mutations (ADR-0003, phase-1 plan S4).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./service": {
+      "types": "./dist/service/index.d.ts",
+      "default": "./dist/service/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@deemed/dates": "workspace:*",
+    "@deemed/db": "workspace:*",
+    "@deemed/domain": "workspace:*",
+    "@deemed/jobs": "workspace:*",
+    "@deemed/requirements-catalog": "workspace:*",
+    "drizzle-orm": "^0.45.3"
+  },
+  "devDependencies": {
+    "@deemed/i18n": "workspace:*",
+    "@deemed/test-fixtures": "workspace:*",
+    "@types/pg": "^8.23.1",
+    "fast-check": "^4.3.0",
+    "pg": "^8.23.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11",
+    "yaml": "^2.5.0"
+  }
+}

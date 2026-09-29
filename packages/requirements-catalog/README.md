@@ -52,5 +52,28 @@ sources (the network proxy blocked them). None is verified, so the production
 bundle is empty (`describeProductionBundle()` says so). The three `CMS-`/`MCD-`
 entries are the payer rules in CLAUDE.md rows R1–R3.
 
+## Build and publish (ADR-0003 rules 3, 8, 11)
+`@deemed/requirements-catalog/compiler` (Node only) holds the compiler, the file loader,
+and canonical hashing.
+
+```sh
+pnpm --filter @deemed/requirements-catalog build:catalog -- --version 2026.1.0 \
+  [--previous-dir <last published bundles>] [--out dist/bundles]
+```
+
+`compileCatalog()` validates every entry (schema, `checkEntryConventions()`, registered
+sources, verified entries citing only verified sources, supersession chains, and, against
+the previous release, stable ids and an increasing version), then writes two bundles:
+`catalog.non-production.json` (every entry, drafts badged) and `catalog.production.json`
+(verified entries only). It prints `describeProductionBundle().message`, so an empty
+production bundle is always called out. Bundles carry no build time: the same sources and
+version give byte-identical bundles and content hashes.
+
+The publish job (`runCatalogPublishJob` in `@deemed/readiness/service`, as
+`app_platform`) loads the bundle matching the database's channel into the global
+`catalog.*` tables (migration 0010). A production database refuses any non-verified entry
+three times over: the job, `catalog.publish_release`, and the table constraint
+`requirement_version_production_verified`. Released versions are immutable.
+
 ## Tests
 `pnpm --filter @deemed/requirements-catalog test` (vitest).

@@ -46,6 +46,7 @@ export async function startApi(
     fieldCipher?: FieldCipher;
     rateLimit?: RateLimitOptions;
     logger?: FastifyServerOptions['logger'];
+    ensureCatalogChannel?: () => Promise<void>;
   } = {},
 ): Promise<TestApi> {
   const c = need();
@@ -78,6 +79,7 @@ export async function startApi(
     },
     ...(options.logger ? { logger: options.logger } : {}),
     ...(options.fieldCipher ? { fieldCipher: options.fieldCipher } : {}),
+    ...(options.ensureCatalogChannel ? { ensureCatalogChannel: options.ensureCatalogChannel } : {}),
   });
   await app.ready();
   const admin = new pg.Client({ connectionString: c.adminUrl });

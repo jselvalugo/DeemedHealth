@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@deemed/dates": ["../dates/src/index.ts"],
+      "@deemed/domain": ["../domain/src/index.ts"],
+      "@deemed/i18n": ["../i18n/src/index.ts"],
+      "@deemed/db": ["../db/src/index.ts"],
+      "@deemed/jobs": ["../jobs/src/index.ts"],
+      "@deemed/readiness": ["./src/index.ts"],
+      "@deemed/readiness/service": ["./src/service/index.ts"],
+      "@deemed/requirements-catalog": ["../requirements-catalog/src/index.ts"],
+      "@deemed/requirements-catalog/compiler": ["../requirements-catalog/src/node.ts"],
+      "@deemed/test-fixtures/catalog": ["../test-fixtures/src/catalog/index.ts"]
+    }
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

@@ -23,7 +23,7 @@ import {
   safeEqual,
   type ActiveSession,
 } from '@deemed/auth';
-import { appendAuditEvent, type Actor } from '@deemed/db';
+import { CatalogChannelMismatchError, appendAuditEvent, type Actor } from '@deemed/db';
 import {
   activeRoleIds,
   auditsEveryView,
@@ -114,6 +114,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     allowedOrigins: options.allowedOrigins,
     secureCookies: options.secureCookies,
     ...(options.fieldCipher ? { fieldCipher: options.fieldCipher } : {}),
+    ...(options.ensureCatalogChannel ? { ensureCatalogChannel: options.ensureCatalogChannel } : {}),
   };
   const names = cookieNames(services.secureCookies);
 
@@ -211,6 +212,14 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       throw error;
     }
     ctx.session = session;
+    if (services.ensureCatalogChannel) {
+      try {
+        await services.ensureCatalogChannel();
+      } catch (error) {
+        if (error instanceof CatalogChannelMismatchError) throw new ApiError('not_configured');
+        throw error;
+      }
+    }
     if (session.rotated) {
       reply.header(
         'set-cookie',

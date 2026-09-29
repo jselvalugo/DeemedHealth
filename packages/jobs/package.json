@@ -2,11 +2,25 @@
   "name": "@deemed/jobs",
   "version": "0.0.0",
   "private": true,
-  "description": "Queue interface and pg-boss adapter (ADR-0001).",
+  "description": "Queue interface, Postgres adapter, and drain() (ADR-0001, ADR-0010 section 3).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc -b"
+  },
+  "dependencies": {
+    "@deemed/db": "workspace:*",
+    "drizzle-orm": "^0.45.3"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.0"
   }
 }

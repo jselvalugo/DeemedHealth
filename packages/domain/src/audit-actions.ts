@@ -161,6 +161,28 @@ export const BASE_AUDIT_ACTIONS = {
     description: 'Saved list view shared with roles',
   },
 
+  // mutation: readiness (S4)
+  'requirement_instance.evaluate': {
+    category: 'mutation',
+    description: 'Readiness status recomputed by the engine (internal readiness)',
+  },
+  'requirement_instance.clear_not_applicable': {
+    category: 'mutation',
+    description: 'Not applicable mark removed, with reason',
+  },
+  'tenant_parameter.set': {
+    category: 'mutation',
+    description: 'Health center value for a catalog parameter set, with reason',
+  },
+  'readiness_fact.record': {
+    category: 'mutation',
+    description: 'Readiness evidence fact recorded',
+  },
+  'readiness_fact.retract': {
+    category: 'mutation',
+    description: 'Readiness evidence fact retracted, with reason',
+  },
+
   // integration
   'screening_run.complete': {
     category: 'integration',
@@ -184,6 +206,14 @@ export const BASE_AUDIT_ACTIONS = {
   'legal_hold.release': { category: 'system', description: 'Legal hold released' },
   'key.rotated': { category: 'system', description: 'Encryption key rotated' },
   'catalog_release.applied': { category: 'system', description: 'Catalog release applied' },
+  'readiness_snapshot.create': {
+    category: 'system',
+    description: 'Readiness snapshot stored (internal readiness)',
+  },
+  'readiness.recompute_batch': {
+    category: 'system',
+    description: 'Readiness recompute batch finished (internal readiness)',
+  },
   'organization.provision': {
     category: 'system',
     description: 'Tenant provisioned by the platform',

@@ -6,6 +6,7 @@
  *
  *   app.organization_id  the tenant; every RLS policy reads it without missing_ok
  *   app.actor_id         user_account id of a human actor ('' for service/system actors)
+ *   app.actor_type       the actor's type (user, break_glass, service, integration, system)
  *   app.request_id       correlation id shared with logs and traces
  *   app.site_ids         '{uuid,...}' site scope, for PHI-table predicates (ADR-0002 section 5)
  *   app.roles            '{role,...}' role keys, for PHI-table predicates
@@ -67,6 +68,7 @@ export type RuntimeRole = (typeof RUNTIME_ROLES)[number];
 export const SETTINGS = {
   organizationId: 'app.organization_id',
   actorId: 'app.actor_id',
+  actorType: 'app.actor_type',
   requestId: 'app.request_id',
   siteIds: 'app.site_ids',
   roles: 'app.roles',
@@ -145,6 +147,7 @@ async function beginContext(
   }
   await tx.execute(sql`
     SELECT set_config(${SETTINGS.actorId}, ${actorId}, true),
+           set_config(${SETTINGS.actorType}, ${actor.type}, true),
            set_config(${SETTINGS.requestId}, ${requestId}, true),
            set_config(${SETTINGS.siteIds}, ${siteIds}, true),
            set_config(${SETTINGS.roles}, ${roles}, true)`);
