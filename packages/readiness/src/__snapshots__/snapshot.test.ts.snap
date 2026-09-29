@@ -1,0 +1,548 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`evaluation snapshots > budget, board approval 2025-10-01 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": 30,
+    "nextDueOn": "2026-10-01",
+    "status": "due_soon",
+    "summary": "At risk (due soon). Evidence on file, dated 2025-10-01. Next due 2026-10-01. Within the 30-day reminder window. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": 30,
+    "nextDueOn": "2026-10-01",
+    "status": "overdue",
+    "summary": "Not met (overdue). Evidence on file, dated 2025-10-01. Was due 2026-10-01. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": 30,
+    "nextDueOn": "2026-10-01",
+    "status": "overdue",
+    "summary": "Not met (overdue). Evidence on file, dated 2025-10-01. Was due 2026-10-01. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": 30,
+    "nextDueOn": "2026-10-01",
+    "status": "overdue",
+    "summary": "Not met (overdue). Evidence on file, dated 2025-10-01. Was due 2026-10-01. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > dea, marked not applicable 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "not_applicable",
+    "summary": "Not applicable. Marked not applicable on 2026-09-01, with a recorded reason. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "not_applicable",
+    "summary": "Not applicable. Marked not applicable on 2026-09-01, with a recorded reason. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "not_applicable",
+    "summary": "Not applicable. Marked not applicable on 2026-09-01, with a recorded reason. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "not_applicable",
+    "summary": "Not applicable. Marked not applicable on 2026-09-01, with a recorded reason. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > florida license, expires 2027-06-30 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": null,
+    "nextDueOn": "2027-06-30",
+    "status": "met",
+    "summary": "Met. Valid through 2027-06-30. Florida requirement. Internal readiness status, not a determination by HRSA or the State of Florida.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": 0,
+    "nextDueOn": "2027-06-30",
+    "status": "due_soon",
+    "summary": "At risk (due soon). Expires today (2027-06-30); valid until midnight site time. Florida requirement. Internal readiness status, not a determination by HRSA or the State of Florida.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": 0,
+    "nextDueOn": "2027-06-30",
+    "status": "overdue",
+    "summary": "Not met (overdue). Expired on 2027-06-30. Florida requirement. Internal readiness status, not a determination by HRSA or the State of Florida.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": 0,
+    "nextDueOn": "2027-06-30",
+    "status": "overdue",
+    "summary": "Not met (overdue). Expired on 2027-06-30. Florida requirement. Internal readiness status, not a determination by HRSA or the State of Florida.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > license draft, production channel 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "not_assessed",
+    "summary": "Not assessed. Not assessed: this catalog entry is not verified, so production does not evaluate it. Draft catalog entry (not verified): shown in non-production only. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "not_assessed",
+    "summary": "Not assessed. Not assessed: this catalog entry is not verified, so production does not evaluate it. Draft catalog entry (not verified): shown in non-production only. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "not_assessed",
+    "summary": "Not assessed. Not assessed: this catalog entry is not verified, so production does not evaluate it. Draft catalog entry (not verified): shown in non-production only. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "not_assessed",
+    "summary": "Not assessed. Not assessed: this catalog entry is not verified, so production does not evaluate it. Draft catalog entry (not verified): shown in non-production only. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > license, expires 2027-06-30, Central 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": null,
+    "nextDueOn": "2027-06-30",
+    "status": "met",
+    "summary": "Met. Valid through 2027-06-30. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": 0,
+    "nextDueOn": "2027-06-30",
+    "status": "due_soon",
+    "summary": "At risk (due soon). Expires today (2027-06-30); valid until midnight site time. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": 0,
+    "nextDueOn": "2027-06-30",
+    "status": "due_soon",
+    "summary": "At risk (due soon). Expires today (2027-06-30); valid until midnight site time. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": 0,
+    "nextDueOn": "2027-06-30",
+    "status": "overdue",
+    "summary": "Not met (overdue). Expired on 2027-06-30. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > license, expires 2027-06-30, Eastern 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": null,
+    "nextDueOn": "2027-06-30",
+    "status": "met",
+    "summary": "Met. Valid through 2027-06-30. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": 0,
+    "nextDueOn": "2027-06-30",
+    "status": "due_soon",
+    "summary": "At risk (due soon). Expires today (2027-06-30); valid until midnight site time. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": 0,
+    "nextDueOn": "2027-06-30",
+    "status": "overdue",
+    "summary": "Not met (overdue). Expired on 2027-06-30. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": 0,
+    "nextDueOn": "2027-06-30",
+    "status": "overdue",
+    "summary": "Not met (overdue). Expired on 2027-06-30. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > license, expires on the leap day 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": null,
+    "nextDueOn": "2028-02-29",
+    "status": "met",
+    "summary": "Met. Valid through 2028-02-29. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": null,
+    "nextDueOn": "2028-02-29",
+    "status": "met",
+    "summary": "Met. Valid through 2028-02-29. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": null,
+    "nextDueOn": "2028-02-29",
+    "status": "met",
+    "summary": "Met. Valid through 2028-02-29. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": 0,
+    "nextDueOn": "2028-02-29",
+    "status": "due_soon",
+    "summary": "At risk (due soon). Expires today (2028-02-29); valid until midnight site time. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > license, nothing on file 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "missing",
+    "summary": "Not met (missing). No qualifying evidence is on file. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "missing",
+    "summary": "Not met (missing). No qualifying evidence is on file. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "missing",
+    "summary": "Not met (missing). No qualifying evidence is on file. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "missing",
+    "summary": "Not met (missing). No qualifying evidence is on file. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > meetings, monthly, last on 2026-09-10 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": null,
+    "nextDueOn": "2026-10-31",
+    "status": "met",
+    "summary": "Met. Done for the period 2026-09-01 to 2026-09-30. Next due 2026-10-31. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": null,
+    "nextDueOn": "2027-06-30",
+    "status": "overdue",
+    "summary": "Not met (overdue). Nothing on file for the period 2027-05-01 to 2027-05-31. Due by 2027-06-30 for the current period. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": null,
+    "nextDueOn": "2027-07-31",
+    "status": "overdue",
+    "summary": "Not met (overdue). Nothing on file for the period 2027-06-01 to 2027-06-30. Due by 2027-07-31 for the current period. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": null,
+    "nextDueOn": "2028-02-29",
+    "status": "overdue",
+    "summary": "Not met (overdue). Nothing on file for the period 2028-01-01 to 2028-01-31. Due by 2028-02-29 for the current period. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > privileges, designated approval 2025-08-31, tenant 12 months 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": 0,
+    "nextDueOn": "2026-08-31",
+    "status": "overdue",
+    "summary": "Not met (overdue). Evidence on file, dated 2025-08-31. Was due 2026-08-31. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": 0,
+    "nextDueOn": "2026-08-31",
+    "status": "overdue",
+    "summary": "Not met (overdue). Evidence on file, dated 2025-08-31. Was due 2026-08-31. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": 0,
+    "nextDueOn": "2026-08-31",
+    "status": "overdue",
+    "summary": "Not met (overdue). Evidence on file, dated 2025-08-31. Was due 2026-08-31. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": 0,
+    "nextDueOn": "2026-08-31",
+    "status": "overdue",
+    "summary": "Not met (overdue). Evidence on file, dated 2025-08-31. Was due 2026-08-31. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`evaluation snapshots > procedures, document 2026-03-01 1`] = `
+[
+  {
+    "asOf": "2026-09-29T15:00:00Z",
+    "asOfDate": "2026-09-29",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "met",
+    "summary": "Met. Evidence on file, dated 2026-03-01. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-06-30T16:00:00Z",
+    "asOfDate": "2027-06-30",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "met",
+    "summary": "Met. Evidence on file, dated 2026-03-01. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2027-07-01T04:30:00Z",
+    "asOfDate": "2027-07-01",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "met",
+    "summary": "Met. Evidence on file, dated 2026-03-01. Internal readiness status, not an HRSA determination.",
+  },
+  {
+    "asOf": "2028-02-29T15:00:00Z",
+    "asOfDate": "2028-02-29",
+    "leadTier": null,
+    "nextDueOn": null,
+    "status": "met",
+    "summary": "Met. Evidence on file, dated 2026-03-01. Internal readiness status, not an HRSA determination.",
+  },
+]
+`;
+
+exports[`readiness snapshots > summarizes counts with their denominator, by chapter, site, and authority 1`] = `
+{
+  "asOfDate": "2026-09-29",
+  "byAuthority": {
+    "hrsa": {
+      "counts": {
+        "due_soon": 1,
+        "met": 1,
+        "missing": 0,
+        "not_applicable": 1,
+        "not_assessed": 0,
+        "overdue": 1,
+      },
+      "denominator": 3,
+      "met": 1,
+    },
+  },
+  "byChapter": {
+    "19": {
+      "counts": {
+        "due_soon": 1,
+        "met": 0,
+        "missing": 0,
+        "not_applicable": 0,
+        "not_assessed": 0,
+        "overdue": 0,
+      },
+      "denominator": 1,
+      "met": 0,
+    },
+    "5": {
+      "counts": {
+        "due_soon": 0,
+        "met": 1,
+        "missing": 0,
+        "not_applicable": 1,
+        "not_assessed": 0,
+        "overdue": 1,
+      },
+      "denominator": 2,
+      "met": 1,
+    },
+  },
+  "bySite": {
+    "organization": {
+      "counts": {
+        "due_soon": 1,
+        "met": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "not_assessed": 0,
+        "overdue": 0,
+      },
+      "denominator": 2,
+      "met": 1,
+    },
+    "s-1": {
+      "counts": {
+        "due_soon": 0,
+        "met": 0,
+        "missing": 0,
+        "not_applicable": 1,
+        "not_assessed": 0,
+        "overdue": 1,
+      },
+      "denominator": 1,
+      "met": 0,
+    },
+  },
+  "catalogVersion": "2026.1.0",
+  "channel": "non_production",
+  "engineVersion": "1.0.0",
+  "items": [
+    {
+      "authority": "hrsa",
+      "chapter": 5,
+      "instanceId": "i-1",
+      "nextDueOn": null,
+      "reasonCodes": [
+        "evidence_on_file",
+      ],
+      "requirementId": "TEST-05-PROCEDURES",
+      "siteId": null,
+      "status": "met",
+    },
+    {
+      "authority": "hrsa",
+      "chapter": 19,
+      "instanceId": "i-2",
+      "nextDueOn": "2026-10-01",
+      "reasonCodes": [
+        "evidence_on_file",
+        "due_on",
+        "lead_tier",
+      ],
+      "requirementId": "TEST-19-BUDGET",
+      "siteId": null,
+      "status": "due_soon",
+    },
+    {
+      "authority": "hrsa",
+      "chapter": 5,
+      "instanceId": "i-3",
+      "nextDueOn": "2026-09-01",
+      "reasonCodes": [
+        "expired",
+      ],
+      "requirementId": "TEST-05-LICENSE",
+      "siteId": "s-1",
+      "status": "overdue",
+    },
+    {
+      "authority": "hrsa",
+      "chapter": 5,
+      "instanceId": "i-4",
+      "nextDueOn": null,
+      "reasonCodes": [
+        "marked_not_applicable",
+      ],
+      "requirementId": "TEST-05-DEA",
+      "siteId": "s-1",
+      "status": "not_applicable",
+    },
+  ],
+  "label": "internal_readiness_not_hrsa_determination",
+  "total": {
+    "counts": {
+      "due_soon": 1,
+      "met": 1,
+      "missing": 0,
+      "not_applicable": 1,
+      "not_assessed": 0,
+      "overdue": 1,
+    },
+    "denominator": 3,
+    "met": 1,
+  },
+}
+`;

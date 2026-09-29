@@ -1,0 +1,31 @@
+{
+  "name": "@deemed/readiness",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Deterministic readiness engine (ADR-0003 rule 4, phase-1 plan S4). Pure: no I/O, no clock.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@deemed/dates": "workspace:*",
+    "@deemed/requirements-catalog": "workspace:*"
+  },
+  "devDependencies": {
+    "@deemed/test-fixtures": "workspace:*",
+    "fast-check": "^4.3.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11",
+    "yaml": "^2.5.0"
+  }
+}

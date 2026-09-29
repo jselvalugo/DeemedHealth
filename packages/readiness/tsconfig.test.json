@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@deemed/dates": ["../dates/src/index.ts"],
+      "@deemed/requirements-catalog": ["../requirements-catalog/src/index.ts"],
+      "@deemed/test-fixtures/catalog": ["../test-fixtures/src/catalog/index.ts"]
+    }
+  },
+  "include": ["src", "vitest.config.ts"]
+}
