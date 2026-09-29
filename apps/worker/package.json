@@ -2,11 +2,17 @@
   "name": "@deemed/worker",
   "version": "0.0.0",
   "private": true,
-  "description": "pg-boss workers: screening, expirations, readiness recompute, notifications (ADR-0001).",
+  "description": "Job handlers by queue (ADR-0001): readiness recompute; screening, expirations, and notifications arrive with S5.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -b"
+  },
+  "dependencies": {
+    "@deemed/dates": "workspace:*",
+    "@deemed/db": "workspace:*",
+    "@deemed/jobs": "workspace:*",
+    "@deemed/readiness": "workspace:*"
   }
 }

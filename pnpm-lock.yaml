@@ -179,7 +179,20 @@ importers:
         specifier: ~5.9.3
         version: 5.9.3
 
-  apps/worker: {}
+  apps/worker:
+    dependencies:
+      '@deemed/dates':
+        specifier: workspace:*
+        version: link:../../packages/dates
+      '@deemed/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@deemed/jobs':
+        specifier: workspace:*
+        version: link:../../packages/jobs
+      '@deemed/readiness':
+        specifier: workspace:*
+        version: link:../../packages/readiness
 
   packages/ai-gateway: {}
 
@@ -295,6 +308,9 @@ importers:
         specifier: ^0.45.3
         version: 0.45.3(@types/pg@8.23.1)(pg@8.23.0)
     devDependencies:
+      '@deemed/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@deemed/test-fixtures':
         specifier: workspace:*
         version: link:../test-fixtures

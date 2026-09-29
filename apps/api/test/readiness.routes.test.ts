@@ -6,7 +6,7 @@
  */
 import { publishCatalogBundle } from '@deemed/readiness/service';
 import { createDatabase } from '@deemed/db';
-import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect } from 'vitest';
 import { ctx, need } from '../../../packages/db/test/helpers.js';
 import { SYSTEM, fxBundles, nextCatalogVersion } from '../../../packages/readiness/test/world.js';
 import {

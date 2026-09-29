@@ -9,7 +9,7 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^@deemed\/(dates|requirements-catalog)$/,
+        find: /^@deemed\/(dates|i18n|requirements-catalog)$/,
         replacement: `${packages}$1/src/index.ts`,
       },
     ],

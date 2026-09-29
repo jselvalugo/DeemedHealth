@@ -26,6 +26,52 @@ export default tseslint.config(
     languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
   },
   {
+    // packages/readiness engine (G1-8): pure and deterministic. No I/O, no clock, no
+    // randomness; only the service/ folder talks to the database and the queue.
+    files: ['packages/readiness/src/**/*.ts'],
+    ignores: [
+      'packages/readiness/src/service/**',
+      'packages/readiness/src/**/*.test.ts',
+      'packages/readiness/src/**/*.test-utils.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@deemed/db',
+                '@deemed/jobs',
+                '@deemed/requirements-catalog/compiler',
+                'drizzle-orm',
+                'pg',
+                'node:*',
+                './service/*',
+              ],
+              message: 'The readiness engine is pure: no I/O. Use src/service/ for database work.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='Date']",
+          message: 'The engine takes the as-of instant as input; never read the clock.',
+        },
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message: 'The engine takes the as-of instant as input; never read the clock.',
+        },
+        {
+          selector: "CallExpression[callee.object.name='Math'][callee.property.name='random']",
+          message: 'The engine is deterministic.',
+        },
+      ],
+    },
+  },
+  {
     // packages/dates: time is injected through a Clock, and the host time zone
     // must never leak in. Only clock.ts may read the system time.
     files: ['packages/dates/src/**/*.ts'],

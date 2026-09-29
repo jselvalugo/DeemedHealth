@@ -174,7 +174,10 @@ export const BASE_AUDIT_ACTIONS = {
     category: 'mutation',
     description: 'Health center value for a catalog parameter set, with reason',
   },
-  'readiness_fact.record': { category: 'mutation', description: 'Readiness evidence fact recorded' },
+  'readiness_fact.record': {
+    category: 'mutation',
+    description: 'Readiness evidence fact recorded',
+  },
   'readiness_fact.retract': {
     category: 'mutation',
     description: 'Readiness evidence fact retracted, with reason',

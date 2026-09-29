@@ -2,5 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "rootDir": "src", "outDir": "dist" },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    { "path": "../../packages/dates" },
+    { "path": "../../packages/db" },
+    { "path": "../../packages/jobs" },
+    { "path": "../../packages/readiness" }
+  ]
 }
