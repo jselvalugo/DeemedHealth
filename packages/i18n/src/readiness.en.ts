@@ -38,6 +38,8 @@ export const readinessEn = {
     'Not assessed: your value for "{parameter}" ({value}) is outside the allowed {min} to {max}.',
   'readiness.reason.rule_unresolved':
     'Not assessed: the catalog entry has no rule the engine can evaluate.',
+  'readiness.reason.threshold_not_evaluated':
+    'Not assessed: this requirement has a threshold the readiness engine does not evaluate yet.',
   'readiness.reason.no_evidence': 'No qualifying evidence is on file.',
   'readiness.reason.approval_capacity_insufficient':
     'An approval on file was not recorded in the required capacity ({required}).',

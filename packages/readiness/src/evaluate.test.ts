@@ -491,6 +491,38 @@ describe('labels (roadmap section 2 rule 5; ADR-0003 rule 6)', () => {
   });
 });
 
+describe('fail closed on unevaluated thresholds (F4)', () => {
+  it('does not assess CM-20-BOARD-SIZE (minMembers/maxMembers), even with evidence on file', () => {
+    const dir = new URL('../../requirements-catalog/entries/', import.meta.url);
+    const entry = CatalogEntrySchema.parse(
+      parseYaml(readFileSync(new URL('CM-20-BOARD-SIZE.yaml', dir), 'utf8')),
+    );
+    const r = evaluate(
+      input(entry, '2026-09-29T15:00:00Z', {
+        applicability: ORG_WIDE,
+        facts: [fact('document', '2026-01-10')],
+      }),
+    );
+    expect(r.status).toBe('not_assessed');
+    expect(r.reasons[0]).toMatchObject({
+      code: 'threshold_not_evaluated',
+      params: { parameters: 'maxMembers,minMembers' },
+    });
+    // The message never shows raw parameter keys.
+    expect(r.reasons[0]?.message).not.toContain('minMembers');
+  });
+
+  it('evaluates entries whose parameters are all known (lookbackMonths included)', () => {
+    const meetings = fxEntry('meetings', {
+      parameters: { cadenceBasis: 'calendar_period', lookbackMonths: 12 },
+    });
+    expect(
+      evaluate(input(meetings, '2026-09-29T15:00:00Z', { applicability: ORG_WIDE })).reasons[0]
+        ?.code,
+    ).not.toBe('threshold_not_evaluated');
+  });
+});
+
 describe('the draft catalog entries (packages/requirements-catalog/entries)', () => {
   const dir = new URL('../../requirements-catalog/entries/', import.meta.url);
   const entries = readdirSync(dir)

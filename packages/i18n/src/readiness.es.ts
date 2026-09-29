@@ -37,6 +37,8 @@ export const readinessEs: Record<keyof typeof readinessEn, string> = {
     'Sin evaluar: su valor para "{parameter}" ({value}) está fuera del rango permitido de {min} a {max}.',
   'readiness.reason.rule_unresolved':
     'Sin evaluar: la entrada del catálogo no tiene una regla que el sistema pueda evaluar.',
+  'readiness.reason.threshold_not_evaluated':
+    'Sin evaluar: este requisito tiene un umbral que el sistema todavía no evalúa.',
   'readiness.reason.no_evidence': 'No hay evidencia válida registrada.',
   'readiness.reason.approval_capacity_insufficient':
     'Una aprobación registrada no se hizo con la autoridad requerida ({required}).',

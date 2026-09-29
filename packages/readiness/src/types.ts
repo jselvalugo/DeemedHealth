@@ -121,6 +121,7 @@ export type ReasonCode =
   | 'tenant_parameter_unset'
   | 'tenant_parameter_out_of_bounds'
   | 'rule_unresolved'
+  | 'threshold_not_evaluated'
   | 'no_evidence'
   | 'approval_capacity_insufficient'
   | 'approval_rejected'

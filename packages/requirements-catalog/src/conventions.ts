@@ -68,8 +68,21 @@ export const KnownParameters = z
     cadenceBasis: CadenceBasis.optional(),
     approval: ApprovalBacking.optional(),
     tenantParameters: z.record(z.string().regex(/^[a-z][A-Za-z0-9]*$/), TenantParameterSpec).optional(),
+    /** calendar_period only: how far back the engine lists missed periods (months). */
+    lookbackMonths: z.number().int().positive().max(120).optional(),
   })
   .passthrough();
+
+/**
+ * The parameter keys the readiness engine evaluates. An entry with any other key (a
+ * threshold such as `minMembers`) is not assessed until the engine learns it: fail closed.
+ */
+export const ENGINE_PARAMETER_KEYS: readonly string[] = [
+  "cadenceBasis",
+  "approval",
+  "tenantParameters",
+  "lookbackMonths",
+];
 
 export interface ConventionIssue {
   path: string;

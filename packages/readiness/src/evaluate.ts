@@ -12,6 +12,7 @@
  *  5. a person marked it N/A, and the catalog allows N/A  -> not_applicable
  *     (a mark the catalog no longer allows is kept, flagged na_superseded_needs_review,
  *     and the status is computed normally, never better than due_soon)
+ *  5b. the entry has parameters the engine does not evaluate -> not_assessed
  *  6. the rule shape (expiration, periodic, one-time, on-change), with board-approval
  *     backing when the entry names one                    -> met | due_soon | overdue | missing
  *     (or not_assessed when a required tenant parameter is unset or out of bounds)
@@ -28,7 +29,7 @@ import {
   nextDueFromLastVerification,
   toZonedDate,
 } from '@deemed/dates';
-import type { CatalogEntry } from '@deemed/requirements-catalog';
+import { ENGINE_PARAMETER_KEYS, type CatalogEntry } from '@deemed/requirements-catalog';
 import { reason, summarize } from './messages.js';
 import {
   approvalTypeMatches,
@@ -430,6 +431,18 @@ export function evaluate(input: EvaluationInput): EvaluationResult {
     // TODO(S5): open a review task for the owner when a mark becomes superseded.
     superseded = true;
     reasons.push(reason('na_superseded_needs_review'));
+  }
+
+  // Fail closed on parameters the engine does not evaluate (e.g. board size thresholds):
+  // never report met while part of the requirement is unchecked (F4).
+  const unevaluated = Object.keys(entry.parameters)
+    .filter((k) => !ENGINE_PARAMETER_KEYS.includes(k))
+    .sort();
+  if (unevaluated.length > 0) {
+    return finish('not_assessed', [
+      ...reasons,
+      reason('threshold_not_evaluated', { parameters: unevaluated.join(',') }),
+    ]);
   }
 
   const rule = resolveRule(entry);
