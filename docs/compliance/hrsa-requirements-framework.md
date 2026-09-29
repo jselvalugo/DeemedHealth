@@ -93,7 +93,7 @@ sources:
     url: <official URL>
     verifiedOn: 2026-09-27
     verifiedBy: <reviewer>
-layer: requirement             # requirement | best_practice | state_requirement
+layer: requirement             # requirement | best_practice | state_requirement | payer_rule
 appliesTo: { awardTypes: [section330, lookalike], subPrograms: null, siteTypes: null, staffTypes: [LIP] }  # omitted = all
 notApplicable: { allowed: false }   # or { allowed: true, reason: ... }; each N/A decision also needs its own reason
 parameters: {}

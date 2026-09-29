@@ -124,6 +124,9 @@ dates, never hard-coded. Owners: `hrsa-regulatory-analyst` (catalog),
 > no official text was read. Verify each item against the named source and
 > record the URL and date before it becomes a `verified` catalog entry.
 
+Draft catalog entries: `packages/requirements-catalog/entries/payer-rules-2026.yaml`
+(layer `payer_rule`).
+
 | # | Rule | Effective | What changes | What the suite does | Source to verify |
 | --- | --- | --- | --- | --- | --- |
 | R1 | Medicare distant-site telehealth billing for FQHCs and RHCs | **Oct 1, 2026** (CMS claims systems reported to switch Oct 5, 2026) | Bill the individual CPT/HCPCS code for the service, with modifier **95** (audio-video) or **93** (audio-only) and the revenue code, instead of the single code **G2025**. Lines with behavioral health revenue code 0900 are reported as excluded. CY 2026 distant-site payment rate reported as $97.53 | Flags billing and collections policies and telehealth procedures that still reference G2025 or the FQ modifier. Opens a policy-update task and, where the policy changes, a board approval task. Rate stored as a catalog parameter | CMS CR 14468 / MLN MM14468 |
