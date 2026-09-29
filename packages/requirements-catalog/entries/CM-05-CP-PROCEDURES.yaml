@@ -1,0 +1,41 @@
+# Rule shape: one-time document (re-opened only when it changes).
+id: CM-05-CP-PROCEDURES
+chapter: 5
+title: Credentialing and privileging procedures on file
+statement: >-
+  The health center has written operating procedures for credentialing and
+  privileging, approved by whoever its own policy names, and follows them.
+layer: requirement
+sources:
+  - key: CM
+    locator: 'Chapter 5: Clinical Staffing (credentialing and privileging operating procedures; element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+notApplicable:
+  allowed: false
+evidence: [cp_operating_procedures]
+cadence:
+  trigger: on_change
+  renewalMonths: null
+  leadDays: []
+parameters:
+  approval:
+    approvalTypeId: cp.procedures
+    requiredCapacity: designated
+severity: high
+effective: { from: 2018-08-20, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. Board approval is not required by HRSA per a secondary source
+  (approval-authority.md D3); the default approver is the CMO, and a tenant may
+  add board approval. Any periodic review is health-center policy, not an HRSA
+  cadence.

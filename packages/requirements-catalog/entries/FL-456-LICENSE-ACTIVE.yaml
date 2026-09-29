@@ -1,0 +1,47 @@
+# Rule shape: expiration with lead days. Florida state rule, never labeled HRSA.
+id: FL-456-LICENSE-ACTIVE
+chapter: null
+title: Hold an active Florida license (Florida requirement)
+statement: >-
+  Florida requires each licensed practitioner to hold an active Florida license
+  for their profession and to renew it before it expires. License status is
+  checked on the Florida Department of Health license lookup.
+layer: state_requirement
+sources:
+  - key: FL-456
+    locator: 'Fla. Stat. ch. 456 and the practice act for the profession (section to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: FL-DOH-MQA
+    locator: 'Florida DOH Division of Medical Quality Assurance license verification'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+  staffTypes: [LIP, OLCP]
+  jurisdiction: florida
+notApplicable:
+  allowed: false
+evidence: [fl_doh_license_lookup]
+cadence:
+  trigger: on_expiration
+  renewalMonths: null
+  leadDays: [90, 60, 30, 0]
+parameters: {}
+severity: critical
+effective: { from: 2026-09-29, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. Florida state rule, not an HRSA requirement; the UI labels it
+  "Florida requirement". Related HRSA entry: CM-05-CRED-LIP-LICENSURE. Renewal
+  cycles by license type (florida.md §4) are not set; the due date is the
+  expiration date on the license record. effective.from is a placeholder (the
+  drafting date), not the statute's effective date.
