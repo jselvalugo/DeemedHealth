@@ -69,12 +69,7 @@ export const RequirementInstance = TenantScoped.extend({
         message: 'Not applicable needs a reason',
       });
     }
-    if (r.status !== 'not_applicable' && r.notApplicableReason !== null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['notApplicableReason'],
-        message: 'Reason is only for not applicable',
-      });
-    }
+    // A person's N/A mark outlives statuses the engine computes (a release without the
+    // entry, or a catalog that stopped allowing N/A): only a person clears it (S4, F1).
   });
 export type RequirementInstance = z.infer<typeof RequirementInstance>;

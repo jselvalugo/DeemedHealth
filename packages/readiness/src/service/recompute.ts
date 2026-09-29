@@ -103,6 +103,7 @@ type InstanceRow = {
   requirement_version_id: string | null;
   not_applicable_reason: string | null;
   na_recorded_ms: string | null;
+  na_superseded_version: string | null;
 };
 
 type FactRow = {
@@ -127,6 +128,7 @@ type Stored = {
   status_reasons: { code: string; params: Readonly<Record<string, string | number | null>> }[];
   catalog_release_id: string | null;
   requirement_version_id: string | null;
+  not_applicable_superseded_catalog_version: string | null;
 };
 
 const asRow = (s: Stored): Record<string, JsonValue> => s as unknown as Record<string, JsonValue>;
@@ -179,6 +181,7 @@ async function recomputeInTransaction(
       SELECT id::text, requirement_id, subject_type, site_id::text, status,
              next_due_on::text, status_reasons, catalog_release_id::text,
              requirement_version_id::text, not_applicable_reason,
+             not_applicable_superseded_catalog_version AS na_superseded_version,
              floor(extract(epoch FROM not_applicable_at) * 1000)::bigint::text AS na_recorded_ms
       FROM public.requirement_instance WHERE archived_at IS NULL ORDER BY id`)
   ).rows;
@@ -244,6 +247,9 @@ async function recomputeInTransaction(
     let versionId: string | null = null;
     let chapter: number | null = null;
     let authority: SnapshotItem['authority'] = 'hrsa';
+    // A person's N/A mark is never changed here: only its "superseded" flag moves, and
+    // only on an actual evaluation (never for a not-assessed cause).
+    let superseded = inst.na_superseded_version;
 
     if (!release) {
       status = 'not_assessed';
@@ -288,6 +294,8 @@ async function recomputeInTransaction(
       versionId = hit.versionId;
       chapter = result.citation.chapter;
       authority = result.citation.authority;
+      if (result.notApplicableSuperseded) superseded = superseded ?? release.catalogVersion;
+      else if (result.status === 'not_applicable') superseded = null;
     }
     statuses[status] += 1;
     items.push({
@@ -307,6 +315,7 @@ async function recomputeInTransaction(
       status_reasons: storedReasons(reasons),
       catalog_release_id: release?.id ?? null,
       requirement_version_id: versionId,
+      not_applicable_superseded_catalog_version: superseded,
     };
     const prev: Stored = {
       status: inst.status,
@@ -314,11 +323,9 @@ async function recomputeInTransaction(
       status_reasons: inst.status_reasons as Stored['status_reasons'],
       catalog_release_id: inst.catalog_release_id,
       requirement_version_id: inst.requirement_version_id,
+      not_applicable_superseded_catalog_version: inst.na_superseded_version,
     };
-    // An N/A mark the engine no longer honors (the catalog stopped allowing it, or the
-    // requirement is not assessed) is cleared and audited, never kept silently.
-    const clearNa = inst.not_applicable_reason !== null && status !== 'not_applicable';
-    if (!clearNa && canonicalJson(next) === canonicalJson(prev)) continue;
+    if (canonicalJson(next) === canonicalJson(prev)) continue;
     changed += 1;
     await tx.execute(sql`
       UPDATE public.requirement_instance
@@ -326,8 +333,11 @@ async function recomputeInTransaction(
           status_reasons = ${JSON.stringify(next.status_reasons)}::jsonb,
           catalog_release_id = ${next.catalog_release_id}::uuid,
           requirement_version_id = ${next.requirement_version_id}::uuid,
+          not_applicable_superseded_catalog_version = ${superseded}::text,
+          not_applicable_superseded_at = CASE
+            WHEN ${superseded}::text IS NULL THEN NULL
+            ELSE coalesce(not_applicable_superseded_at, now()) END,
           status_computed_at = now()
-          ${clearNa ? sql`, not_applicable_reason = NULL` : sql``}
       WHERE id = ${inst.id}::uuid`);
     const common = {
       targetTable: 'requirement_instance',
@@ -335,19 +345,6 @@ async function recomputeInTransaction(
       requirementIds: [inst.requirement_id],
       ...(inst.site_id ? { siteId: inst.site_id } : {}),
     };
-    if (clearNa) {
-      await appendAuditEvent(tx, ctx, {
-        ...common,
-        category: 'mutation',
-        action: 'requirement_instance.clear_not_applicable',
-        reason: `cleared by the readiness engine: ${reasons[0]?.code ?? 'not_applicable_not_allowed'}`,
-        diff: redactedDiff(
-          'public.requirement_instance',
-          { not_applicable_reason: inst.not_applicable_reason },
-          { not_applicable_reason: null },
-        ),
-      });
-    }
     await appendAuditEvent(tx, ctx, {
       ...common,
       category: 'mutation',

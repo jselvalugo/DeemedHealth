@@ -200,6 +200,9 @@ export const requirementInstance = pgTable('requirement_instance', {
   /** Set by the database from the human actor who marked it not applicable. */
   notApplicableBy: uuid('not_applicable_by'),
   notApplicableAt: timestamptz('not_applicable_at'),
+  /** Set by the recompute job when the catalog no longer allows the mark (kept for review). */
+  notApplicableSupersededAt: timestamptz('not_applicable_superseded_at'),
+  notApplicableSupersededCatalogVersion: text('not_applicable_superseded_catalog_version'),
 });
 
 export const task = pgTable('task', {

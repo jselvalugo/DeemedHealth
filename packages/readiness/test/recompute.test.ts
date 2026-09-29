@@ -20,7 +20,7 @@ import {
   retractFact,
   setTenantParameter,
 } from '@deemed/readiness/service';
-import { fxCatV2 } from '@deemed/test-fixtures/catalog';
+import { FX_CAT_ENTRIES, fxCatV2 } from '@deemed/test-fixtures/catalog';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { describeDb, expectPgError } from '../../db/test/helpers.js';
@@ -40,6 +40,8 @@ const TODAY = '2026-09-29T15:00:00Z';
 describeDb('readiness service and recompute job', () => {
   let w: World;
   let v1: string;
+  /** The latest release this file published (other tests publish more). */
+  let latest: string;
   let v1Release: string;
 
   beforeAll(async () => {
@@ -50,6 +52,7 @@ describeDb('readiness service and recompute job', () => {
         publishCatalogBundle(tx, fxBundles(v1).nonProduction, 'readiness test'),
       )
     ).releaseId;
+    latest = v1;
   });
 
   afterAll(async () => {
@@ -330,6 +333,69 @@ describeDb('readiness service and recompute job', () => {
     ).toMatchObject({ code: '42501' });
   });
 
+  it("never clears a person's N/A mark: a release without the entry leaves it intact, a catalog that disallows N/A flags it, and republishing restores it (F1)", async () => {
+    const id = w.a.instances.deaE;
+    const mark = async () =>
+      (
+        await w.admin.query(
+          `SELECT not_applicable_reason, not_applicable_by::text, not_applicable_at,
+                  not_applicable_superseded_at, not_applicable_superseded_catalog_version
+           FROM public.requirement_instance WHERE id = $1`,
+          [id],
+        )
+      ).rows[0];
+    const original = await mark();
+    expect(original.not_applicable_reason).toBe(NA_REASON);
+    const publish = async (entries: Record<string, unknown>[]) => {
+      latest = await nextCatalogVersion(w.admin);
+      await w.platform.withPlatform(SYSTEM, (tx) =>
+        publishCatalogBundle(tx, fxBundles(latest, entries).nonProduction, 'readiness test'),
+      );
+      await recomputeTenant(w.tenant, w.a.id, { asOf: parseInstant(TODAY) });
+      return latest;
+    };
+    const all = Object.values(FX_CAT_ENTRIES) as Record<string, unknown>[];
+
+    // 1. A release without the entry: not assessed, and the mark is left completely alone.
+    await publish(all.filter((e) => e.id !== 'TEST-05-DEA'));
+    expect(await instance(id)).toMatchObject({ status: 'not_assessed' });
+    expect(await mark()).toEqual(original);
+    expect(await audit(w.a, 'requirement_instance.clear_not_applicable')).toEqual([]);
+
+    // 2. A release that no longer allows N/A: the mark is kept, flagged, and the status is
+    //    computed normally (no DEA evidence on file: missing).
+    const disallowing = await publish(
+      all.map((e) => (e.id === 'TEST-05-DEA' ? { ...e, notApplicable: { allowed: false } } : e)),
+    );
+    const flagged = await mark();
+    expect(flagged).toMatchObject({
+      not_applicable_reason: NA_REASON,
+      not_applicable_by: original.not_applicable_by,
+      not_applicable_at: original.not_applicable_at,
+      not_applicable_superseded_catalog_version: disallowing,
+    });
+    expect(flagged.not_applicable_superseded_at).toBeInstanceOf(Date);
+    const row = await instance(id);
+    expect(row.status).toBe('missing');
+    expect(row.status_reasons.map((r: { code: string }) => r.code)).toContain(
+      'na_superseded_needs_review',
+    );
+    // Neither the engine nor any system job can clear a mark.
+    expect(
+      await pgError(
+        w.tenant.withTenant(w.a.id, SYSTEM, (tx) =>
+          tx.execute(sql`UPDATE public.requirement_instance SET not_applicable_reason = NULL
+                         WHERE id = ${id}::uuid`),
+        ),
+      ),
+    ).toMatchObject({ code: '42501' });
+
+    // 3. Republished with N/A allowed: the same mark applies again, flag cleared.
+    await publish(all);
+    expect(await instance(id)).toMatchObject({ status: 'not_applicable' });
+    expect(await mark()).toEqual(original);
+  });
+
   it('allows N/A only where the catalog does, with a reason, once; clearing needs a reason and is audited', async () => {
     const err = (p: Promise<unknown>) =>
       p.then(
@@ -512,7 +578,7 @@ describeDb('readiness service and recompute job', () => {
     const first = await snaps();
     expect(first).toHaveLength(1);
     expect(first[0]).toMatchObject({
-      catalog_version: v1,
+      catalog_version: latest,
       as_of_date: '2026-09-29',
       kind: 'nightly',
     });
@@ -528,7 +594,7 @@ describeDb('readiness service and recompute job', () => {
     await sweep();
     await drainAt(TODAY);
     const after = await snaps();
-    expect(after.map((s) => s.catalog_version)).toEqual([v1, v2]);
+    expect(after.map((s) => s.catalog_version)).toEqual([latest, v2]);
     expect(after[0]).toEqual(first[0]);
     expect(await instance(w.a.instances.procedures)).toMatchObject({ status: 'not_assessed' });
     expect(await instance(w.a.instances.budget)).toMatchObject({

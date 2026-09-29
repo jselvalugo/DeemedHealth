@@ -301,6 +301,8 @@ A catalog requirement applied to an organization, site, or person. Scope: tenant
 | `status_reasons` | internal | Readiness engine reason codes and parameters (no free text) | at rest | no | shown |
 | `not_applicable_by` | internal | user_account that marked it not applicable (database-set) | at rest | no | shown |
 | `not_applicable_at` | internal | When it was marked not applicable (database-set) | at rest | no | shown |
+| `not_applicable_superseded_at` | internal | When the catalog stopped allowing the N/A mark (kept, flagged for human review) | at rest | no | shown |
+| `not_applicable_superseded_catalog_version` | internal | Catalog version that stopped allowing the N/A mark | at rest | no | shown |
 
 ## `public.task`
 

@@ -474,32 +474,60 @@ ALTER TABLE public.requirement_instance
   ADD CONSTRAINT requirement_instance_na_by_fk FOREIGN KEY (organization_id, not_applicable_by)
     REFERENCES public.user_account (organization_id, id) NOT VALID,
   ADD CONSTRAINT requirement_instance_na_fields CHECK (
-    (not_applicable_reason IS NULL) = (not_applicable_at IS NULL));
+    (not_applicable_reason IS NULL) = (not_applicable_at IS NULL)),
+  -- A human N/A mark outlives the engine: it stays (reason, by, at) while the catalog does
+  -- not honor it, and only a person clears it (clearNotApplicable). So the reason no longer
+  -- implies status = 'not_applicable'; status = 'not_applicable' still needs a reason.
+  DROP CONSTRAINT requirement_instance_na_reason,
+  ADD CONSTRAINT requirement_instance_na_reason CHECK (
+    (status <> 'not_applicable' OR not_applicable_reason IS NOT NULL)
+    AND (not_applicable_reason IS NULL OR length(btrim(not_applicable_reason)) > 0)),
+  -- Set by the recompute job when the effective catalog entry no longer allows N/A: the
+  -- mark is kept and flagged for human review (status computed normally).
+  ADD COLUMN not_applicable_superseded_at              timestamptz,
+  ADD COLUMN not_applicable_superseded_catalog_version text,
+  ADD CONSTRAINT requirement_instance_na_superseded CHECK (
+    (not_applicable_superseded_at IS NULL) = (not_applicable_superseded_catalog_version IS NULL)
+    AND (not_applicable_superseded_at IS NULL OR not_applicable_reason IS NOT NULL));
 
--- A "not applicable" mark is a human decision (product principle 2): it needs a human
--- actor, and records who and when from the transaction, whatever the caller sent.
+-- A "not applicable" mark is a human decision (product principle 2). Setting it and
+-- clearing it both need a human actor, and the database records who and when from the
+-- transaction, whatever the caller sent. No system job (the readiness engine included)
+-- can set, change, or clear a mark; it can only flag one as superseded.
 CREATE FUNCTION public.requirement_instance_na_guard() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   v_actor uuid := nullif(current_setting('app.actor_id', true), '')::uuid;
+  v_old   text := CASE WHEN TG_OP = 'UPDATE' THEN OLD.not_applicable_reason END;
 BEGIN
-  -- A blank reason is left to the table's check constraint (23514).
-  IF length(btrim(coalesce(NEW.not_applicable_reason, ''))) > 0
-     AND (TG_OP = 'INSERT' OR NEW.not_applicable_reason IS DISTINCT FROM OLD.not_applicable_reason) THEN
-    IF v_actor IS NULL THEN
-      RAISE EXCEPTION 'marking a requirement not applicable needs a human user' USING ERRCODE = 'insufficient_privilege';
+  IF NEW.not_applicable_reason IS NOT DISTINCT FROM v_old THEN
+    IF TG_OP = 'UPDATE' THEN
+      NEW.not_applicable_by := OLD.not_applicable_by;
+      NEW.not_applicable_at := OLD.not_applicable_at;
+    ELSE
+      NEW.not_applicable_by := NULL;
+      NEW.not_applicable_at := NULL;
     END IF;
-    NEW.not_applicable_by := v_actor;
-    NEW.not_applicable_at := now();
-  ELSIF length(btrim(coalesce(NEW.not_applicable_reason, ''))) = 0 THEN
+    RETURN NEW;
+  END IF;
+  -- A blank reason is left to the table's check constraint (23514).
+  IF NEW.not_applicable_reason IS NOT NULL AND length(btrim(NEW.not_applicable_reason)) = 0 THEN
+    RETURN NEW;
+  END IF;
+  IF v_actor IS NULL THEN
+    RAISE EXCEPTION 'setting or clearing a not-applicable mark needs a human user' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NEW.not_applicable_reason IS NULL THEN
     NEW.not_applicable_by := NULL;
     NEW.not_applicable_at := NULL;
   ELSE
-    NEW.not_applicable_by := OLD.not_applicable_by;
-    NEW.not_applicable_at := OLD.not_applicable_at;
+    NEW.not_applicable_by := v_actor;
+    NEW.not_applicable_at := now();
   END IF;
+  NEW.not_applicable_superseded_at := NULL;
+  NEW.not_applicable_superseded_catalog_version := NULL;
   RETURN NEW;
 END
 $$;

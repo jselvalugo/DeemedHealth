@@ -355,6 +355,14 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       status_reasons: c('internal', 'Readiness engine reason codes and parameters (no free text)'),
       not_applicable_by: c('internal', 'user_account that marked it not applicable (database-set)'),
       not_applicable_at: c('internal', 'When it was marked not applicable (database-set)'),
+      not_applicable_superseded_at: c(
+        'internal',
+        'When the catalog stopped allowing the N/A mark (kept, flagged for human review)',
+      ),
+      not_applicable_superseded_catalog_version: c(
+        'internal',
+        'Catalog version that stopped allowing the N/A mark',
+      ),
     },
   },
   'public.task': {

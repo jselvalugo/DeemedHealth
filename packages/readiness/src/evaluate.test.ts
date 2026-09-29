@@ -326,15 +326,33 @@ describe('not applicable (TEST-05-DEA allows it; TEST-05-LICENSE does not)', () 
     expect(JSON.stringify(r)).not.toContain('prescribe');
   });
 
-  it('ignores an N/A mark the catalog does not allow, and evaluates the rule', () => {
+  it('keeps and flags an N/A mark the catalog no longer allows: evaluated normally, never better than at risk', () => {
     const r = evaluate(
       input(fxEntry('license'), '2026-09-29T15:00:00Z', {
         notApplicable: naMark('2026-09-01'),
         facts: [expiring('2030-01-01')],
       }),
     );
-    expect(r.status).toBe('met');
-    expect(codes(r)[0]).toBe('not_applicable_not_allowed');
+    // The license is current (would be met), but a person's mark needs review.
+    expect(r.status).toBe('due_soon');
+    expect(r.notApplicableSuperseded).toBe(true);
+    expect(codes(r)[0]).toBe('na_superseded_needs_review');
+    const lapsed = evaluate(
+      input(fxEntry('license'), '2026-09-29T15:00:00Z', {
+        notApplicable: naMark('2026-09-01'),
+        facts: [expiring('2026-01-01')],
+      }),
+    );
+    expect(lapsed).toMatchObject({ status: 'overdue', notApplicableSuperseded: true });
+    // A not-assessed cause never touches the mark: no flag.
+    const retired = fxEntry('dea', {
+      status: 'retired',
+      effective: { from: '2018-08-20', to: '2026-01-01' },
+    });
+    const na = evaluate(
+      input(retired, '2026-09-29T15:00:00Z', { notApplicable: naMark('2025-09-01') }),
+    );
+    expect(na).toMatchObject({ status: 'not_assessed', notApplicableSuperseded: false });
   });
 
   it('does not apply a mark recorded after the as-of instant', () => {

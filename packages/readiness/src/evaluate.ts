@@ -10,6 +10,8 @@
  *  3. the entry is not in effect on the as-of date        -> not_assessed
  *  4. the subject is outside the entry's appliesTo        -> not_assessed
  *  5. a person marked it N/A, and the catalog allows N/A  -> not_applicable
+ *     (a mark the catalog no longer allows is kept, flagged na_superseded_needs_review,
+ *     and the status is computed normally, never better than due_soon)
  *  6. the rule shape (expiration, periodic, one-time, on-change), with board-approval
  *     backing when the entry names one                    -> met | due_soon | overdue | missing
  *     (or not_assessed when a required tenant parameter is unset or out of bounds)
@@ -360,7 +362,15 @@ export function evaluate(input: EvaluationInput): EvaluationResult {
     status: ReadinessStatus,
     reasons: Reason[],
     extra: Partial<
-      Pick<EvaluationResult, 'nextDueOn' | 'daysUntilDue' | 'leadTier' | 'rule' | 'intervalMonths'>
+      Pick<
+        EvaluationResult,
+        | 'nextDueOn'
+        | 'daysUntilDue'
+        | 'leadTier'
+        | 'rule'
+        | 'intervalMonths'
+        | 'notApplicableSuperseded'
+      >
     > = {},
   ): EvaluationResult => {
     const all = [...reasons, ...draftNote];
@@ -378,6 +388,7 @@ export function evaluate(input: EvaluationInput): EvaluationResult {
       reasons: all,
       summary: summarize(status, all, authority),
       citation,
+      notApplicableSuperseded: extra.notApplicableSuperseded ?? false,
       internalOnly: true,
     };
   };
@@ -403,19 +414,26 @@ export function evaluate(input: EvaluationInput): EvaluationResult {
 
   const reasons: Reason[] = [];
   const na = input.notApplicable;
-  if (na && na.recordedAt <= input.asOf) {
-    if (entry.notApplicable.allowed && na.hasReason) {
+  let superseded = false;
+  if (na && na.recordedAt <= input.asOf && na.hasReason) {
+    if (entry.notApplicable.allowed) {
       return finish('not_applicable', [
         reason('marked_not_applicable', { decidedOn: na.decidedOn }),
       ]);
     }
-    reasons.push(reason('not_applicable_not_allowed'));
+    // The entry no longer allows N/A: keep the person's mark, flag it, evaluate normally.
+    // TODO(S5): open a review task for the owner when a mark becomes superseded.
+    superseded = true;
+    reasons.push(reason('na_superseded_needs_review'));
   }
 
   const rule = resolveRule(entry);
   if (!rule) return finish('not_assessed', [...reasons, reason('rule_unresolved')]);
   const out = evaluateRule(input, rule, asOfDate);
-  return finish(out.status, [...reasons, ...out.reasons], {
+  // A superseded mark needs a human decision: never report it as simply met.
+  const status = superseded && out.status === 'met' ? 'due_soon' : out.status;
+  return finish(status, [...reasons, ...out.reasons], {
+    notApplicableSuperseded: superseded,
     nextDueOn: out.nextDueOn,
     daysUntilDue: out.due?.daysUntilDue ?? null,
     leadTier: out.leadTier,

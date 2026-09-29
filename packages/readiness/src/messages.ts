@@ -16,8 +16,8 @@ export const REASON_TEMPLATES: Readonly<Record<ReasonCode, string>> = {
   outside_applicability:
     'Not assessed: this requirement does not apply to this subject ({dimension}).',
   marked_not_applicable: 'Marked not applicable on {decidedOn}, with a recorded reason.',
-  not_applicable_not_allowed:
-    'A "not applicable" mark was ignored: the catalog does not allow it for this requirement.',
+  na_superseded_needs_review:
+    'A "not applicable" mark is on file, but this catalog version does not allow it. The mark is kept; please review it.',
   tenant_parameter_unset:
     'Not assessed: set "{parameter}" for your health center (allowed {min} to {max}).',
   tenant_parameter_out_of_bounds:

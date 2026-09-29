@@ -29,8 +29,8 @@ export const readinessEs: Record<keyof typeof readinessEn, string> = {
     'Sin evaluar: este requisito no aplica a este caso ({dimension}).',
   'readiness.reason.marked_not_applicable':
     'Marcado como no aplica el {decidedOn}, con un motivo registrado.',
-  'readiness.reason.not_applicable_not_allowed':
-    'Se ignoró una marca de "no aplica": el catálogo no la permite para este requisito.',
+  'readiness.reason.na_superseded_needs_review':
+    'Hay una marca de "no aplica", pero esta versión del catálogo no la permite. La marca se conserva; revísela.',
   'readiness.reason.tenant_parameter_unset':
     'Sin evaluar: defina "{parameter}" para su centro de salud (se permite de {min} a {max}).',
   'readiness.reason.tenant_parameter_out_of_bounds':

@@ -1354,6 +1354,20 @@ export const COLUMN_CLASSES: Readonly<Record<string, TableClasses>> = {
         display: 'shown',
         freeText: false,
       },
+      not_applicable_superseded_at: {
+        class: 'internal',
+        encryption: null,
+        fipa: 'no',
+        display: 'shown',
+        freeText: false,
+      },
+      not_applicable_superseded_catalog_version: {
+        class: 'internal',
+        encryption: null,
+        fipa: 'no',
+        display: 'shown',
+        freeText: false,
+      },
     },
   },
   'public.task': {

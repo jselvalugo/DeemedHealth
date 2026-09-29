@@ -117,7 +117,7 @@ export type ReasonCode =
   | 'not_effective'
   | 'outside_applicability'
   | 'marked_not_applicable'
-  | 'not_applicable_not_allowed'
+  | 'na_superseded_needs_review'
   | 'tenant_parameter_unset'
   | 'tenant_parameter_out_of_bounds'
   | 'rule_unresolved'
@@ -195,6 +195,12 @@ export interface EvaluationResult {
   /** One line for people: status, why, and the internal-readiness label. */
   summary: string;
   citation: Citation;
+  /**
+   * A person's N/A mark is on file but the catalog entry no longer allows N/A. The mark is
+   * kept (only a person clears it) and flagged for review; the status is computed normally
+   * and never better than at risk.
+   */
+  notApplicableSuperseded: boolean;
   /** Always true: readiness is internal, never an HRSA or State of Florida determination. */
   internalOnly: true;
 }

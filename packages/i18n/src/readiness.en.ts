@@ -30,8 +30,8 @@ export const readinessEn = {
     'Not assessed: this requirement does not apply to this subject ({dimension}).',
   'readiness.reason.marked_not_applicable':
     'Marked not applicable on {decidedOn}, with a recorded reason.',
-  'readiness.reason.not_applicable_not_allowed':
-    'A "not applicable" mark was ignored: the catalog does not allow it for this requirement.',
+  'readiness.reason.na_superseded_needs_review':
+    'A "not applicable" mark is on file, but this catalog version does not allow it. The mark is kept; please review it.',
   'readiness.reason.tenant_parameter_unset':
     'Not assessed: set "{parameter}" for your health center (allowed {min} to {max}).',
   'readiness.reason.tenant_parameter_out_of_bounds':
