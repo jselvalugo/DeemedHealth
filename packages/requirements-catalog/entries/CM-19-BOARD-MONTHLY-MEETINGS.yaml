@@ -1,0 +1,46 @@
+# Rule shape: periodic cadence (one per calendar month).
+id: CM-19-BOARD-MONTHLY-MEETINGS
+chapter: 19
+title: Board meets at least once a month
+statement: >-
+  The governing board meets at least once in each month and keeps minutes that
+  show attendance, a quorum, and the actions taken.
+layer: requirement
+sources:
+  - key: CM
+    locator: 'Chapter 19: Board Authority (board meetings; element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: CFR-51c
+    locator: '42 CFR 51c.304 (governing board; paragraph to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+notApplicable:
+  allowed: false
+evidence: [board_meeting_minutes]
+cadence:
+  trigger: periodic
+  renewalMonths: 1
+  leadDays: [14, 7]
+parameters:
+  cadenceBasis: calendar_period
+severity: high
+effective: { from: 2018-08-20, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. Open question for the HRSA project officer: whether any board (for
+  example one with a patient-majority waiver, or a co-applicant board) may meet
+  less often. If so, that becomes an applicability rule or a waiver record, not
+  N/A. HRSA does not require signed minutes (secondary source,
+  approval-authority.md §2.1). Public-agency boards also carry Florida Sunshine
+  Law notice rules (FL-SUNSHINE), to be a separate FL- entry.

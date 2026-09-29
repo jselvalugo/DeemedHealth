@@ -1,0 +1,45 @@
+# Rule shape: periodic cadence. Industry best practice, never labeled HRSA.
+id: BP-EXCL-MONTHLY-SCREENING
+chapter: null
+title: Screen people against exclusion lists every month (best practice)
+statement: >-
+  Common industry practice is to check staff, board members, and contractors
+  against the federal exclusion lists before they start and then every month,
+  when the lists are updated. This is best practice, not an HRSA requirement.
+layer: best_practice
+sources:
+  - key: EXCL-LEIE
+    locator: 'HHS OIG List of Excluded Individuals/Entities (update schedule to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: EXCL-SAM
+    locator: 'SAM.gov exclusions (update schedule to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+notApplicable:
+  allowed: false
+evidence: [exclusion_screening_result]
+cadence:
+  trigger: periodic
+  renewalMonths: 1
+  leadDays: [7, 0]
+parameters:
+  cadenceBasis: since_last_completion
+severity: medium
+effective: { from: 2026-09-29, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. Best practice only. The cited sources are the lists themselves; they
+  do not set this cadence. Florida AHCA list screening (FL-AHCA-SANC) and any
+  Medicaid or SMMC contract cadence are separate FL- entries still to write.
+  effective.from is a placeholder (the drafting date).

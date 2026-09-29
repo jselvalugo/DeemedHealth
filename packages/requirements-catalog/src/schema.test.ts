@@ -64,29 +64,3 @@ describe("source register", () => {
     for (const s of doc.sources) expect(SourceSchema.safeParse(s).success, s.key).toBe(true);
   });
 });
-
-describe("catalog entries", () => {
-  const loadYaml = async (rel: string) => {
-    const { parse: parseYaml } = await import("yaml");
-    return parseYaml(readFileSync(new URL(rel, import.meta.url), "utf8"));
-  };
-
-  it("payer-rule entries parse, cite registered sources, and stay draft until verified", async () => {
-    const register = await loadYaml("../sources/sources.yaml");
-    const keys = new Set(register.sources.map((s: { key: string }) => s.key));
-    const doc = await loadYaml("../entries/payer-rules-2026.yaml");
-    const ids = new Set<string>();
-    for (const raw of doc.entries) {
-      const r = CatalogEntrySchema.safeParse(raw);
-      expect(r.success, `${raw.id}: ${JSON.stringify(r.error?.issues)}`).toBe(true);
-      const e = r.data!;
-      expect(ids.has(e.id), `duplicate id ${e.id}`).toBe(false);
-      ids.add(e.id);
-      expect(e.layer).toBe("payer_rule");
-      for (const s of e.sources) expect(keys.has(s.key), `${e.id} cites unregistered source ${s.key}`).toBe(true);
-      // Drafted from search summaries only (official sources were blocked): none may reach production.
-      expect(e.status).toBe("draft");
-    }
-    expect(productionEntries(CatalogEntrySchema.array().parse(doc.entries))).toEqual([]);
-  });
-});

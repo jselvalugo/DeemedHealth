@@ -1,0 +1,44 @@
+# Rule shape: expiration with lead days.
+id: CM-05-CRED-LIP-LICENSURE
+chapter: 5
+title: Verify current licensure (LIP)
+statement: >-
+  Before a licensed independent practitioner starts, and again whenever the
+  license renews or expires, the health center verifies with the primary source
+  that the license is current, and keeps the record in the credentialing file.
+layer: requirement
+sources:
+  - key: CM
+    locator: 'Chapter 5: Clinical Staffing (credentialing of LIPs; element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: SVP
+    locator: 'Clinical Staffing chapter (documents requested for credentialing files; to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+  staffTypes: [LIP]
+notApplicable:
+  allowed: false
+evidence: [license_primary_source_verification]
+cadence:
+  trigger: on_hire_and_expiration
+  renewalMonths: null
+  leadDays: [90, 60, 30, 0]
+parameters: {}
+severity: critical
+effective: { from: 2018-08-20, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. Lead days 90/60/30/0 are a product default, not an HRSA number.
+  Florida license rules are a separate entry (FL-456-LICENSE-ACTIVE).
+  effective.from 2018-08-20 is the framework example date; confirm it.

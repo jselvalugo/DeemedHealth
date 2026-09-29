@@ -124,8 +124,9 @@ dates, never hard-coded. Owners: `hrsa-regulatory-analyst` (catalog),
 > no official text was read. Verify each item against the named source and
 > record the URL and date before it becomes a `verified` catalog entry.
 
-Draft catalog entries: `packages/requirements-catalog/entries/payer-rules-2026.yaml`
-(layer `payer_rule`).
+Draft catalog entries (layer `payer_rule`), in `packages/requirements-catalog/entries/`:
+`CMS-FQHC-TELEHEALTH-DISTANT-SITE-BILLING` (R1), `MCD-71109-NONCITIZEN-ELIGIBILITY-IMPACT` (R2),
+and `CMS-FQHC-PPS-RATE-CY2026` (R3).
 
 | # | Rule | Effective | What changes | What the suite does | Source to verify |
 | --- | --- | --- | --- | --- | --- |

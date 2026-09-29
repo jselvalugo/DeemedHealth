@@ -1,0 +1,74 @@
+# Rule shape: one-time document (on_change). Layer payer_rule: a Medicaid rule, not an HRSA requirement.
+id: MCD-71109-NONCITIZEN-ELIGIBILITY-IMPACT
+chapter: 9
+title: Plan for patients losing full Medicaid under the non-citizen eligibility change
+statement: >-
+  From October 1, 2026, full federally funded Medicaid and CHIP is limited to
+  lawful permanent residents, Cuban and Haitian entrants, and COFA migrants.
+  Refugees, asylees, and humanitarian parolees outside those groups lose full
+  coverage; emergency Medicaid remains. Florida reports that lawfully residing
+  children 18 and under stay eligible. The health center reviews what this does
+  to its sliding fee discount program (Ch. 9), budget (Ch. 17), and billing and
+  collections (Ch. 16), and updates patient notices. The suite tracks aggregate
+  counts only and never stores a patient's immigration or eligibility status.
+layer: payer_rule
+sources:
+  - key: PL-119-21
+    locator: "§71109"
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: MCD-SHO-26-001
+    locator: "SHO #26-001 (whole letter)"
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: FL-DCF-71109
+    locator: "Florida implementation notice (to be located)"
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: CM
+    locator: "Chapter 9, Sliding Fee Discount Program; Chapter 16; Chapter 17, Budget"
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+  jurisdiction: florida
+notApplicable:
+  allowed: false
+evidence:
+  - sfdp_impact_review
+  - budget_reforecast
+  - board_approval_record
+  - patient_notice_update
+cadence:
+  trigger: on_change
+  renewalMonths: null
+  leadDays: []
+parameters:
+  keptCategories:
+    - lawful_permanent_resident
+    - cuban_haitian_entrant
+    - cofa_migrant
+  losingCategories:
+    - refugee
+    - asylee
+    - humanitarian_parolee
+  emergencyMedicaidUnchanged: true
+  floridaLawfullyResidingChildrenMaxAge: 18
+  patientLevelData: aggregate_only
+severity: medium
+effective: { from: "2026-10-01", to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. Written 2026-09-29 from web-search summaries only: the
+  session network proxy blocked cms.gov, medicaid.gov, and the secondary sites,
+  so no official text was read. Source url, verifiedOn, and verifiedBy stay
+  null until someone opens the source. Every value in parameters is a planning
+  value to check. Money and multipliers are decimal strings, not floats.
+  Shape: one-time impact review (on_change). The Florida children's option
+  rests on a secondary summary of a DCF notice that was not located. Aggregate
+  counts only (principle 6). CLAUDE.md row R2.

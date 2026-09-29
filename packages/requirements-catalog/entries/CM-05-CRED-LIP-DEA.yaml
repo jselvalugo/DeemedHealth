@@ -1,0 +1,44 @@
+# Rule shapes: expiration with lead days; "Not applicable" allowed with a reason.
+id: CM-05-CRED-LIP-DEA
+chapter: 5
+title: Verify DEA registration where it applies (LIP)
+statement: >-
+  For a licensed independent practitioner who prescribes controlled substances,
+  the health center verifies a current DEA registration at credentialing and
+  again before it expires. It does not apply to a practitioner who does not
+  prescribe controlled substances.
+layer: requirement
+sources:
+  - key: CM
+    locator: 'Chapter 5: Clinical Staffing (LIP credentialing, DEA registration "as applicable"; element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+  staffTypes: [LIP]
+notApplicable:
+  allowed: true
+  reason: >-
+    The practitioner does not prescribe, order, or dispense controlled
+    substances at the health center, so no DEA registration is held.
+evidence: [dea_registration_verification]
+cadence:
+  trigger: on_hire_and_expiration
+  renewalMonths: null
+  leadDays: [90, 60, 30, 0]
+parameters: {}
+severity: high
+effective: { from: 2018-08-20, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. N/A basis: the Compliance Manual is recalled to list DEA registration
+  "as applicable" for LIP credentialing; confirm the wording. Each health
+  center N/A still needs its own reason, actor, and date. Florida
+  controlled-substance prescriber rules are not modeled here.

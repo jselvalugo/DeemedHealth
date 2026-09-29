@@ -1,0 +1,56 @@
+# Rule shapes: tenant parameter with bounds; periodic cadence driven by it.
+id: CM-05-PRIV-RENEWAL
+chapter: 5
+title: Renew clinical privileges on the set interval
+statement: >-
+  The health center renews each practitioner's clinical privileges on the
+  interval set in its credentialing and privileging procedures, and checks
+  current competence and fitness for duty each time.
+layer: requirement
+sources:
+  - key: CM
+    locator: 'Chapter 5: Clinical Staffing (privileging and renewal of privileges; element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+  staffTypes: [LIP, OLCP]
+notApplicable:
+  allowed: false
+evidence: [privileges_granted_record, competence_verification]
+cadence:
+  trigger: periodic
+  renewalMonths: null
+  leadDays: [90, 60, 30, 0]
+parameters:
+  cadenceBasis: since_last_completion
+  approval:
+    approvalTypeId: cp.privileges.grant
+    requiredCapacity: designated
+  tenantParameters:
+    reprivilegingIntervalMonths:
+      type: integer
+      unit: month
+      min: 1
+      max: 24
+      default: 24
+      drives: cadence.renewalMonths
+      guidance: >-
+        Use the interval written in your credentialing and privileging
+        procedures. The upper limit of 24 months reflects the commonly cited
+        "at least every two years" and is not yet verified against HRSA.
+severity: high
+effective: { from: 2018-08-20, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. The 24-month upper bound is the framework's unverified assumption
+  (framework §2, Ch. 5); confirm whether HRSA sets a maximum or leaves it to the
+  health center. The approver is designated by the health center, not the board
+  (approval-authority.md D1; default CMO).

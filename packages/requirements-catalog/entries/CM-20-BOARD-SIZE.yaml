@@ -1,0 +1,45 @@
+# Rule shape: fixed catalog thresholds, re-checked on change.
+id: CM-20-BOARD-SIZE
+chapter: 20
+title: Board has 9 to 25 members
+statement: >-
+  The governing board has at least 9 and no more than 25 members, as the bylaws
+  set out. The count is checked again whenever a member joins or leaves.
+layer: requirement
+sources:
+  - key: CM
+    locator: 'Chapter 20: Board Composition (board size; element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: CFR-51c
+    locator: '42 CFR 51c.304 (governing board size; paragraph to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+notApplicable:
+  allowed: false
+evidence: [board_roster, bylaws]
+cadence:
+  trigger: on_change
+  renewalMonths: null
+  leadDays: []
+parameters:
+  minMembers: 9
+  maxMembers: 25
+severity: high
+effective: { from: 2018-08-20, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. 9 and 25 are framework §3 values, unverified. Patient majority (51%)
+  and the health-industry income test are separate entries still to write.
+  Waivers for some sub-program-only recipients affect composition, not size
+  (confirm), and are not modeled yet.

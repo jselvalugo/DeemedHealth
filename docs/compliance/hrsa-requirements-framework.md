@@ -107,6 +107,35 @@ status: verified              # draft | verified | retired
 
 Schema of record: `packages/requirements-catalog/src/schema.ts` (added 2026-09-27: `layer`, `appliesTo` by award type/sub-program/site type/staff type replacing `siteScope`, `notApplicable`, `parameters`). Only `verified` entries reach production (`productionEntries()`). Source register: `packages/requirements-catalog/sources/sources.yaml`.
 
+Added 2026-09-29 (S4): an optional entry `notes` field (reviewer notes such as
+verification state; never shown to customers as a source), and
+`src/conventions.ts`, which types the `cadence.trigger` vocabulary
+(`on_expiration`, `on_hire_and_expiration`, `periodic`, `on_change`) and the
+well-known `parameters` keys: `cadenceBasis`, `approval` (approval type and
+required capacity, from `approval-authority.md` §4.1), and `tenantParameters`
+(bounds, default, guidance, and the field it drives). The package README maps
+each rule shape to its YAML form.
+
+### 4.1 Draft entries (2026-09-29, none verified)
+
+Written for the readiness engine (phase-1 plan S4). The official sources could
+not be opened (the network proxy returned 403 for bphc.hrsa.gov, ecfr.gov,
+flrules.org, leg.state.fl.us), so every entry is `status: draft` with source
+`url`, `verifiedOn`, and `verifiedBy` null. The production bundle is empty.
+
+| requirementId | Layer | Rule shape | Citation locator (to verify) |
+| --- | --- | --- | --- |
+| `CM-05-CRED-LIP-LICENSURE` | HRSA requirement | Expiration with lead days (90/60/30/0) | CM Ch. 5; SVP Clinical Staffing |
+| `CM-05-CRED-LIP-DEA` | HRSA requirement | Expiration with lead days; N/A allowed (no controlled-substance prescribing) | CM Ch. 5 ("as applicable") |
+| `CM-05-PRIV-RENEWAL` | HRSA requirement | Periodic, driven by tenant parameter `reprivilegingIntervalMonths` (1–24, default 24); designated approver | CM Ch. 5 |
+| `CM-05-CP-PROCEDURES` | HRSA requirement | One-time document (`on_change`); designated approver | CM Ch. 5 |
+| `CM-19-BOARD-MONTHLY-MEETINGS` | HRSA requirement | Periodic, calendar month | CM Ch. 19; 42 CFR 51c.304 |
+| `CM-19-BUDGET-ANNUAL` | HRSA requirement | Periodic 12 months; board approval (`budget.annual`) | CM Ch. 19, Ch. 17 |
+| `CM-19-POLICY-SFDP` | HRSA requirement | Periodic 36 months; board approval (`policy.sfdp`) | CM Ch. 19, Ch. 9 |
+| `CM-20-BOARD-SIZE` | HRSA requirement | Catalog thresholds (9–25), re-checked on change | CM Ch. 20; 42 CFR 51c.304 |
+| `FL-456-LICENSE-ACTIVE` | Florida requirement | Expiration with lead days | Fla. Stat. ch. 456 and practice acts; DOH MQA lookup |
+| `BP-EXCL-MONTHLY-SCREENING` | Best practice | Periodic 1 month | OIG LEIE; SAM.gov (lists only; they do not set the cadence) |
+
 ## 5. Policy update workflow (PAL/PIN)
 
 1. `hrsa-regulatory-analyst` records the update as a changeset with its effective

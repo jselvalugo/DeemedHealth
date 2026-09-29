@@ -1,0 +1,48 @@
+# Rule shapes: board-approval-backed; periodic evaluation.
+id: CM-19-POLICY-SFDP
+chapter: 19
+title: Board approves and re-evaluates the sliding fee discount policies
+statement: >-
+  The governing board adopts the sliding fee discount program policies,
+  approves changes to them, and evaluates them on a set schedule (assumed to be
+  at least every three years).
+layer: requirement
+sources:
+  - key: CM
+    locator: 'Chapter 19: Board Authority (adopting, evaluating, and updating policies; element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+  - key: CM
+    locator: 'Chapter 9: Sliding Fee Discount Program (element to confirm)'
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+appliesTo:
+  awardTypes: [section330, lookalike]
+notApplicable:
+  allowed: false
+evidence: [sfdp_policy, board_meeting_minutes]
+cadence:
+  trigger: periodic
+  renewalMonths: 36
+  leadDays: [90, 60, 30, 0]
+parameters:
+  cadenceBasis: since_last_completion
+  approval:
+    approvalTypeId: policy.sfdp
+    requiredCapacity: board
+severity: high
+effective: { from: 2018-08-20, to: null }
+supersedes: []
+status: draft
+notes: >-
+  DRAFT, not verified. On 2026-09-29 the official source could not be opened:
+  the session network proxy refused the connection (HTTP 403) to bphc.hrsa.gov,
+  ecfr.gov, flrules.org, and leg.state.fl.us. Locator, wording, and parameters
+  come from docs/compliance and general program knowledge, not the source text.
+  Source url, verifiedOn, and verifiedBy stay null until someone opens the
+  source. Approval type B6 in approval-authority.md. The 36-month interval is
+  unverified (framework §2, Ch. 9 and Ch. 19). Keep this board policy
+  evaluation apart from the Chapter 9 evaluation of the program itself and from
+  the annual Federal Poverty Guidelines update; each gets its own entry.
