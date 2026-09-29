@@ -7,9 +7,9 @@
  * FX-ORG-XYZ (docs/qa/fixture-plan.md section 2): XYZ Community Health Center, a section 330
  * recipient with three Florida sites, two Eastern and one Central (western Panhandle).
  *
- * The requirementIds used below follow the catalog id format. Only CM-05-C&P-LIP-LICENSURE
- * appears in the framework today; the others are placeholders until hrsa-regulatory-analyst
- * publishes verified catalog entries.
+ * Every requirementId used below is an entry in packages/requirements-catalog/entries/
+ * (all still `draft`), and each instance's subject type matches its entry: LIP entries
+ * apply to a person; board and board-policy entries apply to the organization.
  */
 import { makeTestNpi } from '@deemed/test-fixtures/npi';
 import type { ProvisionOrganizationInput } from '../src/platform.js';
@@ -267,7 +267,7 @@ export const XYZ_FIXTURE: TenantFixture = {
   requirementInstances: [
     {
       key: 'lic-raman',
-      requirementId: 'CM-05-C&P-LIP-LICENSURE',
+      requirementId: 'CM-05-CRED-LIP-LICENSURE',
       subject: { type: 'person', person: 'provider1' },
       site: 'S1',
       owner: 'credentialing',
@@ -277,7 +277,7 @@ export const XYZ_FIXTURE: TenantFixture = {
     },
     {
       key: 'lic-rivera',
-      requirementId: 'CM-05-C&P-LIP-LICENSURE',
+      requirementId: 'CM-05-CRED-LIP-LICENSURE',
       subject: { type: 'person', person: 'provider2' },
       site: 'S3',
       owner: 'credentialing',
@@ -287,17 +287,16 @@ export const XYZ_FIXTURE: TenantFixture = {
     },
     {
       key: 'board',
-      requirementId: 'CM-20-BOARD-COMPOSITION',
+      requirementId: 'CM-20-BOARD-SIZE',
       subject: { type: 'organization' },
       owner: 'compliance',
       status: 'missing',
       test: true,
     },
     {
-      key: 'sfds-s3',
-      requirementId: 'CM-09-SLIDING-FEE-DISCOUNT',
-      subject: { type: 'site', site: 'S3' },
-      site: 'S3',
+      key: 'sfdp',
+      requirementId: 'CM-19-POLICY-SFDP',
+      subject: { type: 'organization' },
       owner: 'compliance',
       status: 'overdue',
       nextDueOn: '2026-09-01',
@@ -317,7 +316,7 @@ export const XYZ_FIXTURE: TenantFixture = {
     },
     {
       key: 'board-roster',
-      title: 'Confirm board roster and patient-member status',
+      title: 'Confirm board roster and member count',
       requirementInstance: 'board',
       assignee: 'compliance',
       dueOn: '2026-11-01',
@@ -325,9 +324,9 @@ export const XYZ_FIXTURE: TenantFixture = {
       test: true,
     },
     {
-      key: 'sfds-review',
-      title: 'Review sliding fee discount schedule for the Panhandle site',
-      requirementInstance: 'sfds-s3',
+      key: 'sfdp-review',
+      title: 'Gather Panhandle site sliding fee data for the board policy evaluation',
+      requirementInstance: 'sfdp',
       site: 'S3',
       assignee: 'qi',
       dueOn: '2026-09-01',
@@ -337,12 +336,12 @@ export const XYZ_FIXTURE: TenantFixture = {
   ],
   approvals: [
     {
-      key: 'sfds-approve',
-      task: 'sfds-review',
+      key: 'sfdp-approve',
+      task: 'sfdp-review',
       approver: 'compliance',
       decision: 'approved',
-      comment: 'Schedule reviewed against the current FPG table.',
-      requirementIds: ['CM-09-SLIDING-FEE-DISCOUNT'],
+      comment: 'Site data checked and ready for the board packet.',
+      requirementIds: ['CM-19-POLICY-SFDP'],
       test: true,
     },
   ],
@@ -422,7 +421,7 @@ export const GULF_FIXTURE: TenantFixture = {
   requirementInstances: [
     {
       key: 'lic-castillo',
-      requirementId: 'CM-05-C&P-LIP-LICENSURE',
+      requirementId: 'CM-05-CRED-LIP-LICENSURE',
       subject: { type: 'person', person: 'provider1' },
       site: 'G1',
       owner: 'compliance',
@@ -449,7 +448,7 @@ export const GULF_FIXTURE: TenantFixture = {
       task: 'verify-castillo',
       approver: 'compliance',
       decision: 'approved',
-      requirementIds: ['CM-05-C&P-LIP-LICENSURE'],
+      requirementIds: ['CM-05-CRED-LIP-LICENSURE'],
       test: true,
     },
   ],

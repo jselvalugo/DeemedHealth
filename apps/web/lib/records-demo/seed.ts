@@ -212,7 +212,7 @@ export function demoSeed(): DemoSeed {
   const pid = (key: string) => PERSON_IDS[key] as string;
   const requirementInstance: SeedRow[] = [
     [
-      'CM-05-C&P-LIP-LICENSURE',
+      'CM-05-CRED-LIP-LICENSURE',
       'person',
       pid('priya.raman'),
       SITE_IDS[0],
@@ -221,7 +221,7 @@ export function demoSeed(): DemoSeed {
       '2028-02-29',
     ],
     [
-      'CM-05-C&P-LIP-LICENSURE',
+      'CM-05-CRED-LIP-LICENSURE',
       'person',
       pid('tomas.rivera'),
       SITE_IDS[2],
@@ -229,20 +229,12 @@ export function demoSeed(): DemoSeed {
       'due_soon',
       '2026-10-31',
     ],
+    ['CM-20-BOARD-SIZE', 'organization', DEMO_ORG_ID, null, pid('maria.delgado'), 'missing', null],
     [
-      'CM-20-BOARD-COMPOSITION',
+      'CM-19-POLICY-SFDP',
       'organization',
       DEMO_ORG_ID,
       null,
-      pid('maria.delgado'),
-      'missing',
-      null,
-    ],
-    [
-      'CM-09-SLIDING-FEE-DISCOUNT',
-      'site',
-      SITE_IDS[2],
-      SITE_IDS[2],
       pid('maria.delgado'),
       'overdue',
       '2026-09-01',

@@ -153,7 +153,7 @@ defineRouteTests('readiness.instance.get', {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       id: XYZ_REQ.licRaman,
-      requirementId: 'CM-05-C&P-LIP-LICENSURE',
+      requirementId: 'CM-05-CRED-LIP-LICENSURE',
       siteId: S1,
     });
     // Ordinary roles' reads are not audited.
@@ -181,14 +181,14 @@ defineRouteTests('readiness.instance.get', {
       (await clients.coS1.get(`/api/readiness/requirement-instances/${XYZ_REQ.licRaman}`))
         .statusCode,
     ).toBe(200);
-    const res = await clients.coS1.get(`/api/readiness/requirement-instances/${XYZ_REQ.sfdsS3}`);
+    const res = await clients.coS1.get(`/api/readiness/requirement-instances/${XYZ_REQ.licRivera}`);
     expect(res.statusCode).toBe(403);
     const [event] = await auditFor(api, res);
     expect(event).toMatchObject({
       action: 'access.denied',
       outcome: 'denied',
       target_table: 'requirement_instance',
-      target_id: XYZ_REQ.sfdsS3,
+      target_id: XYZ_REQ.licRivera,
       metadata: { reason: 'site_scope' },
     });
     // An organization-wide record needs an organization-wide grant.
@@ -207,13 +207,13 @@ defineRouteTests('readiness.instance.get', {
     ).toBe(200);
   },
   auditorViewsAreLogged: async () => {
-    const res = await clients.auditor.get(`/api/readiness/requirement-instances/${XYZ_REQ.sfdsS3}`);
+    const res = await clients.auditor.get(`/api/readiness/requirement-instances/${XYZ_REQ.sfdp}`);
     expect(res.statusCode).toBe(200);
     const [event] = await auditFor(api, res);
     expect(event).toMatchObject({
       action: 'access.view',
       outcome: 'success',
-      target_id: XYZ_REQ.sfdsS3,
+      target_id: XYZ_REQ.sfdp,
     });
   },
 });

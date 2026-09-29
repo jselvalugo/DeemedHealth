@@ -67,10 +67,12 @@ export const RECORD_FIXTURES: Readonly<Record<string, RecordFixture>> = {
     expiresAt: null,
     grantReason: 'Synthetic fixture grant',
   }),
+  // Catalog entries whose subject matches: a site-level record is an LIP's licensure
+  // at that site; an organization-wide one is the board-size check.
   requirement_instance: ({ organizationId, siteId, personId }) => ({
-    requirementId: 'CM-05-C&P-LIP-LICENSURE',
-    subjectType: siteId ? 'site' : 'organization',
-    subjectId: siteId ?? organizationId,
+    requirementId: siteId ? 'CM-05-CRED-LIP-LICENSURE' : 'CM-20-BOARD-SIZE',
+    subjectType: siteId ? 'person' : 'organization',
+    subjectId: siteId ? personId : organizationId,
     siteId,
     ownerPersonId: personId,
   }),

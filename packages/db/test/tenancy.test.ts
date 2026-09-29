@@ -312,7 +312,7 @@ describeDb('tenant isolation (ADR-0002)', () => {
         attempt(user, () =>
           user.query(
             `INSERT INTO public.requirement_instance (organization_id, requirement_id, subject_type, subject_id)
-             VALUES ($1, 'CM-05-C&P-LIP-LICENSURE', 'person', $2)`,
+             VALUES ($1, 'CM-05-CRED-LIP-LICENSURE', 'person', $2)`,
             [xyz, gulfPerson],
           ),
         ),

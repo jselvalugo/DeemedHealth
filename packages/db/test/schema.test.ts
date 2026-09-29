@@ -348,7 +348,7 @@ describeDb('schema against the database', () => {
           attempt(user, () =>
             user.query(
               `INSERT INTO public.requirement_instance (organization_id, requirement_id, subject_type, subject_id, status, not_applicable_reason)
-               VALUES ($1, 'CM-20-BOARD-COMPOSITION', $2, $3, $4, $5)`,
+               VALUES ($1, 'TEST-NOT-APPLICABLE-CHECK', $2, $3, $4, $5)`,
               [org, subjectType, subjectId, status, reason],
             ),
           );

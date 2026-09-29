@@ -101,7 +101,7 @@ export const XYZ_REQ = {
   licRaman: fixtureId('d0000001', KIND.requirementInstance, 1), // person subject, site S1
   licRivera: fixtureId('d0000001', KIND.requirementInstance, 2), // site S3
   board: fixtureId('d0000001', KIND.requirementInstance, 3), // organization-wide
-  sfdsS3: fixtureId('d0000001', KIND.requirementInstance, 4), // site S3
+  sfdp: fixtureId('d0000001', KIND.requirementInstance, 4), // organization-wide
 };
 export const GULF_REQ = { licCastillo: fixtureId('d0000002', KIND.requirementInstance, 1) };
 
