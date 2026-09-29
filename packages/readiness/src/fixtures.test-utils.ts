@@ -29,6 +29,13 @@ export const ORG_WIDE: ApplicabilityContext = {
   staffTypes: null,
 };
 
+/** The FX-CAT entries' evidence types, by fact kind (tests pass another to test F5). */
+const DEFAULT_EVIDENCE: Partial<Record<ReadinessFact['kind'], string>> = {
+  document: 'cp_procedures',
+  completion: 'board_meeting_minutes',
+  expiration: 'license_primary_source_verification',
+};
+
 let seq = 0;
 export function fact(
   kind: ReadinessFact['kind'],
@@ -44,6 +51,8 @@ export function fact(
   return {
     id: rest.id ?? `fact-${String(seq).padStart(4, '0')}`,
     kind,
+    evidenceTypeId:
+      rest.evidenceTypeId !== undefined ? rest.evidenceTypeId : (DEFAULT_EVIDENCE[kind] ?? null),
     effectiveOn: parseCalendarDate(effectiveOn),
     recordedAt: parseInstant(recordedAt ?? `${effectiveOn}T12:00:00Z`),
     retractedAt: retractedAt ? parseInstant(retractedAt) : null,

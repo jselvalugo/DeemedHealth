@@ -581,6 +581,7 @@ Dated evidence the readiness engine reads; recorded by a person or an integratio
 | `approval_capacity` | internal | board, committee_ratified, designated, staff | at rest | no | shown |
 | `approval_decision` | internal | approved or rejected | at rest | no | shown |
 | `approval_type_id` | internal | Approval type (approval-authority.md section 4) | at rest | no | shown |
+| `evidence_type_id` | internal | Catalog evidence type (entry.evidence) of the fact | at rest | no | shown |
 | `evidence_version_id` | internal | Evidence file version (FK arrives with S6) | at rest | no | shown |
 | `recorded_by_type` | internal | user, break_glass, or integration; never a service (AI) actor | at rest | no | shown |
 | `recorded_at` | internal | When it was recorded (database time) | at rest | no | shown |

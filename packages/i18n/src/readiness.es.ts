@@ -40,6 +40,8 @@ export const readinessEs: Record<keyof typeof readinessEn, string> = {
   'readiness.reason.threshold_not_evaluated':
     'Sin evaluar: este requisito tiene un umbral que el sistema todavía no evalúa.',
   'readiness.reason.no_evidence': 'No hay evidencia válida registrada.',
+  'readiness.reason.evidence_type_not_accepted':
+    'La evidencia registrada no es de un tipo que este requisito acepte, así que no cuenta.',
   'readiness.reason.approval_capacity_insufficient':
     'Una aprobación registrada no se hizo con la autoridad requerida ({required}).',
   'readiness.reason.approval_rejected': 'La decisión de aprobación más reciente fue un rechazo.',

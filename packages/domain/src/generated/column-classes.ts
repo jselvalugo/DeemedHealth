@@ -2430,6 +2430,13 @@ export const COLUMN_CLASSES: Readonly<Record<string, TableClasses>> = {
         display: 'shown',
         freeText: false,
       },
+      evidence_type_id: {
+        class: 'internal',
+        encryption: null,
+        fipa: 'no',
+        display: 'shown',
+        freeText: false,
+      },
       evidence_version_id: {
         class: 'internal',
         encryption: null,

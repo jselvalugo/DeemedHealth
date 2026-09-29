@@ -40,10 +40,19 @@ const factArb: fc.Arbitrary<ReadinessFact> = fc
     capacity: fc.constantFrom('board', 'committee_ratified', 'designated', 'staff'),
     decision: fc.constantFrom('approved', 'rejected'),
     approvalTypeId: fc.constantFrom(null, 'budget.annual', 'cp.privileges.grant', 'other.type'),
+    evidenceTypeId: fc.constantFrom(
+      null,
+      'cp_procedures',
+      'board_meeting_minutes',
+      'license_primary_source_verification',
+      'dea_registration_verification',
+      'other_type',
+    ),
   })
   .map((r) => ({
     id: r.id,
     kind: r.kind,
+    evidenceTypeId: r.evidenceTypeId,
     effectiveOn: r.effectiveOn,
     expiresOn: r.kind === 'expiration' ? r.expiresOn : null,
     recordedAt: r.recordedAt,
@@ -201,6 +210,7 @@ describe('readiness engine properties', () => {
         const renewal: ReadinessFact = {
           id: 'renewal',
           kind: 'expiration',
+          evidenceTypeId: 'license_primary_source_verification',
           effectiveOn: EPOCH,
           expiresOn: addDays(latest, 1),
           recordedAt: instantFromEpochMilliseconds(T0),

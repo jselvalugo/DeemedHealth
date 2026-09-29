@@ -115,6 +115,7 @@ type FactRow = {
   id: string;
   requirement_instance_id: string;
   kind: FactKind;
+  evidence_type_id: string | null;
   effective_on: string;
   expires_on: string | null;
   approval_capacity: ApprovalCapacity | null;
@@ -204,7 +205,8 @@ async function recomputeInTransaction(
   const facts = new Map<string, ReadinessFact[]>();
   for (const f of (
     await tx.execute<FactRow>(sql`
-      SELECT id::text, requirement_instance_id::text, kind, effective_on::text, expires_on::text,
+      SELECT id::text, requirement_instance_id::text, kind, evidence_type_id, effective_on::text,
+             expires_on::text,
              approval_capacity, approval_decision, approval_type_id,
              floor(extract(epoch FROM recorded_at) * 1000)::bigint::text AS recorded_ms,
              floor(extract(epoch FROM retracted_at) * 1000)::bigint::text AS retracted_ms
@@ -214,6 +216,7 @@ async function recomputeInTransaction(
     list.push({
       id: f.id,
       kind: f.kind,
+      evidenceTypeId: f.evidence_type_id,
       effectiveOn: parseCalendarDate(f.effective_on),
       expiresOn: f.expires_on === null ? null : parseCalendarDate(f.expires_on),
       recordedAt: ms(f.recorded_ms) as Instant,

@@ -491,6 +491,33 @@ describe('labels (roadmap section 2 rule 5; ADR-0003 rule 6)', () => {
   });
 });
 
+describe('evidence types (F5)', () => {
+  it('counts only facts of a type the entry lists; an expiration needs the catalog evidence type', () => {
+    const license = fxEntry('license');
+    const at = '2026-09-29T15:00:00Z';
+    const wrong = fact('expiration', '2025-01-02', {
+      expiresOn: '2030-01-01',
+      evidenceTypeId: 'dea_registration_verification',
+    });
+    const untyped = fact('expiration', '2025-01-02', {
+      expiresOn: '2030-01-01',
+      evidenceTypeId: null,
+    });
+    const r = evaluate(input(license, at, { facts: [wrong, untyped] }));
+    expect(r.status).toBe('missing');
+    expect(codes(r)).toEqual(['evidence_type_not_accepted', 'no_evidence']);
+    const right = evaluate(input(license, at, { facts: [wrong, expiring('2030-01-01')] }));
+    expect(right.status).toBe('met');
+    const meetings = evaluate(
+      input(fxEntry('meetings'), at, {
+        applicability: ORG_WIDE,
+        facts: [fact('completion', '2026-09-10', { evidenceTypeId: 'cp_procedures' })],
+      }),
+    );
+    expect(meetings.status).toBe('missing');
+  });
+});
+
 describe('fail closed on unevaluated thresholds (F4)', () => {
   it('does not assess CM-20-BOARD-SIZE (minMembers/maxMembers), even with evidence on file', () => {
     const dir = new URL('../../requirements-catalog/entries/', import.meta.url);

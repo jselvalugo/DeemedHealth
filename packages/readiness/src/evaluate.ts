@@ -213,8 +213,18 @@ function evaluateRule(
   rule: ResolvedRule,
   asOfDate: CalendarDate,
 ): RuleOutcome {
-  const facts = visibleFacts(input, asOfDate);
+  const visible = visibleFacts(input, asOfDate);
   const reasons: Reason[] = [];
+  // Evidence counts only when it is a type the catalog entry lists (F5). Approval facts
+  // match on their approval type instead; change facts are not evidence.
+  const accepted = new Set(input.entry.evidence);
+  const facts = visible.filter(
+    (f) =>
+      f.kind === 'approval' ||
+      f.kind === 'change' ||
+      (typeof f.evidenceTypeId === 'string' && accepted.has(f.evidenceTypeId)),
+  );
+  if (facts.length < visible.length) reasons.push(reason('evidence_type_not_accepted'));
   const none = (status: ReadinessStatus = 'missing'): RuleOutcome => ({
     status,
     nextDueOn: null,

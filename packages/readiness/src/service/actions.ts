@@ -273,6 +273,8 @@ export interface RecordFactInput {
   kind: FactKind;
   effectiveOn: string;
   expiresOn?: string | null;
+  /** The catalog evidence type (one of the entry's `evidence`); omitted only for `change`. */
+  evidenceTypeId?: string | null;
   /** S6: the evidence file version behind the fact (no FK until evidence tables exist). */
   evidenceVersionId?: string | null;
 }
@@ -309,12 +311,24 @@ export async function recordFact(
     throw new ReadinessError('invalid_fact', ['expiresOn']);
   }
   const instance = await loadInstance(tx, input.instanceId);
+  // Evidence must be a type the catalog entry lists (F5); a change carries none.
+  const evidenceTypeId = input.kind === 'change' ? null : (input.evidenceTypeId ?? null);
+  if (input.kind === 'change' ? input.evidenceTypeId : !evidenceTypeId) {
+    throw new ReadinessError('invalid_fact', ['evidenceTypeId']);
+  }
+  if (evidenceTypeId !== null) {
+    const entry = await catalogEntry(tx, instance.requirementId);
+    if (!entry.evidence.includes(evidenceTypeId)) {
+      throw new ReadinessError('invalid_fact', ['evidenceTypeId']);
+    }
+  }
   const r = await tx.execute<{ id: string }>(sql`
     INSERT INTO public.readiness_fact
       (organization_id, requirement_instance_id, kind, effective_on, expires_on,
-       evidence_version_id, recorded_by_type)
+       evidence_type_id, evidence_version_id, recorded_by_type)
     VALUES (${ctx.organizationId}::uuid, ${instance.id}::uuid, ${input.kind}, ${input.effectiveOn}::date,
-            ${input.expiresOn ?? null}::date, ${input.evidenceVersionId ?? null}::uuid, ${type})
+            ${input.expiresOn ?? null}::date, ${evidenceTypeId}, ${input.evidenceVersionId ?? null}::uuid,
+            ${type})
     RETURNING id::text`);
   const id = r.rows[0]?.id as string;
   await appendAuditEvent(tx, ctx, {
@@ -330,6 +344,7 @@ export async function recordFact(
       effective_on: input.effectiveOn,
       expires_on: input.expiresOn ?? null,
       recorded_by_type: type,
+      evidence_type_id: evidenceTypeId,
       approval_id: null,
       approval_type_id: null,
       approval_capacity: null,

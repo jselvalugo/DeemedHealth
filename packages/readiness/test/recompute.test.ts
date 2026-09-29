@@ -143,6 +143,7 @@ describeDb('readiness service and recompute job', () => {
         {
           instanceId: w.a.instances.licenseE,
           kind: 'expiration',
+          evidenceTypeId: 'license_primary_source_verification',
           effectiveOn: '2029-07-01',
           expiresOn: '2031-06-30',
         },
@@ -153,6 +154,7 @@ describeDb('readiness service and recompute job', () => {
         {
           instanceId: w.a.instances.licenseC,
           kind: 'expiration',
+          evidenceTypeId: 'license_primary_source_verification',
           effectiveOn: '2029-07-01',
           expiresOn: '2031-06-30',
         },
@@ -160,12 +162,22 @@ describeDb('readiness service and recompute job', () => {
       ],
       [
         'meetings',
-        { instanceId: w.a.instances.meetings, kind: 'completion', effectiveOn: '2030-09-10' },
+        {
+          instanceId: w.a.instances.meetings,
+          kind: 'completion',
+          evidenceTypeId: 'board_meeting_minutes',
+          effectiveOn: '2030-09-10',
+        },
         w.human(w.a),
       ],
       [
         'procedures',
-        { instanceId: w.a.instances.procedures, kind: 'document', effectiveOn: '2030-03-01' },
+        {
+          instanceId: w.a.instances.procedures,
+          kind: 'document',
+          evidenceTypeId: 'cp_procedures',
+          effectiveOn: '2030-03-01',
+        },
         w.human(w.a),
       ],
     ];
@@ -178,7 +190,14 @@ describeDb('readiness service and recompute job', () => {
     expect(events[0]).toMatchObject({ actor_type: 'integration', actor_user_id: null });
     // The diff names who recorded it and the (empty) approval and evidence links (S11).
     expect(Object.keys(events[0].diff.fields).sort()).toEqual(
-      ['effective_on', 'expires_on', 'kind', 'recorded_by_type', 'requirement_instance_id'].sort(),
+      [
+        'effective_on',
+        'evidence_type_id',
+        'expires_on',
+        'kind',
+        'recorded_by_type',
+        'requirement_instance_id',
+      ].sort(),
     );
     expect(events[0].diff.fields.recorded_by_type).toEqual({ before: null, after: 'integration' });
   });
@@ -211,6 +230,30 @@ describeDb('readiness service and recompute job', () => {
         ),
       ),
     ).toBe('actor_not_allowed');
+    // Evidence must be a type the catalog entry lists (F5).
+    expect(
+      await code(
+        asHuman(w.a, (tx, ctx) =>
+          recordFact(tx, ctx, {
+            instanceId: w.a.instances.procedures,
+            kind: 'document',
+            evidenceTypeId: 'board_meeting_minutes',
+            effectiveOn: '2030-03-01',
+          }),
+        ),
+      ),
+    ).toBe('invalid_fact');
+    expect(
+      await code(
+        asHuman(w.a, (tx, ctx) =>
+          recordFact(tx, ctx, {
+            instanceId: w.a.instances.procedures,
+            kind: 'document',
+            effectiveOn: '2030-03-01',
+          }),
+        ),
+      ),
+    ).toBe('invalid_fact');
     // The database refuses them too, whatever the input says.
     // A real, human-recorded approval exists; the fact is still refused (no capacity or type
     // on public.approval to copy).
@@ -254,16 +297,16 @@ describeDb('readiness service and recompute job', () => {
     expect(
       await pgError(
         asActor(w.a, assistant(w.a), (tx) =>
-          tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on, recorded_by_type)
-                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'completion', DATE '2030-03-01', 'integration')`),
+          tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on, evidence_type_id, recorded_by_type)
+                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'completion', DATE '2030-03-01', 'cp_procedures', 'integration')`),
         ),
       ),
     ).toMatchObject({ code: '42501' });
     expect(
       await pgError(
         asActor(w.a, integration, (tx) =>
-          tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on, recorded_by_type)
-                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'completion', DATE '2030-03-01', 'user')`),
+          tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on, evidence_type_id, recorded_by_type)
+                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'completion', DATE '2030-03-01', 'cp_procedures', 'user')`),
         ),
       ),
     ).toMatchObject({ code: '42501' });
@@ -389,8 +432,8 @@ describeDb('readiness service and recompute job', () => {
     expect(
       await pgError(
         asActor(w.a, SYSTEM, (tx) =>
-          tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on, recorded_by_type)
-                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'document', DATE '2030-09-01', 'user')`),
+          tx.execute(sql`INSERT INTO public.readiness_fact (organization_id, requirement_instance_id, kind, effective_on, evidence_type_id, recorded_by_type)
+                         VALUES (${w.a.id}::uuid, ${w.a.instances.procedures}::uuid, 'document', DATE '2030-09-01', 'cp_procedures', 'user')`),
         ),
       ),
     ).toMatchObject({ code: '42501' });
@@ -633,6 +676,7 @@ describeDb('readiness service and recompute job', () => {
         recordFact(tx, ctx, {
           instanceId: w.a.instances.procedures,
           kind: 'completion',
+          evidenceTypeId: 'cp_procedures',
           effectiveOn: '2030-01-01',
         }),
       ),
@@ -655,6 +699,7 @@ describeDb('readiness service and recompute job', () => {
       recordFact(tx, ctx, {
         instanceId: w.b.instances.procedures,
         kind: 'document',
+        evidenceTypeId: 'cp_procedures',
         effectiveOn: '2030-02-01',
       }),
     );

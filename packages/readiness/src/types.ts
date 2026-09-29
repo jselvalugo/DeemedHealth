@@ -54,6 +54,12 @@ export type FactKind = 'document' | 'completion' | 'expiration' | 'approval' | '
 export interface ReadinessFact {
   id: string;
   kind: FactKind;
+  /**
+   * The catalog evidence type this fact is (entry.evidence, e.g.
+   * license_primary_source_verification). Only facts of a type the entry lists count
+   * (F5). Null only for `change` and `approval` facts (approvals match on approvalTypeId).
+   */
+  evidenceTypeId?: string | null;
   /** Date of the document, completion, approval, or change (site calendar date). */
   effectiveOn: CalendarDate;
   /** `expiration` facts: valid through this date (end of day in the site's zone). */
@@ -123,6 +129,7 @@ export type ReasonCode =
   | 'rule_unresolved'
   | 'threshold_not_evaluated'
   | 'no_evidence'
+  | 'evidence_type_not_accepted'
   | 'approval_capacity_insufficient'
   | 'approval_rejected'
   | 'approval_type_missing'

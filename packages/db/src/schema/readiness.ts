@@ -95,6 +95,7 @@ export const readinessFact = pgTable('readiness_fact', {
   approvalCapacity: text('approval_capacity', { enum: APPROVAL_CAPACITIES }),
   approvalDecision: text('approval_decision', { enum: ['approved', 'rejected'] }),
   approvalTypeId: text('approval_type_id'),
+  evidenceTypeId: text('evidence_type_id'),
   evidenceVersionId: uuid('evidence_version_id'),
   recordedByType: text('recorded_by_type', {
     enum: ['user', 'break_glass', 'integration'],

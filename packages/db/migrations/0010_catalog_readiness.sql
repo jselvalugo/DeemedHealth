@@ -610,6 +610,8 @@ CREATE TABLE public.readiness_fact (
   approval_decision        text        CHECK (approval_decision IN ('approved', 'rejected')),
   -- A recorded approval type is concrete: no '*' (wildcards belong to catalog patterns).
   approval_type_id         text        CHECK (approval_type_id ~ '^[a-z][a-z0-9_]*([.][a-z0-9_]+)+$'),
+  -- The catalog evidence type (entry.evidence) this fact is; only listed types count (F5).
+  evidence_type_id         text        CHECK (evidence_type_id ~ '^[a-z][a-z0-9_]{0,63}$'),
   evidence_version_id      uuid,
   recorded_by_type         text        NOT NULL CHECK (recorded_by_type IN ('user', 'break_glass', 'integration')),
   recorded_at              timestamptz NOT NULL DEFAULT now(),
@@ -628,6 +630,8 @@ CREATE TABLE public.readiness_fact (
   CONSTRAINT readiness_fact_retracted_by_fk FOREIGN KEY (organization_id, retracted_by)
     REFERENCES public.user_account (organization_id, id),
   CONSTRAINT readiness_fact_expiration_has_date CHECK ((kind = 'expiration') = (expires_on IS NOT NULL)),
+  CONSTRAINT readiness_fact_evidence_type CHECK (
+    (kind IN ('document', 'completion', 'expiration')) = (evidence_type_id IS NOT NULL)),
   -- An approval fact names its approval record and type (F2, F3); other facts carry none.
   CONSTRAINT readiness_fact_approval_fields CHECK (
     CASE WHEN kind = 'approval'

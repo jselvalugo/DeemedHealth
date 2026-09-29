@@ -26,6 +26,8 @@ export const REASON_TEMPLATES: Readonly<Record<ReasonCode, string>> = {
   threshold_not_evaluated:
     'Not assessed: this requirement has a threshold the readiness engine does not evaluate yet.',
   no_evidence: 'No qualifying evidence is on file.',
+  evidence_type_not_accepted:
+    'Evidence on file is not a type this requirement accepts, so it does not count.',
   approval_capacity_insufficient:
     'An approval on file was not recorded in the required capacity ({required}).',
   approval_rejected: 'The latest approval decision on file was a rejection.',

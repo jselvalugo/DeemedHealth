@@ -41,6 +41,8 @@ export const readinessEn = {
   'readiness.reason.threshold_not_evaluated':
     'Not assessed: this requirement has a threshold the readiness engine does not evaluate yet.',
   'readiness.reason.no_evidence': 'No qualifying evidence is on file.',
+  'readiness.reason.evidence_type_not_accepted':
+    'Evidence on file is not a type this requirement accepts, so it does not count.',
   'readiness.reason.approval_capacity_insufficient':
     'An approval on file was not recorded in the required capacity ({required}).',
   'readiness.reason.approval_rejected': 'The latest approval decision on file was a rejection.',

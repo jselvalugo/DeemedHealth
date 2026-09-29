@@ -643,6 +643,7 @@ export const DATA_DICTIONARY: Record<string, TableEntry> = {
       approval_capacity: c('internal', 'board, committee_ratified, designated, staff'),
       approval_decision: c('internal', 'approved or rejected'),
       approval_type_id: c('internal', 'Approval type (approval-authority.md section 4)'),
+      evidence_type_id: c('internal', 'Catalog evidence type (entry.evidence) of the fact'),
       evidence_version_id: c('internal', 'Evidence file version (FK arrives with S6)'),
       recorded_by_type: c(
         'internal',
