@@ -29,6 +29,8 @@ export const readinessEs: Record<keyof typeof readinessEn, string> = {
     'Requisito de Florida. Estado de preparación interno; no es una determinación de HRSA ni del Estado de Florida.',
   'readiness.label.best_practice':
     'Buena práctica, no es un requisito de HRSA. Estado de preparación interno; no es una determinación de HRSA.',
+  'readiness.label.payer':
+    'Regla de pagador de Medicare o Medicaid, no es un requisito de HRSA. Estado de preparación interno; no es una determinación de HRSA, de CMS ni de la agencia estatal de Medicaid.',
 
   'readiness.reason.no_catalog_release':
     'Sin evaluar: todavía no hay una versión del catálogo publicada en este entorno.',

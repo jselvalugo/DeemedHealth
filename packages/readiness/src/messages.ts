@@ -66,6 +66,8 @@ export const INTERNAL_LABEL: Readonly<Record<Authority, string>> = {
     'Florida requirement. Internal readiness status, not a determination by HRSA or the State of Florida.',
   best_practice:
     'Best practice, not an HRSA requirement. Internal readiness status, not an HRSA determination.',
+  payer:
+    'Medicare or Medicaid payer rule, not an HRSA requirement. Internal readiness status, not a determination by HRSA, CMS, or the state Medicaid agency.',
 };
 
 /**

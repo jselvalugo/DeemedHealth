@@ -43,7 +43,7 @@ export interface ReadinessSnapshotBody {
   engineVersion: string;
   asOfDate: CalendarDate;
   label: 'internal_readiness_not_hrsa_determination';
-  /** HRSA requirements only (F8). Florida and best-practice items are in byAuthority. */
+  /** HRSA requirements only (F8). Florida, best-practice, and payer-rule items are in byAuthority. */
   total: ScoreLine;
   byChapter: Readonly<Record<string, ScoreLine>>;
   bySite: Readonly<Record<string, ScoreLine>>;
@@ -110,6 +110,8 @@ const SCORE_LABEL: Readonly<Record<Authority, string>> = {
   florida:
     'Florida requirements; internal readiness, not a determination by HRSA or the State of Florida',
   best_practice: 'best practices, not HRSA requirements; internal readiness',
+  payer:
+    'Medicare and Medicaid payer rules, not HRSA requirements; internal readiness, not a determination by HRSA, CMS, or the state Medicaid agency',
 };
 
 /**

@@ -56,6 +56,8 @@ import {
 } from './types.js';
 
 export function authorityOf(entry: CatalogEntry): Authority {
+  // Medicare and Medicaid payer rules are never labeled or counted as HRSA requirements.
+  if (entry.layer === 'payer_rule') return 'payer';
   if (entry.layer === 'state_requirement' || entry.appliesTo.jurisdiction === 'florida') {
     return 'florida';
   }

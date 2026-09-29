@@ -29,6 +29,8 @@ export const readinessEn = {
     'Florida requirement. Internal readiness status, not a determination by HRSA or the State of Florida.',
   'readiness.label.best_practice':
     'Best practice, not an HRSA requirement. Internal readiness status, not an HRSA determination.',
+  'readiness.label.payer':
+    'Medicare or Medicaid payer rule, not an HRSA requirement. Internal readiness status, not a determination by HRSA, CMS, or the state Medicaid agency.',
 
   'readiness.reason.no_catalog_release':
     'Not assessed: no catalog release is published in this environment yet.',

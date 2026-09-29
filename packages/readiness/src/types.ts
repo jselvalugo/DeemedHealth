@@ -165,7 +165,7 @@ export interface Reason {
 }
 
 /** "HRSA requirement" vs "Florida requirement" vs "Best practice" (ADR-0003 rule 6). */
-export type Authority = 'hrsa' | 'florida' | 'best_practice';
+export type Authority = 'hrsa' | 'florida' | 'best_practice' | 'payer';
 
 export interface Citation {
   requirementId: string;

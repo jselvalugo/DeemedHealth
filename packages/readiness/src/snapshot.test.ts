@@ -226,6 +226,26 @@ describe('readiness snapshots', () => {
     expect(JSON.stringify(before)).toBe(frozen);
   });
 
+  it('labels payer rules as payer rules and keeps them out of the HRSA total', () => {
+    const entry = fxEntry('floridaLicense', {
+      id: 'CMS-TEST-PAYER-RULE',
+      layer: 'payer_rule',
+      appliesTo: { ...fxEntry('floridaLicense').appliesTo, jurisdiction: 'federal' },
+    });
+    expect(authorityOf(entry)).toBe('payer');
+    const r = evaluate(input(entry, at, { facts: [expiring('2030-01-01')] }));
+    expect(r.citation.authority).toBe('payer');
+    expect(r.summary).toContain('not a determination by HRSA, CMS, or the state Medicaid agency');
+    const snap = buildSnapshot({
+      catalogVersion: '2026.1.0',
+      channel: 'non_production',
+      asOfDate: parseCalendarDate('2026-09-29'),
+      items: items([{ id: 'i-10', siteId: 's-1', r }]),
+    });
+    expect(snap.total).toMatchObject({ met: 0, denominator: 0 });
+    expect(snap.byAuthority.payer).toMatchObject({ denominator: 1 });
+  });
+
   it('groups Florida requirements apart from HRSA ones', () => {
     const r = evaluate(input(fxEntry('floridaLicense'), at, { facts: [expiring('2030-01-01')] }));
     expect(authorityOf(fxEntry('floridaLicense'))).toBe('florida');
